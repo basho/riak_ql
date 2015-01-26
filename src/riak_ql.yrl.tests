@@ -1,0 +1,234 @@
+%% -*- erlang -*-
+-include_lib("eunit/include/eunit.hrl").
+
+t(String, Expected) ->
+    Tokens = riak_tsql_lexer:get_tokens(String),
+    % Msg = io_lib:format("Tokens is ~p~n", [Tokens]),
+    % bits:log_terms(lists:flatten(Msg)),
+    Got = parse(Tokens), 
+    Msg1 = io_lib:format("Tokens is ~p~n", 
+			 [Tokens]),
+    Msg2 = io_lib:format("Got is ~p~n", 
+			 [Got]),
+    Msg3 = io_lib:format("Expected is ~p~n", 
+			 [Expected]),
+    bits:log_terms(lists:flatten(Msg1)),
+    bits:log_terms(lists:flatten(Msg2)),
+    bits:log_terms(lists:flatten(Msg3)),
+    ?_assertEqual({ok, Expected}, Got).    
+   
+
+%% Tests
+select_test_() -> 
+    t("select * from argle",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "argle"}}).
+
+select_quoted_test_() -> 
+    t("select * from \"argle\"",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "argle"}}).
+
+select_nested_quotes_test_() -> 
+    t("select * from \"some \"quotes\" in me\"",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "some \"quotes\" in me"}}).
+
+select_regex_test_() -> 
+    t("select * from /.*/",
+      #outputs{type    = select,
+	       fields = "*",
+	       buckets = {regex, "/.*/"}}).
+
+select_with_limit_test_() -> 
+    t("select * from /.*/ limit 1",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {regex, "/.*/"},
+	       limit   = 1}).
+
+select_from_lists_test_() ->
+    t("select * from events, errors",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {list, ["events", "errors"]}
+	      }).
+
+select_where_1_test_() -> 
+    t("select value from response_times " ++
+	  "where time > '2013-08-12 23:32:01' and time < '2013-08-13 12:34:56'",
+      #outputs{type    = select,
+	       fields  = "value",
+	       buckets = {string, "response_times"},
+	       where   = {and_, 
+			  {
+			    {'>', 
+			     {"time", {datetime, {{2013, 8, 12}, {23, 32, 1}}}}
+			    },
+			    {'<', 
+			     {"time", {datetime, {{2013, 8, 13}, {12, 34, 56}}}}
+			    }
+			  }
+			 }
+	      }).
+
+select_where_2_test_() -> 
+    t("select value from response_times where time > now() - 1h limit 1000",
+      #outputs{type    = select,
+	       fields  = "value",
+	       buckets = {string, "response_times"},
+	       where   = {'>', {"time", {'-', {{"now", []}, {int, 3600}}}}},
+	       limit = 1000
+	      }).
+
+select_where_3_test_() -> 
+    t("select value from response_times where time > 1388534400",
+      #outputs{type    = select,
+	       fields  = "value",
+	       buckets = {string, "response_times"},
+	       where   = {'>', {"time", {int, 1388534400}}}
+	      }).
+
+select_where_4_test_() -> 
+    t("select value from response_times where time > 1388534400s",
+      #outputs{type    = select,
+	       fields  = "value",
+	       buckets = {string, "response_times"},
+	       where   = {'>', {"time", {int, 1388534400}}}
+	      }).
+      
+select_where_5_test_() -> 
+    t("select * from events where time = 1400497861762723 "++
+	  "and sequence_number = 2321",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "events"},
+	       where   = {and_, {
+			    {'=', {"time",            {int, 1400497861762723}}},
+			    {'=', {"sequence_number", {int, 2321}}}
+			   }
+			 }
+	      }).
+
+select_where_6_test_() -> 
+    t("select * from /^stats\./i where time > now() - 1h",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {regex, "/^stats\./i"},
+	       where   = {'>', {"time",
+				{'-', {{"now", []}, {int, 3600}}}
+			       }
+			 }
+	      }).
+
+select_where_7_test_() -> 
+    t("select * from /.*/ limit 1",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {regex, "/.*/"},
+	       limit   = 1
+	      }).
+
+select_where_8_test_() -> 
+    t("select * from events where state = 'NY'",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "events"},
+	       where   = {'=', {"state", {word, "NY"}}}
+	      }).
+
+select_where_9_test_() -> 
+    t("select * from log_lines where line =~ /error/i",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "log_lines"},
+	       where   = {'=~', {"line", {regex, "/error/i"}}}
+	      }).
+
+select_where_10_test_() -> 
+    t("select * from events where customer_id = 23 and type = 'click'",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "events"},
+	       where   = {and_, {
+			    {'=', {"customer_id", {int,  23}}},
+			    {'=', {"type",        {word, "click"}}}
+			   }
+			 }
+	      }).
+
+select_where_11_test_() -> 
+    t("select * from response_times where value > 500",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "response_times"},
+	       where   = {'>', {"value", {int, 500}}}
+	      }).
+
+select_where_12_test_() -> 
+    t("select * from events where email !~ /.*gmail.*/", 
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "events"},
+	       where   = {'!~', {"email", {regex, "/.*gmail.*/"}}}
+	      }).
+
+select_where_13_test_() -> 
+    t("select * from nagios_checks where status <> 0",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "nagios_checks"},
+	       where   = {'<>', {"status", {int, 0}}}
+	      }).
+
+select_where_14_test() -> 
+    t("select * from events where signed_in = false", 
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "events"},
+	       where   = {'=', {"signed_in", {word, "false"}}}
+	      }).
+
+select_where_15_test() -> 
+    t("select * from events where (email =~ /.*gmail.*/ or " ++
+	  "email =~ /.*yahoo.*/) and state = 'ny'",
+      #outputs{type    = select,
+	       fields  = "*",
+	       buckets = {string, "events"},
+	       where   = {and_,
+			  {conditional, {or_, 
+					 {'=~', {"email", {regex, "/.*gmail.*/"}}},
+					 {'=~', {"email", {regex, "/.*yahoo.*/"}}}
+				 }
+			  },
+			  {"=", {"state", {word, "ny"}}
+			  }
+			 }
+	      }).
+
+% select count(type) from events group by time(10m);
+
+% select count(type) from events group by time(10m), type;
+
+% select percentile(value, 95) from response_times group by time(30s);
+
+% select count(type) as number_of_types group by time(10m)
+
+% select count(type) from events group by time(1h) where time > now() - 3h
+
+% select count(type) from events group by time(1h) fill(0) where time > now() - 3h
+
+% select count(type) from events group by time(1h) fill(-1) where time > now() - 3h
+
+% select count(type) from events group by time(1h) fill(null) where time > now() - 3h
+
+% select count(type) from events group by time(1h), type fill(0) where time > now() - 3h
+
+% select count(type) from user_events merge admin_events group by time(10m)
+
+% select hosta.value + hostb.value from cpu_load as hosta inner join cpu_load as hostb where hosta.host = 'hosta.influxdb.orb' and hostb.host = 'hostb.influxdb.org'
+
+% select hosta.value + hostb.value from cpu_load as hosta inner join cpu_load as hostb where hosta.host = 'hosta.influxdb.orb' and hostb.host = 'hostb.influxdb.org'

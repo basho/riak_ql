@@ -1,0 +1,11 @@
+{application, riak_ql,
+ [
+  {description, "a lexer/parser for a riak query language"},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
