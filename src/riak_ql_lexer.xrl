@@ -21,7 +21,7 @@ AS      = (A|a)(S|s)
 
 DATETIME = ('[0-9a-zA-Z\s:\-\.]*')
 
-REGEX = (/[^/][a-zA-Z0-9\*\.]+/)
+REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
 QUOTED = ("(.*(\")*)")
 
