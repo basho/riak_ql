@@ -157,9 +157,9 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
 		  where   = E
 		 }.
 
-log(A, Str) ->
-    Msg = io_lib:format(Str ++ " ~p~n", [A]),
-    bits:log_terms(lists:flatten(Msg)),
+log(A, _Str) ->
+    %% Msg = io_lib:format(Str ++ " ~p~n", [A]),
+    %% bits:log_terms(lists:flatten(Msg)),
     A.
 
 add_limit(A, _B, {int, C}) ->
@@ -193,9 +193,9 @@ make_where({where, A}, {conditional, B}) ->
 make_funcall({A, B}) ->
      make_funcall({A, B}, []).
 
-make_funcall({A, B}, C) ->
-    Msg = io_lib:format("in make_funcall with ~p and ~p~n", [A, B]),
-    bits:log_terms(lists:flatten(Msg)),
+make_funcall({_A, B}, C) ->
+    %% Msg = io_lib:format("in make_funcall with ~p and ~p~n", [A, B]),
+    %% bits:log_terms(lists:flatten(Msg)),
     {funcall, {B, C}}.
 
 add_unit({Type, A}, {chars, U}) when U =:= "s" -> {Type, A};
