@@ -99,10 +99,10 @@ Rules.
 .  : {token, {chars, TokenChars}}.
 
 Erlang code.
-		
+
 -export([
-	 get_tokens/1
-	]).
+         get_tokens/1
+        ]).
 
 -include("riak_ql.xrl.tests").
 
@@ -114,51 +114,51 @@ post_process(X) ->
     post_p(X, []).
 
 % filter out the whitespaces at the end
-post_p([], Acc) -> 
+post_p([], Acc) ->
     [{Type, X} || {Type, X} <- lists:reverse(Acc), Type =/= whitespace];
 % when you've merged two items hoy them back on the list
 % so they can continue to sook up chars
 post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars   orelse
-						 Word1 =:= select  orelse
-						 Word1 =:= from    orelse
-						 Word1 =:= limit   orelse
-						 Word1 =:= and_    orelse
-						 Word1 =:= or_     orelse
-						 Word1 =:= delete  orelse
-						 Word1 =:= drop    orelse
-						 Word1 =:= groupby orelse
-						 Word1 =:= merge   orelse
-						 Word1 =:= inner   orelse
-						 Word1 =:= join    orelse
-						 Word1 =:= as,
-						 Word2 =:= chars   orelse
-						 Word2 =:= select  orelse
-						 Word2 =:= from    orelse
-						 Word2 =:= limit   orelse
-						 Word2 =:= and_    orelse
-						 Word2 =:= or_     orelse
-						 Word2 =:= delete  orelse
-						 Word2 =:= drop    orelse
-						 Word2 =:= groupby orelse
-						 Word2 =:= merge   orelse
-						 Word2 =:= inner   orelse
-						 Word2 =:= join    orelse
-						 Word2 =:= as      ->
+                                                 Word1 =:= select  orelse
+                                                 Word1 =:= from    orelse
+                                                 Word1 =:= limit   orelse
+                                                 Word1 =:= and_    orelse
+                                                 Word1 =:= or_     orelse
+                                                 Word1 =:= delete  orelse
+                                                 Word1 =:= drop    orelse
+                                                 Word1 =:= groupby orelse
+                                                 Word1 =:= merge   orelse
+                                                 Word1 =:= inner   orelse
+                                                 Word1 =:= join    orelse
+                                                 Word1 =:= as,
+                                                 Word2 =:= chars   orelse
+                                                 Word2 =:= select  orelse
+                                                 Word2 =:= from    orelse
+                                                 Word2 =:= limit   orelse
+                                                 Word2 =:= and_    orelse
+                                                 Word2 =:= or_     orelse
+                                                 Word2 =:= delete  orelse
+                                                 Word2 =:= drop    orelse
+                                                 Word2 =:= groupby orelse
+                                                 Word2 =:= merge   orelse
+                                                 Word2 =:= inner   orelse
+                                                 Word2 =:= join    orelse
+                                                 Word2 =:= as      ->
     post_p([{chars, W1 ++ W2} | T], Acc);
 post_p([H | T], Acc) ->
     post_p(T, [H | Acc]).
 
 lex(String) -> {ok, Toks, 1} = string(String),
-	       Toks.
+               Toks.
 
 fix_up_date(Date) ->
     Date2 = string:strip(Date, both, $'), %'
     Date3 = string:strip(Date2),
     case dh_date:parse(Date3) of
-	{error, bad_date} -> {chars, Date2};
-	Date4             -> {datetime, Date4}
+        {error, bad_date} -> {chars, Date2};
+        Date4             -> {datetime, Date4}
     end.
-			     
+
 
 strip_quoted(Date) ->
     Date2 = string:strip(Date, both, $"), %"

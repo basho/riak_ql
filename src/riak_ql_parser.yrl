@@ -81,7 +81,7 @@ Buckets -> Bucket               : '$1'.
 Bucket -> Word   : '$1'.
 Bucket -> regex  : log('$1', "buckets -> regex").
 Bucket -> quoted : log('$1', "buckets -> quoted").
-	       
+
 Word -> Word chars : concatenate('$1', '$2').
 Word -> chars      : process('$1').
 
@@ -125,14 +125,14 @@ Erlang code.
 -compile(export_all).
 
 -record(outputs,
-	{
-	  type    = [] :: select | drop | delete,
-	  fields  = [], 
-	  buckets = [],
-	  limit   = none,
-	  where   = none,
-	  ops     = []
-	 }).
+        {
+          type    = [] :: select | drop | delete,
+          fields  = [],
+          buckets = [],
+          limit   = none,
+          where   = none,
+          ops     = []
+         }).
 
 -include("riak_ql.yrl.tests").
 
@@ -143,19 +143,19 @@ concatenate({word, A}, {chars, B}) ->
     {word, A ++ B}.
 
 make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, none}).
-    
+
 make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
     Type2 = case Type of
-		list   -> list;
-		word   -> string;
-		quoted -> string;
-		regex  -> regex
-	    end,
+                list   -> list;
+                word   -> string;
+                quoted -> string;
+                regex  -> regex
+            end,
     _O = #outputs{type    = list_to_existing_atom(A),
-		  fields  = B,
-		  buckets = {Type2, D},
-		  where   = E
-		 }.
+                  fields  = B,
+                  buckets = {Type2, D},
+                  where   = E
+                 }.
 
 log(A, _Str) ->
     %% Msg = io_lib:format(Str ++ " ~p~n", [A]),
@@ -167,24 +167,24 @@ add_limit(A, _B, {int, C}) ->
 
 make_expr({_, A}, {B, _}, {Type, C}) ->
     B1 = case B of
-	     and_      -> and_;
-	     or_       -> or_;
-	     plus      -> '+';
-	     minus     -> '-';
-	     maybetime -> '*';
-	     div_      -> '/';
-	     gt        -> '>';
-	     lt        -> '<';
-	     eq        -> '=';
-	     ne        -> '<>';
-	     approx    -> '=~';
-	     notapprox -> '!~';
-	     nomatch   -> '!='
-	 end,
+             and_      -> and_;
+             or_       -> or_;
+             plus      -> '+';
+             minus     -> '-';
+             maybetime -> '*';
+             div_      -> '/';
+             gt        -> '>';
+             lt        -> '<';
+             eq        -> '=';
+             ne        -> '<>';
+             approx    -> '=~';
+             notapprox -> '!~';
+             nomatch   -> '!='
+         end,
     C2 = case Type of
-	     conditional -> C;
-	     _           -> {Type, C}
-	 end,
+             conditional -> C;
+             _           -> {Type, C}
+         end,
     {conditional, {B1, {A, C2}}}.
 
 make_where({where, A}, {conditional, B}) ->
