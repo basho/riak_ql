@@ -9,3 +9,5 @@ rel/example_project
 .concrete/DEV_MODE
 .rebar
 *~
+src/riak_ql_lexer.erl
+src/riak_ql_parser.erl
