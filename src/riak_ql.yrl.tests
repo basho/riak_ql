@@ -208,7 +208,7 @@ select_where_15_test() ->
 create_simple_test_() ->
     ?_t("create table temperatures " ++
             "(time timestamp not null, " ++
-            "temperature_k float not null, " ++
+            "temperature_k float, " ++
             "partition key (time))",
         #ddl_v1{
            bucket = <<"temperatures">>,
@@ -222,7 +222,7 @@ create_simple_test_() ->
                         name = "temperature_k",
                         position = 1,
                         type = float,
-                        optional = false}],
+                        optional = true}],
            partition_key = #partition_key_v1{
                               ast = [#param_v1{
                                         name = "time"
