@@ -22,5 +22,6 @@ rows
 select
 system versioning
 temporary
+timestamp
 where
 with
