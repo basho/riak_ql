@@ -1,6 +1,6 @@
 and
 as
-create
+create table
 delete
 drop
 float
@@ -21,7 +21,6 @@ preserve
 rows
 select
 system versioning
-table
 temporary
 where
 with

@@ -5,19 +5,32 @@
 
 Definitions.
 
-SELECT  = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
-FROM    = (F|f)(R|r)(O|o)(M|m)
-LIMIT   = (L|l)(I|i)(M|m)(I|i)(T|t)
-WHERE   = (W|w)(H|h)(E|e)(R|r)(E|e)
-AND     = (A|a)(N|n)(D|d)
-OR      = (O|o)(R|r)
-DELETE  = (D|d)(E|e)(L|l)(E|e)(T|t)(E|e)
-DROP    = (D|d)(R|r)(O|o)(P|p)
+AND = (A|a)(N|n)(D|d)
+AS = (A|a)(S|s)
+CREATE_TABLE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)\s(T|t)(A|a)(B|b)(L|l)(E|e)
+DELETE = (D|d)(E|e)(L|l)(E|e)(T|t)(E|e)
+DROP = (D|d)(R|r)(O|o)(P|p)
+FLOAT = (F|f)(L|l)(O|o)(A|a)(T|t)
+FROM = (F|f)(R|r)(O|o)(M|m)
+GLOBAL = (G|g)(L|l)(O|o)(B|b)(A|a)(L|l)
 GROUPBY = (G|g)(R|r)(O|o)(U|u)(P|p)(B|b)(Y|y)
-MERGE   = (M|m)(E|e)(R|r)(G|g)(E|e)
-INNER   = (I|i)(N|n)(N|n)(E|e)(R|r)
-JOIN    = (J|j)(O|o)(I|i)(N|n)
-AS      = (A|a)(S|s)
+INNER = (I|i)(N|n)(N|n)(E|e)(R|r)
+JOIN = (J|j)(O|o)(I|i)(N|n)
+LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
+LOCAL = (L|l)(O|o)(C|c)(A|a)(L|l)
+MERGE = (M|m)(E|e)(R|r)(G|g)(E|e)
+NOT_NULL = (N|n)(O|o)(T|t)\s(N|n)(U|u)(L|l)(L|l)
+OF = (O|o)(F|f)
+ON_COMMIT = (O|o)(N|n)\s(C|c)(O|o)(M|m)(M|m)(I|i)(T|t)
+OR = (O|o)(R|r)
+PARTITION_KEY = (P|p)(A|a)(R|r)(T|t)(I|i)(T|t)(I|i)(O|o)(N|n)\s(K|k)(E|e)(Y|y)
+PRESERVE = (P|p)(R|r)(E|e)(S|s)(E|e)(R|r)(V|v)(E|e)
+ROWS = (R|r)(O|o)(W|w)(S|s)
+SELECT = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
+SYSTEM_VERSIONING = (S|s)(Y|y)(S|s)(T|t)(E|e)(M|m)\s(V|v)(E|e)(R|r)(S|s)(I|i)(O|o)(N|n)(I|i)(N|n)(G|g)
+TEMPORARY = (T|t)(E|e)(M|m)(P|p)(O|o)(R|r)(A|a)(R|r)(Y|y)
+WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
+WITH = (W|w)(I|i)(T|t)(H|h)
 
 DATETIME = ('[0-9a-zA-Z\s:\-\.]*')
 
@@ -50,19 +63,32 @@ COMMA = (,)
 
 Rules.
 
-{SELECT}  : {token, {select,  TokenChars}}.
-{FROM}    : {token, {from,    TokenChars}}.
-{LIMIT}   : {token, {limit,   TokenChars}}.
-{WHERE}   : {token, {where,   TokenChars}}.
-{AND}     : {token, {and_,    TokenChars}}.
-{OR}      : {token, {or_,     TokenChars}}.
-{DELETE}  : {token, {delete,  TokenChars}}.
-{DROP}    : {token, {drop,    TokenChars}}.
+{AND} : {token, {and_, TokenChars}}.
+{AS} : {token, {as, TokenChars}}.
+{CREATE_TABLE} : {token, {create_table, TokenChars}}.
+{DELETE} : {token, {delete, TokenChars}}.
+{DROP} : {token, {drop, TokenChars}}.
+{FLOAT} : {token, {float, TokenChars}}.
+{FROM} : {token, {from, TokenChars}}.
+{GLOBAL} : {token, {global, TokenChars}}.
 {GROUPBY} : {token, {groupby, TokenChars}}.
-{MERGE}   : {token, {merge,   TokenChars}}.
-{INNER}   : {token, {inner,   TokenChars}}.
-{JOIN}    : {token, {join,    TokenChars}}.
-{AS}      : {token, {as,      TokenChars}}.
+{INNER} : {token, {inner, TokenChars}}.
+{JOIN} : {token, {join, TokenChars}}.
+{LIMIT} : {token, {limit, TokenChars}}.
+{LOCAL} : {token, {local, TokenChars}}.
+{MERGE} : {token, {merge, TokenChars}}.
+{NOT_NULL} : {token, {not_null, TokenChars}}.
+{OF} : {token, {of_, TokenChars}}.
+{ON_COMMIT} : {token, {on_commit, TokenChars}}.
+{OR} : {token, {or_, TokenChars}}.
+{PARTITION_KEY} : {token, {partition_key, TokenChars}}.
+{PRESERVE} : {token, {preserve, TokenChars}}.
+{ROWS} : {token, {rows, TokenChars}}.
+{SELECT} : {token, {select, TokenChars}}.
+{SYSTEM_VERSIONING} : {token, {system_versioning, TokenChars}}.
+{TEMPORARY} : {token, {temporary, TokenChars}}.
+{WHERE} : {token, {where, TokenChars}}.
+{WITH} : {token, {with, TokenChars}}.
 
 {INT}      : {token, {int,   list_to_integer(TokenChars)}}.
 {FLOATDEC} : {token, {float, list_to_float(TokenChars)}}.
