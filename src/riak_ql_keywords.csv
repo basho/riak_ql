@@ -3,6 +3,7 @@ as
 create
 delete
 drop
+float
 from
 global
 groupby
@@ -11,9 +12,11 @@ join
 limit
 local
 merge
+not null
 of
 on commit
 or
+partition key
 preserve
 rows
 select
