@@ -229,6 +229,41 @@ create_simple_test_() ->
                                        }]}
           }).
 
+create_local_key_test_() ->
+    ?_t("create table temperatures " ++
+            "(time timestamp not null, " ++
+            "temperature_k float, " ++
+            "user_id varchar not null, " ++
+            "partition key (time), " ++
+            "local key (user_id))",
+        #ddl_v1{
+           bucket = <<"temperatures">>,
+           fields = [
+                     #riak_field_v1{
+                        name = "time",
+                        position = 0,
+                        type = timestamp,
+                        optional = false},
+                     #riak_field_v1{
+                        name = "temperature_k",
+                        position = 1,
+                        type = float,
+                        optional = true},
+                     #riak_field_v1{
+                        name = "user_id",
+                        position = 2,
+                        type = varchar,
+                        optional = false}],
+           partition_key = #partition_key_v1{
+                              ast = [#param_v1{
+                                        name = "time"
+                                       }]},
+           local_key = #local_key_v1{
+                          ast = [#param_v1{
+                                    name = "user_id"
+                                    }]}
+          }).
+
 % select count(type) from events group by time(10m);
 
 % select count(type) from events group by time(10m), type;
