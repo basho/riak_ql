@@ -272,10 +272,39 @@ make_key_definition({partition_key, _}, {word, FieldName}) ->
                  name = FieldName
                 }]}.
 
-make_table_definition({word, BucketName}, Contents) ->
-    {table_definition, BucketName, Contents}.
-
-make_table_element_list({table_element_list, A}, B) ->
-    {table_element_list, A ++ [B]};
+make_table_element_list(A, {table_element_list, B}) ->
+    {table_element_list, [A] ++ B};
 make_table_element_list(A, B) ->
     {table_element_list, [A, B]}.
+
+
+make_table_definition({word, BucketName}, Contents) ->
+    io:format("bucketname~n~p~ncontents~n~p~n", [BucketName, Contents]),
+    PartitionKey = find_partition_key(Contents),
+    io:format("partitionkey~n~p~n", [PartitionKey]),
+    Fields = find_fields(Contents),
+    io:format("fields~n~p~n", [Fields]),
+    #ddl_v1{
+       bucket = list_to_binary(BucketName),
+       partition_key = PartitionKey,
+       fields = Fields}.
+
+find_partition_key({table_element_list, Elements}) ->
+    find_partition_key(Elements);
+find_partition_key([]) ->
+    none;
+find_partition_key([PartitionKey = #partition_key_v1{} | _Rest]) ->
+    PartitionKey;
+find_partition_key([_Head | Rest]) ->
+    find_partition_key(Rest).
+
+find_fields({table_element_list, Elements}) ->
+    find_fields(0, Elements, []).
+
+find_fields(_Count, [], Found) ->
+    lists:reverse(Found);
+find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
+    PositionedField = Field#riak_field_v1{position = Count},
+    find_fields(Count + 1, Rest, [PositionedField | Elements]);
+find_fields(Count, [_Head | Rest], Elements) ->
+    find_fields(Count, Rest, Elements).
