@@ -5,6 +5,7 @@
 
 Nonterminals
 
+Statement
 Query
 Select
 Bucket
@@ -20,6 +21,15 @@ Logic
 Val
 Vals
 Funcall
+TableDefinition
+TableContentsSource
+TableElementList
+TableElements
+TableElement
+ColumnDefinition
+ColumnConstraint
+KeyDefinition
+DataType
 .
 
 Terminals
@@ -57,10 +67,17 @@ maybetimes
 div_
 comma
 chars
+create_table
+not_null
+partition_key
+timestamp
 .
 
-Rootsymbol Query.
+Rootsymbol Statement.
 Endsymbol '$end'.
+
+Statement -> Query : '$1'.
+Statement -> TableDefinition : '$1'.
 
 Query -> Select limit int : add_limit('$1', '$2', '$3').
 Query -> Select           : '$1'.
@@ -119,6 +136,33 @@ Comp -> ne        : '$1'.
 Comp -> nomatch   : '$1'.
 Comp -> notapprox : '$1'.
 
+%% TABLE DEFINTITION
+
+TableDefinition ->
+    create_table Bucket TableContentsSource :
+        make_table_definition('$2', '$3').
+
+TableContentsSource -> TableElementList : '$1'.
+TableElementList -> openb TableElements closeb : '$2'.
+
+TableElements ->
+    TableElement comma TableElements : make_table_element_list('$1', '$3').
+TableElements -> TableElement : '$1'.
+
+TableElement -> ColumnDefinition : '$1'.
+TableElement -> KeyDefinition : '$1'.
+
+ColumnDefinition ->
+    Field DataType ColumnConstraint : make_column('$1', '$2', '$3').
+ColumnDefinition ->
+    Field DataType : make_column('$1', '$2').
+ColumnConstraint -> not_null : '$1'.
+
+DataType -> timestamp : '$1'.
+DataType -> float : '$1'.
+
+KeyDefinition ->
+    partition_key openb Field closeb : make_key_definition('$1', '$3').
 
 Erlang code.
 
@@ -209,3 +253,29 @@ make_list({_,    A}, {_, B}) -> {list, [A, B]}.
 
 make_expr(A) ->
     {conditional, A}.
+
+make_column({word, FieldName}, {DataType, _}) ->
+    #riak_field_v1{
+       name = FieldName,
+       type = DataType,
+       optional = true}.
+
+make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
+    #riak_field_v1{
+       name = FieldName,
+       type = DataType,
+       optional = false}.
+
+make_key_definition({partition_key, _}, {word, FieldName}) ->
+    #partition_key_v1{
+       ast = [#param_v1{
+                 name = FieldName
+                }]}.
+
+make_table_definition({word, BucketName}, Contents) ->
+    {table_definition, BucketName, Contents}.
+
+make_table_element_list({table_element_list, A}, B) ->
+    {table_element_list, A ++ [B]};
+make_table_element_list(A, B) ->
+    {table_element_list, [A, B]}.
