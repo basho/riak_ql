@@ -7,6 +7,7 @@ Definitions.
 
 AND = (A|a)(N|n)(D|d)
 AS = (A|a)(S|s)
+ATOM = (A|a)(T|t)(O|o)(M|m)
 CREATE_TABLE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)\s(T|t)(A|a)(B|b)(L|l)(E|e)
 DELETE = (D|d)(E|e)(L|l)(E|e)(T|t)(E|e)
 DROP = (D|d)(R|r)(O|o)(P|p)
@@ -20,6 +21,7 @@ LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
 LOCAL = (L|l)(O|o)(C|c)(A|a)(L|l)
 LOCAL_KEY = (L|l)(O|o)(C|c)(A|a)(L|l)\s(K|k)(E|e)(Y|y)
 MERGE = (M|m)(E|e)(R|r)(G|g)(E|e)
+MODFUN = (M|m)(O|o)(D|d)(F|f)(U|u)(N|n)
 NOT_NULL = (N|n)(O|o)(T|t)\s(N|n)(U|u)(L|l)(L|l)
 OF = (O|o)(F|f)
 ON_COMMIT = (O|o)(N|n)\s(C|c)(O|o)(M|m)(M|m)(I|i)(T|t)
@@ -68,6 +70,7 @@ Rules.
 
 {AND} : {token, {and_, TokenChars}}.
 {AS} : {token, {as, TokenChars}}.
+{ATOM} : {token, {atom, TokenChars}}.
 {CREATE_TABLE} : {token, {create_table, TokenChars}}.
 {DELETE} : {token, {delete, TokenChars}}.
 {DROP} : {token, {drop, TokenChars}}.
@@ -81,6 +84,7 @@ Rules.
 {LOCAL} : {token, {local, TokenChars}}.
 {LOCAL_KEY} : {token, {local_key, TokenChars}}.
 {MERGE} : {token, {merge, TokenChars}}.
+{MODFUN} : {token, {modfun, TokenChars}}.
 {NOT_NULL} : {token, {not_null, TokenChars}}.
 {OF} : {token, {of_, TokenChars}}.
 {ON_COMMIT} : {token, {on_commit, TokenChars}}.

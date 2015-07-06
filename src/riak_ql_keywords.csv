@@ -1,5 +1,6 @@
 and
 as
+atom
 create table
 delete
 drop
@@ -13,6 +14,7 @@ limit
 local
 local key
 merge
+modfun
 not null
 of
 on commit
