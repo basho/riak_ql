@@ -30,6 +30,8 @@ ColumnDefinition
 ColumnConstraint
 KeyDefinition
 DataType
+KeyFieldList
+KeyField
 .
 
 Terminals
@@ -168,9 +170,14 @@ DataType -> timestamp : '$1'.
 DataType -> varchar : '$1'.
 
 KeyDefinition ->
-    partition_key openb Field closeb : make_key_definition('$1', '$3').
+    partition_key openb KeyFieldList closeb : make_key_definition('$1', '$3').
 KeyDefinition ->
-    local_key openb Field closeb : make_key_definition('$1', '$3').
+    local_key openb KeyFieldList closeb : make_key_definition('$1', '$3').
+
+KeyFieldList -> KeyField comma KeyFieldList : make_key_field_list('$1', '$3').
+KeyFieldList -> KeyField : make_key_field_list('$1', {key_field_list, []}).
+
+KeyField -> Word : '$1'.
 
 Erlang code.
 
@@ -274,25 +281,32 @@ make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
        type = DataType,
        optional = false}.
 
-make_key_definition({partition_key, _}, {word, FieldName}) ->
+make_key_definition({partition_key, _}, FieldList) ->
     #partition_key_v1{
-       ast = [#param_v1{
-                 name = FieldName
-                }]};
-make_key_definition({local_key, _}, {word, FieldName}) ->
+       ast = extract_key_field_list(FieldList, [])};
+make_key_definition({local_key, _}, FieldList) ->
     #local_key_v1{
-       ast = [#param_v1{
-                 name = FieldName
-                }]}.
+       ast = extract_key_field_list(FieldList, [])}.
 
 make_table_element_list(A, {table_element_list, B}) ->
     {table_element_list, [A] ++ B};
 make_table_element_list(A, B) ->
     {table_element_list, [A, B]}.
 
+make_key_field_list(A, {key_field_list, B}) ->
+    {key_field_list, [A] ++ B};
+make_key_field_list(A, B) ->
+    {key_field_list, [A, B]}.
+
+extract_key_field_list({key_field_list, []}, Extracted) ->
+    lists:reverse(Extracted);
+extract_key_field_list({key_field_list, [{word, Field} | Rest]}, Extracted) ->
+    [#param_v1{name = Field} |
+     extract_key_field_list({key_field_list, Rest}, Extracted)].
 
 make_table_definition({word, BucketName}, Contents) ->
     PartitionKey = find_partition_key(Contents),
+    io:format("partition key ~p~n", [PartitionKey]),
     LocalKey = find_local_key(Contents),
     Fields = find_fields(Contents),
     #ddl_v1{
