@@ -299,6 +299,35 @@ create_composite_key_test_() ->
                                     }]}
           }).
 
+create_modfun_key_test_() ->
+    ?_t("create table temperatures " ++
+            "(time timestamp not null, " ++
+            "user_id varchar not null, " ++
+            "partition key (time, modfun(crypto, hash, atom(sha512))))",
+        #ddl_v1{
+           bucket = <<"temperatures">>,
+           fields = [
+                     #riak_field_v1{
+                        name = "time",
+                        position = 0,
+                        type = timestamp,
+                        optional = false},
+                     #riak_field_v1{
+                        name = "user_id",
+                        position = 1,
+                        type = varchar,
+                        optional = false}],
+           partition_key = #partition_key_v1{
+                              ast = [#param_v1{
+                                        name = "time"
+                                       },
+                                     #hash_fn_v1{
+                                        mod = crypto,
+                                        fn = hash,
+                                        args = [sha512]
+                                       }]}
+          }).
+
 % select count(type) from events group by time(10m);
 
 % select count(type) from events group by time(10m), type;
