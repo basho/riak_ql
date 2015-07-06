@@ -18,6 +18,7 @@ INNER = (I|i)(N|n)(N|n)(E|e)(R|r)
 JOIN = (J|j)(O|o)(I|i)(N|n)
 LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
 LOCAL = (L|l)(O|o)(C|c)(A|a)(L|l)
+LOCAL_KEY = (L|l)(O|o)(C|c)(A|a)(L|l)\s(K|k)(E|e)(Y|y)
 MERGE = (M|m)(E|e)(R|r)(G|g)(E|e)
 NOT_NULL = (N|n)(O|o)(T|t)\s(N|n)(U|u)(L|l)(L|l)
 OF = (O|o)(F|f)
@@ -30,6 +31,7 @@ SELECT = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
 SYSTEM_VERSIONING = (S|s)(Y|y)(S|s)(T|t)(E|e)(M|m)\s(V|v)(E|e)(R|r)(S|s)(I|i)(O|o)(N|n)(I|i)(N|n)(G|g)
 TEMPORARY = (T|t)(E|e)(M|m)(P|p)(O|o)(R|r)(A|a)(R|r)(Y|y)
 TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
+VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
 WITH = (W|w)(I|i)(T|t)(H|h)
 
@@ -77,6 +79,7 @@ Rules.
 {JOIN} : {token, {join, TokenChars}}.
 {LIMIT} : {token, {limit, TokenChars}}.
 {LOCAL} : {token, {local, TokenChars}}.
+{LOCAL_KEY} : {token, {local_key, TokenChars}}.
 {MERGE} : {token, {merge, TokenChars}}.
 {NOT_NULL} : {token, {not_null, TokenChars}}.
 {OF} : {token, {of_, TokenChars}}.
@@ -89,6 +92,7 @@ Rules.
 {SYSTEM_VERSIONING} : {token, {system_versioning, TokenChars}}.
 {TEMPORARY} : {token, {temporary, TokenChars}}.
 {TIMESTAMP} : {token, {timestamp, TokenChars}}.
+{VARCHAR} : {token, {varchar, TokenChars}}.
 {WHERE} : {token, {where, TokenChars}}.
 {WITH} : {token, {with, TokenChars}}.
 
