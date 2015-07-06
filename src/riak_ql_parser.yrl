@@ -32,6 +32,8 @@ KeyDefinition
 DataType
 KeyFieldList
 KeyField
+KeyFieldArgList
+KeyFieldArg
 .
 
 Terminals
@@ -75,6 +77,8 @@ partition_key
 timestamp
 varchar
 local_key
+modfun
+atom
 .
 
 Rootsymbol Statement.
@@ -174,10 +178,19 @@ KeyDefinition ->
 KeyDefinition ->
     local_key openb KeyFieldList closeb : make_key_definition('$1', '$3').
 
-KeyFieldList -> KeyField comma KeyFieldList : make_key_field_list('$1', '$3').
-KeyFieldList -> KeyField : make_key_field_list('$1', {key_field_list, []}).
+KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
+KeyFieldList -> KeyField : make_list({list, []}, '$1').
 
 KeyField -> Word : '$1'.
+KeyField -> modfun openb KeyFieldArgList closeb : {modfun, '$3'}.
+
+KeyFieldArgList ->
+    KeyFieldArg comma KeyFieldArgList : make_list('$3', '$1').
+KeyFieldArgList ->
+    KeyFieldArg : make_list({list, []}, '$1').
+
+KeyFieldArg -> Word : '$1'.
+KeyFieldArg -> atom openb Word closeb : make_atom('$3').
 
 Erlang code.
 
@@ -201,6 +214,9 @@ process({chars, A}) ->
 
 concatenate({word, A}, {chars, B}) ->
     {word, A ++ B}.
+
+make_atom({word, SomeWord}) ->
+    {atom, list_to_atom(SomeWord)}.
 
 make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, none}).
 
@@ -293,16 +309,11 @@ make_table_element_list(A, {table_element_list, B}) ->
 make_table_element_list(A, B) ->
     {table_element_list, [A, B]}.
 
-make_key_field_list(A, {key_field_list, B}) ->
-    {key_field_list, [A] ++ B};
-make_key_field_list(A, B) ->
-    {key_field_list, [A, B]}.
-
-extract_key_field_list({key_field_list, []}, Extracted) ->
+extract_key_field_list({list, []}, Extracted) ->
     lists:reverse(Extracted);
-extract_key_field_list({key_field_list, [{word, Field} | Rest]}, Extracted) ->
+extract_key_field_list({list, [Field | Rest]}, Extracted) ->
     [#param_v1{name = Field} |
-     extract_key_field_list({key_field_list, Rest}, Extracted)].
+     extract_key_field_list({list, Rest}, Extracted)].
 
 make_table_definition({word, BucketName}, Contents) ->
     PartitionKey = find_partition_key(Contents),
