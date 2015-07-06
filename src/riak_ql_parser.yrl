@@ -71,6 +71,8 @@ create_table
 not_null
 partition_key
 timestamp
+varchar
+local_key
 .
 
 Rootsymbol Statement.
@@ -124,6 +126,7 @@ Val -> int chars : add_unit('$1', '$2').
 Val -> int       : '$1'.
 Val -> float     : '$1'.
 Val -> datetime  : '$1'.
+Val -> varchar   : '$1'.
 
 Logic -> and_ : '$1'.
 Logic -> or_  : '$1'.
@@ -158,11 +161,16 @@ ColumnDefinition ->
     Field DataType : make_column('$1', '$2').
 ColumnConstraint -> not_null : '$1'.
 
-DataType -> timestamp : '$1'.
+DataType -> datetime : '$1'.
 DataType -> float : '$1'.
+DataType -> int : '$1'.
+DataType -> timestamp : '$1'.
+DataType -> varchar : '$1'.
 
 KeyDefinition ->
     partition_key openb Field closeb : make_key_definition('$1', '$3').
+KeyDefinition ->
+    local_key openb Field closeb : make_key_definition('$1', '$3').
 
 Erlang code.
 
@@ -270,6 +278,11 @@ make_key_definition({partition_key, _}, {word, FieldName}) ->
     #partition_key_v1{
        ast = [#param_v1{
                  name = FieldName
+                }]};
+make_key_definition({local_key, _}, {word, FieldName}) ->
+    #local_key_v1{
+       ast = [#param_v1{
+                 name = FieldName
                 }]}.
 
 make_table_element_list(A, {table_element_list, B}) ->
@@ -279,24 +292,34 @@ make_table_element_list(A, B) ->
 
 
 make_table_definition({word, BucketName}, Contents) ->
-    io:format("bucketname~n~p~ncontents~n~p~n", [BucketName, Contents]),
     PartitionKey = find_partition_key(Contents),
-    io:format("partitionkey~n~p~n", [PartitionKey]),
+    LocalKey = find_local_key(Contents),
     Fields = find_fields(Contents),
-    io:format("fields~n~p~n", [Fields]),
     #ddl_v1{
        bucket = list_to_binary(BucketName),
        partition_key = PartitionKey,
+       local_key = LocalKey,
        fields = Fields}.
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
 find_partition_key([]) ->
-    none;
+    undefined;
 find_partition_key([PartitionKey = #partition_key_v1{} | _Rest]) ->
     PartitionKey;
 find_partition_key([_Head | Rest]) ->
     find_partition_key(Rest).
+
+find_local_key({table_element_list, Elements}) ->
+    find_local_key(Elements);
+find_local_key([]) ->
+    undefined;
+find_local_key([LocalKey = #local_key_v1{} | _Rest]) ->
+    LocalKey;
+find_local_key([_Head | Rest]) ->
+    find_local_key(Rest).
+
+
 
 find_fields({table_element_list, Elements}) ->
     find_fields(0, Elements, []).
