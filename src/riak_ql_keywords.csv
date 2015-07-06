@@ -11,6 +11,7 @@ inner
 join
 limit
 local
+local key
 merge
 not null
 of
@@ -23,5 +24,6 @@ select
 system versioning
 temporary
 timestamp
+varchar
 where
 with
