@@ -215,12 +215,12 @@ create_simple_test_() ->
            fields = [
                      #riak_field_v1{
                         name = "time",
-                        position = 0,
+                        position = 1,
                         type = timestamp,
                         optional = false},
                      #riak_field_v1{
                         name = "temperature_k",
-                        position = 1,
+                        position = 2,
                         type = float,
                         optional = true}],
            partition_key = #partition_key_v1{
@@ -241,17 +241,17 @@ create_local_key_test_() ->
            fields = [
                      #riak_field_v1{
                         name = "time",
-                        position = 0,
+                        position = 1,
                         type = timestamp,
                         optional = false},
                      #riak_field_v1{
                         name = "temperature_k",
-                        position = 1,
+                        position = 2,
                         type = float,
                         optional = true},
                      #riak_field_v1{
                         name = "user_id",
-                        position = 2,
+                        position = 3,
                         type = varchar,
                         optional = false}],
            partition_key = #partition_key_v1{
@@ -275,12 +275,12 @@ create_composite_key_test_() ->
            fields = [
                      #riak_field_v1{
                         name = "time",
-                        position = 0,
+                        position = 1,
                         type = timestamp,
                         optional = false},
                      #riak_field_v1{
                         name = "user_id",
-                        position = 1,
+                        position = 2,
                         type = varchar,
                         optional = false}],
            partition_key = #partition_key_v1{
@@ -310,12 +310,12 @@ create_modfun_key_test_() ->
            fields = [
                      #riak_field_v1{
                         name = "time",
-                        position = 0,
+                        position = 1,
                         type = timestamp,
                         optional = false},
                      #riak_field_v1{
                         name = "user_id",
-                        position = 1,
+                        position = 2,
                         type = varchar,
                         optional = false}],
            partition_key = #partition_key_v1{
@@ -347,12 +347,12 @@ create_no_key_test_() ->
            fields = [
                      #riak_field_v1{
                         name = "time",
-                        position = 0,
+                        position = 1,
                         type = timestamp,
                         optional = false},
                      #riak_field_v1{
                         name = "temperature_k",
-                        position = 1,
+                        position = 2,
                         type = float,
                         optional = true}]
           }).

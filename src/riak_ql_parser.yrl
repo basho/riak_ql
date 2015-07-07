@@ -358,7 +358,7 @@ make_modfun({list, Elements}) ->
        args = Args}}.
 
 find_fields({table_element_list, Elements}) ->
-    find_fields(0, Elements, []).
+    find_fields(1, Elements, []).
 
 find_fields(_Count, [], Found) ->
     lists:reverse(Found);
