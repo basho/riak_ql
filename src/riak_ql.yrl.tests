@@ -303,7 +303,7 @@ create_modfun_key_test_() ->
     ?_t("create table temperatures " ++
             "(time timestamp not null, " ++
             "user_id varchar not null, " ++
-            "partition key (time, modfun(crypto, hash, atom(sha512))))",
+            "partition key (time, modfun(crypto, hash, atom('sha512'))))",
         #ddl_v1{
            bucket = <<"temperatures">>,
            fields = [

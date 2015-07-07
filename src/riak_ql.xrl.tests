@@ -90,7 +90,7 @@ words_containing_keywords_test_() ->
     ?_assertEqual(Expected, Got).
 
 words_containing_digits_test_() ->
-    Got = riak_ql_lexer:get_tokens("sha512 sha 512"),
+    Got = riak_ql_lexer:get_tokens("'sha512' sha 512"),
     Expected = [
                 {chars, "sha512"},
                 {chars, "sha"},
