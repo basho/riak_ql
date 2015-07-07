@@ -321,11 +321,8 @@ extract_key_field_list({list, [Field | Rest]}, Extracted) ->
 
 make_table_definition({word, BucketName}, Contents) ->
     PartitionKey = find_partition_key(Contents),
-    io:format("partition key ~p~n", [PartitionKey]),
     LocalKey = find_local_key(Contents),
-    io:format("local key ~p~n", [LocalKey]),
     Fields = find_fields(Contents),
-    io:format("fields ~p~n", [Fields]),
     #ddl_v1{
        bucket = list_to_binary(BucketName),
        partition_key = PartitionKey,
