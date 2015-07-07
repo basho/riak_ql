@@ -299,10 +299,10 @@ make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
 
 make_key_definition({partition_key, _}, FieldList) ->
     #partition_key_v1{
-       ast = extract_key_field_list(FieldList, [])};
+       ast = lists:reverse(extract_key_field_list(FieldList, []))};
 make_key_definition({local_key, _}, FieldList) ->
     #local_key_v1{
-       ast = extract_key_field_list(FieldList, [])}.
+       ast = lists:reverse(extract_key_field_list(FieldList, []))}.
 
 make_table_element_list(A, {table_element_list, B}) ->
     {table_element_list, [A] ++ B};
@@ -310,7 +310,7 @@ make_table_element_list(A, B) ->
     {table_element_list, [A, B]}.
 
 extract_key_field_list({list, []}, Extracted) ->
-    lists:reverse(Extracted);
+    Extracted;
 extract_key_field_list({list, [Field | Rest]}, Extracted) ->
     [#param_v1{name = Field} |
      extract_key_field_list({list, Rest}, Extracted)].
