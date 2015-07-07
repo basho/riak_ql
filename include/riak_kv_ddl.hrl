@@ -20,9 +20,6 @@
 %%
 %% -------------------------------------------------------------------
 
--ifndef(RIAK_KV_DDL).
--define(RIAK_KV_DDL, true).
-
 -record(riak_field_v1, {
           name     = <<>>  :: list(),
           position         :: pos_integer(),
@@ -58,5 +55,3 @@
           partition_key      :: #partition_key_v1{},
           local_key          :: #local_key_v1{}
          }).
-
--endif.

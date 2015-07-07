@@ -206,8 +206,8 @@ Erlang code.
           ops     = []
          }).
 
--include("riak_ql.yrl.tests").
 -include("riak_kv_ddl.hrl").
+-include("riak_ql.yrl.tests").
 
 process({chars, A}) ->
     {word, A}.

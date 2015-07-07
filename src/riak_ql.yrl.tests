@@ -1,7 +1,6 @@
 %% -*- erlang -*-
 -include_lib("eunit/include/eunit.hrl").
 
--include("riak_kv_ddl.hrl").
 
 -define(_t(String, Expected),
         ?_test(
