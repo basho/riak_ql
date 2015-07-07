@@ -181,8 +181,8 @@ KeyDefinition ->
 KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
 KeyFieldList -> KeyField : make_list({list, []}, '$1').
 
+KeyField -> modfun openb KeyFieldArgList closeb : make_modfun('$3').
 KeyField -> Word : '$1'.
-KeyField -> modfun openb KeyFieldArgList closeb : {modfun, '$3'}.
 
 KeyFieldArgList ->
     KeyFieldArg comma KeyFieldArgList : make_list('$3', '$1').
@@ -311,6 +311,10 @@ make_table_element_list(A, B) ->
 
 extract_key_field_list({list, []}, Extracted) ->
     Extracted;
+extract_key_field_list({list,
+                        [Modfun = #hash_fn_v1{} | Rest]},
+                       Extracted) ->
+    [Modfun | extract_key_field_list({list, Rest}, Extracted)];
 extract_key_field_list({list, [Field | Rest]}, Extracted) ->
     [#param_v1{name = Field} |
      extract_key_field_list({list, Rest}, Extracted)].
@@ -319,7 +323,9 @@ make_table_definition({word, BucketName}, Contents) ->
     PartitionKey = find_partition_key(Contents),
     io:format("partition key ~p~n", [PartitionKey]),
     LocalKey = find_local_key(Contents),
+    io:format("local key ~p~n", [LocalKey]),
     Fields = find_fields(Contents),
+    io:format("fields ~p~n", [Fields]),
     #ddl_v1{
        bucket = list_to_binary(BucketName),
        partition_key = PartitionKey,
@@ -344,7 +350,12 @@ find_local_key([LocalKey = #local_key_v1{} | _Rest]) ->
 find_local_key([_Head | Rest]) ->
     find_local_key(Rest).
 
-
+make_modfun({list, Elements}) ->
+    [Mod, Fn | Args] = lists:reverse(Elements),
+    {modfun, #hash_fn_v1{
+       mod = list_to_atom(Mod),
+       fn = list_to_atom(Fn),
+       args = Args}}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(0, Elements, []).
