@@ -252,7 +252,7 @@ create_local_key_test_() ->
                      #riak_field_v1{
                         name = "user_id",
                         position = 3,
-                        type = varchar,
+                        type = binary,
                         optional = false}],
            partition_key = #partition_key_v1{
                               ast = [#param_v1{
@@ -281,7 +281,7 @@ create_composite_key_test_() ->
                      #riak_field_v1{
                         name = "user_id",
                         position = 2,
-                        type = varchar,
+                        type = binary,
                         optional = false}],
            partition_key = #partition_key_v1{
                               ast = [#param_v1{
@@ -316,7 +316,7 @@ create_modfun_key_test_() ->
                      #riak_field_v1{
                         name = "user_id",
                         position = 2,
-                        type = varchar,
+                        type = binary,
                         optional = false}],
            partition_key = #partition_key_v1{
                               ast = [#param_v1{

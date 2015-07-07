@@ -79,6 +79,7 @@ varchar
 local_key
 modfun
 atom
+binary
 .
 
 Rootsymbol Statement.
@@ -294,7 +295,7 @@ make_column({word, FieldName}, {DataType, _}) ->
 make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
     #riak_field_v1{
        name = FieldName,
-       type = DataType,
+       type = canonicalize_field_type(DataType),
        optional = false}.
 
 make_key_definition({partition_key, _}, FieldList) ->
@@ -367,3 +368,8 @@ find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
     find_fields(Count + 1, Rest, [PositionedField | Elements]);
 find_fields(Count, [_Head | Rest], Elements) ->
     find_fields(Count, Rest, Elements).
+
+canonicalize_field_type(varchar) ->
+    binary;
+canonicalize_field_type(Type) ->
+    Type.
