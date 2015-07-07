@@ -303,7 +303,8 @@ create_modfun_key_test_() ->
     ?_t("create table temperatures " ++
             "(time timestamp not null, " ++
             "user_id varchar not null, " ++
-            "partition key (time, modfun(crypto, hash, atom('sha512'))))",
+            "partition key (time, modfun(crypto, hash, atom('sha512'))), " ++
+            "local key (modfun(crypto, hash, atom(ripemd)), time))",
         #ddl_v1{
            bucket = <<"temperatures">>,
            fields = [
@@ -325,7 +326,16 @@ create_modfun_key_test_() ->
                                         mod = crypto,
                                         fn = hash,
                                         args = [sha512]
-                                       }]}
+                                       }]},
+           local_key = #local_key_v1{
+                          ast = [#hash_fn_v1{
+                                    mod = crypto,
+                                    fn = hash,
+                                    args = [ripemd]
+                                    },
+                                #param_v1{
+                                  name = "time"
+                                  }]}
           }).
 
 % select count(type) from events group by time(10m);
