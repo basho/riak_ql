@@ -79,7 +79,6 @@ varchar
 local_key
 modfun
 atom
-binary
 .
 
 Rootsymbol Statement.
