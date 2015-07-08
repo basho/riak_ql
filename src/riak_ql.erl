@@ -15,17 +15,15 @@
 -file("src/riak_ql.xrl", 86).
 
 -include_lib("eunit/include/eunit.hrl").
-		
+
 -export([
-	 lex/1
-	]).
+         lex/1
+        ]).
 
 -compile(export_all).
 
--include("riak_ql.xrl.tests").
-
 lex(String) -> {ok, Toks, 1} = string(String),
-	       Toks.
+               Toks.
 
 strip_date(Date) ->
     Date2 = string:strip(Date, both, $'), %'

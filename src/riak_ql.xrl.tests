@@ -69,6 +69,14 @@ keywords_3b_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+keywords_create_test_() ->
+    Got = riak_ql_lexer:get_tokens("create table not null partition key"),
+    Expected = [
+                {create_table, "create table"},
+                {not_null, "not null"},
+                {partition_key, "partition key"}],
+    ?_assertEqual(Expected, Got).
+
 words_containing_keywords_test_() ->
     Got = riak_ql_lexer:get_tokens("error or horror and handy andy"),
     Expected = [
@@ -78,6 +86,15 @@ words_containing_keywords_test_() ->
                 {and_,  "and"},
                 {chars, "handy"},
                 {chars, "andy"}
+               ],
+    ?_assertEqual(Expected, Got).
+
+words_containing_digits_test_() ->
+    Got = riak_ql_lexer:get_tokens("'sha512' sha 512"),
+    Expected = [
+                {chars, "sha512"},
+                {chars, "sha"},
+                {int, 512}
                ],
     ?_assertEqual(Expected, Got).
 

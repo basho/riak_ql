@@ -1,6 +1,7 @@
 %% -*- erlang -*-
 -include_lib("eunit/include/eunit.hrl").
 
+
 -define(_t(String, Expected),
         ?_test(
            ?assertEqual({ok, Expected},
@@ -202,6 +203,158 @@ select_where_15_test() ->
                           }
                          }
               }).
+
+create_simple_test_() ->
+    ?_t("create table temperatures " ++
+            "(time timestamp not null, " ++
+            "temperature_k float, " ++
+            "partition key (time))",
+        #ddl_v1{
+           bucket = <<"temperatures">>,
+           fields = [
+                     #riak_field_v1{
+                        name = "time",
+                        position = 1,
+                        type = timestamp,
+                        optional = false},
+                     #riak_field_v1{
+                        name = "temperature_k",
+                        position = 2,
+                        type = float,
+                        optional = true}],
+           partition_key = #partition_key_v1{
+                              ast = [#param_v1{
+                                        name = "time"
+                                       }]}
+          }).
+
+create_local_key_test_() ->
+    ?_t("create table temperatures " ++
+            "(time timestamp not null, " ++
+            "temperature_k float, " ++
+            "user_id varchar not null, " ++
+            "partition key (time), " ++
+            "local key (user_id))",
+        #ddl_v1{
+           bucket = <<"temperatures">>,
+           fields = [
+                     #riak_field_v1{
+                        name = "time",
+                        position = 1,
+                        type = timestamp,
+                        optional = false},
+                     #riak_field_v1{
+                        name = "temperature_k",
+                        position = 2,
+                        type = float,
+                        optional = true},
+                     #riak_field_v1{
+                        name = "user_id",
+                        position = 3,
+                        type = binary,
+                        optional = false}],
+           partition_key = #partition_key_v1{
+                              ast = [#param_v1{
+                                        name = "time"
+                                       }]},
+           local_key = #local_key_v1{
+                          ast = [#param_v1{
+                                    name = "user_id"
+                                    }]}
+          }).
+
+create_composite_key_test_() ->
+    ?_t("create table temperatures " ++
+            "(time timestamp not null, " ++
+            "user_id varchar not null, " ++
+            "partition key (time, user_id), " ++
+            "local key (time, user_id))",
+        #ddl_v1{
+           bucket = <<"temperatures">>,
+           fields = [
+                     #riak_field_v1{
+                        name = "time",
+                        position = 1,
+                        type = timestamp,
+                        optional = false},
+                     #riak_field_v1{
+                        name = "user_id",
+                        position = 2,
+                        type = binary,
+                        optional = false}],
+           partition_key = #partition_key_v1{
+                              ast = [#param_v1{
+                                        name = "time"
+                                       },
+                                    #param_v1{
+                                      name = "user_id"
+                                      }]},
+           local_key = #local_key_v1{
+                          ast = [#param_v1{
+                                    name = "time"
+                                    },
+                                 #param_v1{
+                                    name = "user_id"
+                                    }]}
+          }).
+
+create_modfun_key_test_() ->
+    ?_t("create table temperatures " ++
+            "(time timestamp not null, " ++
+            "user_id varchar not null, " ++
+            "partition key (time, modfun(crypto, hash, atom('sha512'))), " ++
+            "local key (modfun(crypto, hash, atom(ripemd)), time))",
+        #ddl_v1{
+           bucket = <<"temperatures">>,
+           fields = [
+                     #riak_field_v1{
+                        name = "time",
+                        position = 1,
+                        type = timestamp,
+                        optional = false},
+                     #riak_field_v1{
+                        name = "user_id",
+                        position = 2,
+                        type = binary,
+                        optional = false}],
+           partition_key = #partition_key_v1{
+                              ast = [#param_v1{
+                                        name = "time"
+                                       },
+                                     #hash_fn_v1{
+                                        mod = crypto,
+                                        fn = hash,
+                                        args = [sha512]
+                                       }]},
+           local_key = #local_key_v1{
+                          ast = [#hash_fn_v1{
+                                    mod = crypto,
+                                    fn = hash,
+                                    args = [ripemd]
+                                    },
+                                #param_v1{
+                                  name = "time"
+                                  }]}
+          }).
+
+create_no_key_test_() ->
+    ?_t("create table temperatures " ++
+            "(time timestamp not null, " ++
+            "temperature_k float)",
+        #ddl_v1{
+           bucket = <<"temperatures">>,
+           fields = [
+                     #riak_field_v1{
+                        name = "time",
+                        position = 1,
+                        type = timestamp,
+                        optional = false},
+                     #riak_field_v1{
+                        name = "temperature_k",
+                        position = 2,
+                        type = float,
+                        optional = true}]
+          }).
 
 % select count(type) from events group by time(10m);
 

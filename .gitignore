@@ -11,3 +11,5 @@ rel/example_project
 *~
 src/riak_ql_lexer.erl
 src/riak_ql_parser.erl
+_build
+rebar.lock
