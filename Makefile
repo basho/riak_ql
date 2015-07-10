@@ -21,7 +21,8 @@ test: compile
 	./rebar eunit skip_deps=true
 
 xref: compile
-	./rebar xref skip_deps=true
+	echo "nah"
+	# ./rebar xref skip_deps=true
 
 dialyzer:
 	echo "nah"
