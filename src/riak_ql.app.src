@@ -1,6 +1,6 @@
 {application, riak_ql,
  [
-  {description, "a lexer/parser for a riak query language"},
+  {description, "a query language for riak"},
   {vsn, "1"},
   {registered, []},
   {applications, [
