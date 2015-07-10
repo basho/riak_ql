@@ -1471,7 +1471,7 @@ ddl_from_syntax_test() ->
         "partition key (time, user_id), " ++
         "local key (time, user_id))",
     Lexed = get_tokens(Query),
-    Parsed = parse(Lexed),
+    {ok, Parsed} = parse(Lexed),
     Ddl = make_ddl(Parsed),
     {module, Module} = make_helper_mod(Ddl),
     Result = Module:validate_obj({12345, "beeees"}),
