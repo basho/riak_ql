@@ -1495,7 +1495,7 @@ complex_ddl_test() ->
                                      },
                                    #param_v1{
                                       name = "time"
-                                     }]},
+                                     }]}},
     {module, Module} = make_helper_mod(Ddl),
     Result = Module:validate_obj({12345, "beeees"}),
     ?assertEqual(?VALID, Result).
