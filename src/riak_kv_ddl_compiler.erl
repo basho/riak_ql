@@ -1464,15 +1464,38 @@ complex_valid_map_extract_test() ->
     Res = (catch Module:extract(Obj, Path)),
     ?assertEqual(3, Res).
 
-ddl_from_syntax_test() ->
-    Query = "create table temperatures " ++
-        "(time timestamp not null, " ++
-        "user_id varchar not null, " ++
-        "partition key (time, user_id), " ++
-        "local key (time, user_id))",
-    Lexed = get_tokens(Query),
-    {ok, Parsed} = parse(Lexed),
-    Ddl = make_ddl(Parsed),
+complex_ddl_test() ->
+    Ddl = #ddl_v1{
+             bucket = <<"temperatures">>,
+             fields = [
+                       #riak_field_v1{
+                          name = "time",
+                          position = 1,
+                          type = timestamp,
+                          optional = false},
+                       #riak_field_v1{
+                          name = "user_id",
+                          position = 2,
+                          type = binary,
+                          optional = false}],
+             partition_key = #partition_key_v1{
+                                ast = [#param_v1{
+                                          name = "time"
+                                         },
+                                       #hash_fn_v1{
+                                              mod = crypto,
+                                          fn = hash,
+                                          args = [sha512]
+                                         }]},
+             local_key = #local_key_v1{
+                            ast = [#hash_fn_v1{
+                                          mod = crypto,
+                                      fn = hash,
+                                      args = [ripemd]
+                                     },
+                                   #param_v1{
+                                      name = "time"
+                                     }]}
     {module, Module} = make_helper_mod(Ddl),
     Result = Module:validate_obj({12345, "beeees"}),
     ?assertEqual(?VALID, Result).
