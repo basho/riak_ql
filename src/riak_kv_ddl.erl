@@ -22,7 +22,7 @@
 %% -------------------------------------------------------------------
 -module(riak_kv_ddl).
 
--include("riak_kv_index.hrl").
+-include_lib("riak_kv/include/riak_kv_index.hrl").
 -include("riak_kv_ddl.hrl").
 
 %% this function can be used to work out which Module to use
