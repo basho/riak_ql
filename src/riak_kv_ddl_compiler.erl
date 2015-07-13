@@ -33,7 +33,7 @@
 %% @doc
 -module(riak_kv_ddl_compiler).
 
--include("riak_kv_index.hrl").
+-include_lib("include/riak/riak_kv_index.hrl").
 -include("riak_kv_ddl.hrl").
 
 -export([
