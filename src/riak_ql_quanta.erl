@@ -5,7 +5,7 @@
 %% minute boundaries: <em>quanta(Time, 15, m)</em>. The quanta time is returned in milliseconds since the
 %% Unix epoch.
 
--module(riak_kv_quanta).
+-module(riak_ql_quanta).
 
 -export([quanta/3,
          timestamp_to_ms/1,
