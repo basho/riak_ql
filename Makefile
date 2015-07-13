@@ -17,12 +17,7 @@ clean:
 distclean: clean
 	./rebar delete-deps
 
-test: compile
-	./rebar eunit skip_deps=true
+DIALYZER_APPS = kernel stdlib erts tools os_mon runtime_tools mnesia eunit \
+		syntax_tools compiler
 
-xref: compile
-	echo "nah"
-	# ./rebar xref skip_deps=true
-
-dialyzer:
-	echo "nah"
+include tools.mk
