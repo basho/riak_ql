@@ -97,15 +97,15 @@ Where -> where Conds : make_where('$1', '$2').
 Fields -> Fields comma Field : make_list('$1', '$3').
 Fields -> Field              : '$1'.
 
-Field -> Word                : log('$1', "make field").
-Field -> maybetimes          : log('$1', "make field").
+Field -> Word                : '$1'.
+Field -> maybetimes          : '$1'.
 
 Buckets -> Buckets comma Bucket : make_list('$1', '$3').
 Buckets -> Bucket               : '$1'.
 
 Bucket -> Word   : '$1'.
-Bucket -> regex  : log('$1', "buckets -> regex").
-Bucket -> quoted : log('$1', "buckets -> quoted").
+Bucket -> regex  : '$1'.
+Bucket -> quoted : '$1'.
 
 Word -> Word chars : concatenate('$1', '$2').
 Word -> chars      : process('$1').
@@ -233,10 +233,8 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
                   where   = E
                  }.
 
-log(A, _Str) ->
-    %% Msg = io_lib:format(Str ++ " ~p~n", [A]),
-    %% bits:log_terms(lists:flatten(Msg)),
-    A.
+%log(A, _Str) ->
+%    A.
 
 add_limit(A, _B, {int, C}) ->
     A#outputs{limit = C}.
