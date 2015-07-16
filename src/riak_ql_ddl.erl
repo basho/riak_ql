@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_kv_ddl: API module for the DDL
+%% riak_ql_ddl: API module for the DDL
 %%
 %%
 %% Copyright (c) 2007-2015 Basho Technologies, Inc.  All Rights Reserved.
@@ -20,10 +20,10 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_kv_ddl).
+-module(riak_ql_ddl).
 
--include_lib("riak_kv/include/riak_kv_index.hrl").
--include("riak_kv_ddl.hrl").
+-include("riak_ql_index.hrl").
+-include("riak_ql_ddl.hrl").
 
 %% this function can be used to work out which Module to use
 -export([
@@ -62,7 +62,7 @@
 make_module_name(Bucket) when is_binary(Bucket) ->
     Nonce = binary_to_list(base64:encode(crypto:hash(md4, Bucket))),
     Nonce2 = remove_hooky_chars(Nonce),
-    ModName = "riak_kv_ddl_helper_mod_" ++ Nonce2,
+    ModName = "riak_ql_ddl_helper_mod_" ++ Nonce2,
     list_to_atom(ModName).
 
 -spec get_partition_key(#ddl_v1{}, tuple()) -> binary().
@@ -104,11 +104,11 @@ convert([Atom | T], Obj, Mod, Acc) ->
 
 -spec is_valid_field(#ddl_v1{}, heirarchicalfieldname()) -> boolean().
 is_valid_field(#ddl_v1{bucket = B}, Field) when is_list(Field)->
-    Mod = riak_kv_ddl:make_module_name(B),
+    Mod = riak_ql_ddl:make_module_name(B),
     Mod:is_field_valid(Field).
 
 is_query_valid(#ddl_v1{bucket = B} = DDL,
-	       #riak_kv_li_index_v1{bucket     = B,
+	       #riak_ql_li_index_v1{bucket     = B,
 				    selections = S,
 				    filters    = F}) ->
     ValidSelection = are_selections_valid(DDL, S, ?CANTBEBLANK),
@@ -120,7 +120,7 @@ is_query_valid(#ddl_v1{bucket = B} = DDL,
 				 {are_filters_valid,    ValidFilters}
 				]}
     end;
-is_query_valid(#ddl_v1{bucket = B1}, #riak_kv_li_index_v1{bucket = B2}) ->
+is_query_valid(#ddl_v1{bucket = B1}, #riak_ql_li_index_v1{bucket = B2}) ->
     Msg = io_lib:format("DDL has a bucket of ~p "
 			"but query has a bucket of ~p~n", [B1, B2]),
     {false, {ddl_mismatch, lists:flatten(Msg)}}.
@@ -217,7 +217,7 @@ simplest_partition_key_test() ->
 				   type     = binary}
 		   ],
 		   PK),
-    {module, _Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {<<"yarble">>},
     Result = (catch get_partition_key(DDL, Obj)),
     ?assertEqual({<<"yarble">>}, sext:decode(Result)).
@@ -242,7 +242,7 @@ simple_partition_key_test() ->
 				   type     = binary}
 		   ],
 		   PK),
-    {module, _Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {<<"one">>, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
     ?assertEqual({<<"three">>, <<"one">>}, sext:decode(Result)).
@@ -274,7 +274,7 @@ function_partition_key_test() ->
 				   type     = binary}
 		   ],
 		   PK),
-    {module, _Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {1234567890, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
     Expected = {<<"three">>, {1234567890, 15, m}},
@@ -343,7 +343,7 @@ complex_partition_key_test() ->
 				   type     = Map1}
 		   ],
 		   PK),
-    {module, _Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {{2, {3}, {4}}},
     Result = (catch get_partition_key(DDL, Obj)),
     Expected = {2, {3, "something", pong}, {2, 3, pang}},
@@ -370,7 +370,7 @@ simplest_local_key_test() ->
 				   type     = binary}
 		   ],
 		   PK, LK),
-    {module, _Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {<<"yarble">>},
     Result = (catch get_partition_key(DDL, Obj)),
     ?assertEqual({<<"yarble">>}, sext:decode(Result)).
@@ -386,7 +386,7 @@ simplest_valid_get_type_test() ->
 				   position = 1,
 				   type     = binary}
 		   ]),
-    {module, Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Result = (catch Module:get_field_type(["yando"])),
     ?assertEqual(binary, Result).
 
@@ -400,7 +400,7 @@ simple_valid_get_type_test() ->
 				   position = 2,
 				   type     = binary}
 		   ]),
-    {module, Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Result = (catch Module:get_field_type(["yando"])),
     ?assertEqual(binary, Result).
 
@@ -422,7 +422,7 @@ simple_valid_map_get_type_1_test() ->
 				   position = 3,
 				   type     = float}
 		   ]),
-    {module, Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Result = (catch Module:get_field_type(["erko", "yarple"])),
     ?assertEqual(integer, Result).
 
@@ -444,7 +444,7 @@ simple_valid_map_get_type_2_test() ->
 				   position = 3,
 				   type     = float}
 		   ]),
-    {module, Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Result = (catch Module:get_field_type(["erko"])),
     ?assertEqual(map, Result).
 
@@ -476,7 +476,7 @@ complex_valid_map_get_type_test() ->
 				   position = 1,
 				   type     = Map1}
 		   ]),
-    {module, Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Path = ["Top_Map", "Level_1_map1", "in_Map_1"],
     Res = (catch Module:get_field_type(Path)),
     ?assertEqual(integer, Res).
@@ -496,7 +496,7 @@ partial_are_selections_valid_test() ->
 				    position = 2,
 				    type     = integer}
 		    ]),
-    {module, _Module} = riak_kv_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = are_selections_valid(DDL, Selections, ?CANTBEBLANK),
     ?assertEqual(true, Res).
 
@@ -511,7 +511,7 @@ partial_wildcard_are_selections_valid_test() ->
 				    position = 2,
 				    type     = integer}
 		    ]),
-    {module, _Module} = riak_kv_ddl_compiler:make_helper_mod(DDL, "/tmp"),
+    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL, "/tmp"),
     Res = are_selections_valid(DDL, Selections, ?CANTBEBLANK),
     ?assertEqual(true, Res).
 
@@ -536,7 +536,7 @@ partial_are_selections_valid_fail_test() ->
 simple_is_query_valid_test() ->
     Bucket = <<"simple_is_query_valid_test">>,
     Selections  = [["temperature"], ["geohash"]],
-    Query = #riak_kv_li_index_v1{bucket     = Bucket,
+    Query = #riak_ql_li_index_v1{bucket     = Bucket,
 				 selections = Selections},
     DDL = make_ddl(Bucket,
 		    [
@@ -547,14 +547,14 @@ simple_is_query_valid_test() ->
 				    position = 2,
 				    type     = integer}
 		    ]),
-    {module, _ModName} = riak_kv_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_kv_ddl:is_query_valid(DDL, Query),
+    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(DDL, Query),
     ?assertEqual(true, Res).
 
 simple_is_query_valid_fail_test() ->
     Bucket = <<"simple_is_query_valid_fail_test">>,
     Selections  = [["temperature"], ["yerble"]],
-    Query = #riak_kv_li_index_v1{bucket     = Bucket,
+    Query = #riak_ql_li_index_v1{bucket     = Bucket,
 				 selections = Selections},
     DDL = make_ddl(Bucket,
 		    [
@@ -565,8 +565,8 @@ simple_is_query_valid_fail_test() ->
 				    position = 2,
 				    type     = integer}
 		    ]),
-    {module, _ModName} = riak_kv_ddl_compiler:make_helper_mod(DDL),
-    {Res, _} = riak_kv_ddl:is_query_valid(DDL, Query),
+    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {Res, _} = riak_ql_ddl:is_query_valid(DDL, Query),
     ?assertEqual(false, Res).
 
 simple_is_query_valid_map_test() ->
@@ -575,7 +575,7 @@ simple_is_query_valid_map_test() ->
     Name1 = "temp",
     Name2 = "geo",
     Selections  = [["temp", "geo"], ["name"]],
-    Query = #riak_kv_li_index_v1{bucket     = Bucket,
+    Query = #riak_ql_li_index_v1{bucket     = Bucket,
 				 selections = Selections},
     Map = {map, [
 		 #riak_field_v1{name     = Name2,
@@ -591,8 +591,8 @@ simple_is_query_valid_map_test() ->
 				    position = 2,
 				    type     = Map}
 		    ]),
-    {module, _ModName} = riak_kv_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_kv_ddl:is_query_valid(DDL, Query),
+    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(DDL, Query),
     ?assertEqual(true, Res).
 
 simple_is_query_valid_map_wildcard_test() ->
@@ -601,7 +601,7 @@ simple_is_query_valid_map_wildcard_test() ->
     Name1 = "temp",
     Name2 = "geo",
     Selections  = [["temp", "*"], ["name"]],
-    Query = #riak_kv_li_index_v1{bucket     = Bucket,
+    Query = #riak_ql_li_index_v1{bucket     = Bucket,
 				 selections = Selections},
     Map = {map, [
 		 #riak_field_v1{name     = Name2,
@@ -617,8 +617,8 @@ simple_is_query_valid_map_wildcard_test() ->
 				    position = 2,
 				    type     = Map}
 		    ]),
-    {module, _ModName} = riak_kv_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_kv_ddl:is_query_valid(DDL, Query),
+    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(DDL, Query),
     ?assertEqual(true, Res).
 
 %%
@@ -628,7 +628,7 @@ simple_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
     Selections  = [["temperature"], ["geohash"]],
     Filters = [{and_, {'>', "temperature", 1}, {'<', "temperature", 15}}],
-    Query = #riak_kv_li_index_v1{bucket     = Bucket,
+    Query = #riak_ql_li_index_v1{bucket     = Bucket,
 				 selections = Selections,
 				 filters    = Filters},
     DDL = make_ddl(Bucket,
@@ -640,15 +640,15 @@ simple_filter_query_test() ->
 				    position = 2,
 				    type     = integer}
 		    ]),
-    {module, _ModName} = riak_kv_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_kv_ddl:is_query_valid(DDL, Query),
+    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(DDL, Query),
     ?assertEqual(true, Res).
 
 simple_filter_query_fail_test() ->
     Bucket = <<"simple_filter_query_fail_test">>,
     Selections  = [["temperature"], ["geohash"]],
     Filters = [{and_, {'>', "gingerbread", 1}, {'<', "temperature", 15}}],
-    Query = #riak_kv_li_index_v1{bucket     = Bucket,
+    Query = #riak_ql_li_index_v1{bucket     = Bucket,
 				 selections = Selections,
 				 filters    = Filters},
     DDL = make_ddl(Bucket,
@@ -660,8 +660,8 @@ simple_filter_query_fail_test() ->
 				    position = 2,
 				    type     = integer}
 		    ]),
-    {module, _ModName} = riak_kv_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_kv_ddl:is_query_valid(DDL, Query),
+    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(DDL, Query),
     Expected = {false, [
 			{are_selections_valid, true},
 			{are_filters_valid, {false, [{invalid_field, ["gingerbread"]}]}}

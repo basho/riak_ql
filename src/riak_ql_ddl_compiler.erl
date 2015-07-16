@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_kv_ddl_compiler: processes the Data Description in the DDL
+%% riak_ql_ddl_compiler: processes the Data Description in the DDL
 %% * verifies that the DDL is valid
 %% * compiles the record description in the DDL into a module that can
 %%   be used to verify that incoming data conforms to a schema at the boundary
@@ -31,10 +31,10 @@
 %% * do we care about the name of the validation module?
 
 %% @doc
--module(riak_kv_ddl_compiler).
+-module(riak_ql_ddl_compiler).
 
--include("riak_kv_index.hrl").
--include("riak_kv_ddl.hrl").
+-include_lib("riak_ql_index.hrl").
+-include("riak_ql_ddl.hrl").
 
 -export([
          make_helper_mod/1,
@@ -378,7 +378,7 @@ build_validn_fns([Fields | T], LineNo, FunNo, Acc1, Acc2) ->
 
 -spec make_attrs(binary(), pos_integer()) -> {atom(), ast(), pos_integer()}.
 make_attrs(Bucket, LineNo) when is_binary(Bucket)    ->
-    ModName = riak_kv_ddl:make_module_name(Bucket),
+    ModName = riak_ql_ddl:make_module_name(Bucket),
     {ModAttr, LineNo1} = make_module_attr(ModName, LineNo),
     {ExpAttr, LineNo2} = make_export_attr(LineNo1),
     {ModName, [ModAttr, ExpAttr], LineNo2}.
