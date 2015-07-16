@@ -233,9 +233,6 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
                   where   = E
                  }.
 
-%log(A, _Str) ->
-%    A.
-
 add_limit(A, _B, {int, C}) ->
     A#outputs{limit = C}.
 
