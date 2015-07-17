@@ -511,7 +511,7 @@ partial_wildcard_are_selections_valid_test() ->
 				    position = 2,
 				    type     = integer}
 		    ]),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL, "/tmp"),
+    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = are_selections_valid(DDL, Selections, ?CANTBEBLANK),
     ?assertEqual(true, Res).
 
