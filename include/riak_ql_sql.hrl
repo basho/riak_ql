@@ -9,7 +9,7 @@
 -record(riak_sql_v1,
 	{
 	  'SELECT'      = []    :: [selection() | operator() | combinator()],
-	  'FROM'        = <<>>  :: [binary() | #riak_sql_v1{}],     % bucket or another query
+	  'FROM'        = <<>>  :: binary(),     % TODO fix up
 	  'WHERE'       = []    :: [filter()],
 	  'ORDER BY'    = []    :: [sorter],
 	  'LIMIT'       = []    :: [limit()],

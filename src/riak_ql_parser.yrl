@@ -197,7 +197,7 @@ Erlang code.
 
 -record(outputs,
         {
-          type    = [] :: select | drop | delete,
+          type    = [] :: select | create,
           buckets = [],
           fields  = [],
           limit   = [],
@@ -207,21 +207,22 @@ Erlang code.
 
 -include("riak_ql_sql.hrl").
 -include("riak_ql_ddl.hrl").
+
+-ifdef(TEST).
 -include("riak_ql.yrl.tests").
+-endif.
 
 convert(#outputs{type    = select,
 		 buckets = B,
 		 fields  = F,
 		 limit   = L,
-		 where   = W} = O) ->
+		 where   = W}) ->
     Q = #riak_sql_v1{'SELECT' = F,
 		     'FROM'   = B,
 		     'WHERE'  = W,
 		     'LIMIT'  = L},
-    gg:format("O is ~p~nQ is ~p~n", [O, Q]),
     Q;
 convert(#outputs{type = create} = O) ->
-    gg:format("in (create) convert outputs is ~p~n", [O]),
     O.
 
 process({chars, A}) ->
