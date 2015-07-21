@@ -12,15 +12,14 @@ inner
 join
 limit
 local
-local key
 merge
-modfun
 not null
 of
 on commit
 or
-partition key
+primary key
 preserve
+quanta
 rows
 select
 system versioning
@@ -29,3 +28,4 @@ timestamp
 varchar
 where
 with
+quanta
