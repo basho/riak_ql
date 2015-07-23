@@ -40,6 +40,12 @@
          make_helper_mod/2
         ]).
 
+%% Testing only
+-export([
+         mk_helper_m2/2,
+         mk_helper_m2/1
+        ]).
+
 -import(riak_ql_parser, [parse/1]).
 -import(riak_ql_lexer, [get_tokens/1]).
 
@@ -62,18 +68,36 @@
 -type maps()   :: {maps, [[#riak_field_v1{}]]}.
 -type map()    :: {map,  [#riak_field_v1{}]}.
 
+
 -spec make_helper_mod(#ddl_v1{}) -> {module, atom()} | {'error', tuple()}.
 make_helper_mod(#ddl_v1{} = DDL) ->
     make_helper_mod(DDL, "/tmp", ?NODEBUGOUTPUT).
 
--spec make_helper_mod(#ddl_v1{}, string()) ->
-                             {module, atom()} | {'error', tuple()}.
+-spec make_helper_mod(#ddl_v1{}, string()) -> {module, atom()} | {'error', tuple()}.
 make_helper_mod(#ddl_v1{} = DDL, OutputDir) ->
     make_helper_mod(DDL, OutputDir, ?DEBUGOUTPUT).
 
--spec make_helper_mod(#ddl_v1{}, string(), boolean()) ->
+make_helper_mod(#ddl_v1{partition_key = none}, _, _) ->
+    {error, ddl_type_not_supported};
+make_helper_mod(#ddl_v1{} = DDL, Dir, IsDebugOn) ->
+    mk_helper_m2(DDL, Dir, IsDebugOn).
+
+%%
+%% this entry point is used in the test suite
+%% when the query language is fully generalised these fns
+%% will merge with make_helper_mod/N
+%%
+-spec mk_helper_m2(#ddl_v1{}) -> {module, atom()} | {'error', tuple()}.
+mk_helper_m2(#ddl_v1{} = DDL) ->
+    mk_helper_m2(DDL, "/tmp", ?NODEBUGOUTPUT).
+
+-spec mk_helper_m2(#ddl_v1{}, string()) -> {module, atom()} | {'error', tuple()}.
+mk_helper_m2(#ddl_v1{} = DDL, OutputDir) ->
+    mk_helper_m2(DDL, OutputDir, ?DEBUGOUTPUT).
+
+-spec mk_helper_m2(#ddl_v1{}, string(), boolean()) ->
                              {module, atom()} | {'error', tuple()}.
-make_helper_mod(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
+mk_helper_m2(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
     case validate_ddl(DDL) of
         true ->
             {Module, AST} = compile(DDL, OutputDir, HasDebugOutput),
@@ -602,7 +626,7 @@ simplest_valid_test() ->
                                    position = 1,
                                    type     = binary}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>}),
     ?assertEqual(?VALID, Result).
 
@@ -616,7 +640,7 @@ simple_valid_binary_test() ->
                                    position = 2,
                                    type     = binary}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, <<"werewr">>}),
     ?assertEqual(?VALID, Result).
 
@@ -633,7 +657,7 @@ simple_valid_integer_test() ->
                                    position = 3,
                                    type     = integer}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({999, -9999, 0}),
     ?assertEqual(?VALID, Result).
 
@@ -650,7 +674,7 @@ simple_valid_float_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({432.22, -23423.22, -0.0}),
     ?assertEqual(?VALID, Result).
 
@@ -664,7 +688,7 @@ simple_valid_boolean_test() ->
                                    position = 2,
                                    type     = boolean}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({true, false}),
     ?assertEqual(?VALID, Result).
 
@@ -681,7 +705,7 @@ simple_valid_timestamp_test() ->
                                    position = 3,
                                    type     = timestamp}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({234324, 23424, 34636}),
     ?assertEqual(?VALID, Result).
 
@@ -703,7 +727,7 @@ simple_valid_map_1_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"erko">>}, 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -728,7 +752,7 @@ simple_valid_map_2_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"erko">>, -999}, 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -740,7 +764,7 @@ simple_valid_optional_1_test() ->
                                    type     = binary,
                                    optional = true}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({[]}),
     ?assertEqual(?VALID, Result).
 
@@ -776,7 +800,7 @@ simple_valid_optional_2_test() ->
                                    type     = timestamp,
                                    optional = true}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({[], [], [], [], [], [], []}),
     ?assertEqual(?VALID, Result).
 
@@ -792,7 +816,7 @@ simple_valid_optional_3_test() ->
                                    type     = binary,
                                    optional = false}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({[], <<"edible">>}),
     ?assertEqual(?VALID, Result).
 
@@ -818,7 +842,7 @@ complex_valid_optional_1_test() ->
                                    type     = Map,
                                    optional = false}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({[], {1, []}}),
     ?assertEqual(?VALID, Result).
 
@@ -854,7 +878,7 @@ complex_valid_map_1_test() ->
                                    position = 3,
                                    type     = integer}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({1, {1, {3, 4}, 1}, 1}),
     ?assertEqual(?VALID, Result).
 
@@ -901,7 +925,7 @@ complex_valid_map_2_test() ->
                                    position = 3,
                                    type     = integer}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({1, {1, {1, 1, {1, 1}}, 1}, 1}),
     ?assertEqual(?VALID, Result).
 
@@ -933,7 +957,7 @@ complex_valid_map_3_test() ->
                                    position = 1,
                                    type     = Map1}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({{2, {3}, {4}}}),
     ?assertEqual(?VALID, Result).
 
@@ -950,7 +974,7 @@ simple_valid_any_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [a, b, d], 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -967,7 +991,7 @@ simple_valid_set_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [a, b, d], 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -987,7 +1011,7 @@ simple_valid_mixed_test() ->
                                    position = 4,
                                    type     = timestamp}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, 99, 4.4, 5555}),
     ?assertEqual(?VALID, Result).
 
@@ -1002,7 +1026,7 @@ simple_invalid_binary_test() ->
                                    position = 2,
                                    type     = binary}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, 55}),
     ?assertEqual(?INVALID, Result).
 
@@ -1019,7 +1043,7 @@ simple_invalid_integer_test() ->
                                    position = 3,
                                    type     = integer}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({999, -9999, 0,0}),
     ?assertEqual(?INVALID, Result).
 
@@ -1036,7 +1060,7 @@ simple_invalid_float_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({432.22, -23423.22, [a, b, d]}),
     ?assertEqual(?INVALID, Result).
 
@@ -1053,7 +1077,7 @@ simple_invalid_boolean_test() ->
                                    position = 3,
                                    type     = boolean}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({true, false, [a, b, d]}),
     ?assertEqual(?INVALID, Result).
 
@@ -1070,7 +1094,7 @@ simple_invalid_set_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [444.44], 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -1087,7 +1111,7 @@ simple_invalid_timestamp_1_test() ->
                                    position = 3,
                                    type     = timestamp}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({234.324, 23424, 34636}),
     ?assertEqual(?INVALID, Result).
 
@@ -1104,7 +1128,7 @@ simple_invalid_timestamp_2_test() ->
                                    position = 3,
                                    type     = timestamp}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({234324, -23424, 34636}),
     ?assertEqual(?INVALID, Result).
 
@@ -1121,7 +1145,7 @@ simple_invalid_timestamp_3_test() ->
                                    position = 3,
                                    type     = timestamp}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({234324, 0, 34636}),
     ?assertEqual(?INVALID, Result).
 
@@ -1143,7 +1167,7 @@ simple_invalid_map_1_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {99}, 4.4}),
     ?assertEqual(?INVALID, Result).
 
@@ -1168,7 +1192,7 @@ simple_invalid_map_2_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"erer">>}, 4.4}),
     ?assertEqual(?INVALID, Result).
 
@@ -1193,7 +1217,7 @@ simple_invalid_map_3_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"bingo">>, <<"bango">>, <<"erk">>}, 4.4}),
     ?assertEqual(?INVALID, Result).
 
@@ -1215,7 +1239,7 @@ simple_invalid_map_4_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [99], 4.4}),
     ?assertEqual(?INVALID, Result).
 
@@ -1251,7 +1275,7 @@ complex_invalid_map_1_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>,
                               {<<"erko">>,
                                {<<"yerk">>, 33.0}
@@ -1273,7 +1297,7 @@ too_small_tuple_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({432.22, -23423.22}),
     ?assertEqual(?INVALID, Result).
 
@@ -1290,7 +1314,7 @@ too_big_tuple_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({432.22, -23423.22, 44.44, 65.43}),
     ?assertEqual(?INVALID, Result).
 
@@ -1310,7 +1334,7 @@ simple_invalid_position_test() ->
                                    type     = float},
                     Duff
                    ]),
-    {error, Err} = make_helper_mod(DDL),
+    {error, Err} = mk_helper_m2(DDL),
     Expected = {invalid_ddl, [{wrong_position, {expected, 3}, Duff}]},
     ?assertEqual(Expected, Err).
 
@@ -1322,7 +1346,7 @@ simple_invalid_vals_test() ->
                    [
                     Duff
                    ]),
-    {error, Err} = make_helper_mod(DDL),
+    {error, Err} = mk_helper_m2(DDL),
     Expected = {invalid_ddl, [{invalid_field, Duff},
                               {wrong_position, {expected, 1}, Duff}]},
     ?assertEqual(Expected, Err).
@@ -1342,7 +1366,7 @@ simple_invalid_optional_test() ->
                    [
                     Duff
                    ]),
-    {error, Err} = make_helper_mod(DDL),
+    {error, Err} = mk_helper_m2(DDL),
     Expected = {invalid_ddl, [{maps_cant_be_optional, Duff}]},
     ?assertEqual(Expected, Err).
 
@@ -1370,7 +1394,7 @@ complex_invalid_vals_test() ->
                                    type     = Map,
                                    optional = false}
                    ]),
-    {error, Err} = make_helper_mod(DDL),
+    {error, Err} = mk_helper_m2(DDL),
     Expected = {invalid_ddl, [{invalid_field, Duff},
                               {wrong_position, {expected, 2}, Duff}]},
     ?assertEqual(Expected, Err).
@@ -1386,7 +1410,7 @@ simplest_valid_extract_test() ->
                                    position = 1,
                                    type     = binary}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Obj = {<<"yarble">>},
     Result = (catch Module:extract(Obj, ["yando"])),
     ?assertEqual(<<"yarble">>, Result).
@@ -1401,7 +1425,7 @@ simple_valid_extract_test() ->
                                    position = 2,
                                    type     = binary}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Obj = {44, <<"yarble">>},
     Result = (catch Module:extract(Obj, ["yando"])),
     ?assertEqual(<<"yarble">>, Result).
@@ -1424,7 +1448,7 @@ simple_valid_map_extract_test() ->
                                    position = 3,
                                    type     = float}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Obj = {<<"erk">>, {<<"jibjib">>}, 3.0},
     Result = (catch Module:extract(Obj, ["erko", "yarple"])),
     ?assertEqual(<<"jibjib">>, Result).
@@ -1457,14 +1481,14 @@ complex_valid_map_extract_test() ->
                                    position = 1,
                                    type     = Map1}
                    ]),
-    {module, Module} = make_helper_mod(DDL),
+    {module, Module} = mk_helper_m2(DDL),
     Obj = {{2, {3}, {4}}},
     Path = ["Top_Map", "Level_1_map1", "in_Map_1"],
     Res = (catch Module:extract(Obj, Path)),
     ?assertEqual(3, Res).
 
 complex_ddl_test() ->
-    Ddl = #ddl_v1{
+    DDL = #ddl_v1{
              bucket = <<"temperatures">>,
              fields = [
                        #riak_field_v1{
@@ -1495,7 +1519,7 @@ complex_ddl_test() ->
                                    #param_v1{
                                       name = "time"
                                      }]}},
-    {module, Module} = make_helper_mod(Ddl),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({12345, <<"beeees">>}),
     ?assertEqual(?VALID, Result).
 -endif.

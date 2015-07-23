@@ -243,9 +243,14 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
                 quoted -> string;
                 regex  -> regex
             end,
+    Bucket = case Type2 of
+		 string -> list_to_binary(D);
+		 list   -> {Type2, [list_to_binary(X) || X <- D]};
+		 regex  -> {Type2, D}
+	     end,
     _O = #outputs{type    = list_to_existing_atom(A),
                   fields  = B,
-                  buckets = {Type2, D},
+                  buckets = Bucket,
                   where   = E
                  }.
 
@@ -272,10 +277,17 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
              conditional -> C;
              _           -> {Type, C}
          end,
-    {conditional, {B1, {A, C2}}}.
+    {conditional, {B1, A, C2}}.
 
 make_where({where, A}, {conditional, B}) ->
-    {A, B}.
+    {A, remove_conditionals(B)}.
+
+remove_conditionals({conditional, A}) ->
+    A;
+remove_conditionals({A, B, C}) ->
+    {A, remove_conditionals(B), remove_conditionals(C)};
+remove_conditionals(A) ->
+    A.
 
 make_funcall({A, B}) ->
      make_funcall({A, B}, []).

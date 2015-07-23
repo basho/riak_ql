@@ -1,188 +1,175 @@
 %% -*- erlang -*-
 -include_lib("eunit/include/eunit.hrl").
 
--define(_t(String, Expected),
-        ?_test(
-           ?assertEqual({ok, Expected},
-                        parse(riak_ql_lexer:get_tokens(String))))).
+-define(sql_test(String, Expected),
+	Toks = riak_ql_lexer:get_tokens(String),
+	{ok, Got} = parse(Toks),
+	?assertEqual(Expected, Got)).
 
 %% Tests
-select_test_() ->
-    ?_t("select * from argle",
+select_sql_test() ->
+    ?sql_test("select * from argle",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "argle"}}).
+		     'FROM'   = <<"argle">>}).
 
-select_quoted_test_() ->
-    ?_t("select * from \"argle\"",
+select_quoted_sql_test() ->
+    ?sql_test("select * from \"argle\"",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "argle"}}).
+		     'FROM'   = <<"argle">>}).
 
-select_quoted_keyword_test_() ->
-    ?_t("select * from \"select\"",
+select_quoted_keyword_sql_test() ->
+    ?sql_test("select * from \"select\"",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "select"}}).
+		     'FROM'   = <<"select">>}).
 
-select_nested_quotes_test_() ->
-    ?_t("select * from \"some \"quotes\" in me\"",
+select_nested_quotes_sql_test() ->
+    ?sql_test("select * from \"some \"quotes\" in me\"",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "some \"quotes\" in me"}}).
+		     'FROM'   = <<"some \"quotes\" in me">>}).
 
-select_regex_test_() ->
-    ?_t("select * from /.*/",
+select_regex_sql_test() ->
+    ?sql_test("select * from /.*/",
 	#riak_sql_v1{'SELECT' = "*",
 		     'FROM'   = {regex, "/.*/"}}).
 
-select_with_limit_test_() ->
-    ?_t("select * from /.*/ limit 1",
+select_with_limit_sql_test() ->
+    ?sql_test("select * from /.*/ limit 1",
 	#riak_sql_v1{'SELECT' = "*",
 		     'FROM'   = {regex, "/.*/"},
 		     'LIMIT'  = 1}).
 
-select_from_lists_test_() ->
-    ?_t("select * from events, errors",
+select_from_lists_sql_test() ->
+    ?sql_test("select * from events, errors",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {list, ["events", "errors"]}
+		     'FROM'   = {list, [<<"events">>, <<"errors">>]}
 		    }).
 
-select_where_1_test_() ->
-    ?_t("select value from response_times " ++
+select_where_1_sql_test() ->
+    ?sql_test("select value from response_times " ++
 	    "where time > '2013-08-12 23:32:01' and time < '2013-08-13 12:34:56'",
 	#riak_sql_v1{'SELECT' = "value",
-		     'FROM'   = {string, "response_times"},
+		     'FROM'   = <<"response_times">>,
 		     'WHERE'  = {and_,
-				 {
-				   {'>',
-				    {"time", {datetime, {{2013, 8, 12}, {23, 32, 1}}}}
-				   },
-				   {'<',
-				    {"time", {datetime, {{2013, 8, 13}, {12, 34, 56}}}}
-				   }
-				 }
+				 {'>', "time", {datetime, {{2013, 8, 12}, {23, 32, 1}}}},
+				 {'<', "time", {datetime, {{2013, 8, 13}, {12, 34, 56}}}}
 				}
 		    }).
 
-select_where_2_test_() ->
-    ?_t("select value from response_times where time > now() - 1h limit 1000",
+select_where_2_sql_test() ->
+    ?sql_test("select value from response_times where time > now() - 1h limit 1000",
 	#riak_sql_v1{'SELECT' = "value",
-		     'FROM'   = {string, "response_times"},
-		     'WHERE'  = {'>', {"time", {'-', {{"now", []}, {int, 3600}}}}},
+		     'FROM'   = <<"response_times">>,
+		     'WHERE'  = {'>', "time", {'-', {"now", []}, {int, 3600}}},
 		     'LIMIT'  = 1000
 		    }).
 
-select_where_3_test_() ->
-    ?_t("select value from response_times where time > 1388534400",
+select_where_3_sql_test() ->
+    ?sql_test("select value from response_times where time > 1388534400",
 	#riak_sql_v1{'SELECT' = "value",
-		     'FROM'   = {string, "response_times"},
-		     'WHERE'  = {'>', {"time", {int, 1388534400}}}
+		     'FROM'   = <<"response_times">>,
+		     'WHERE'  = {'>', "time", {int, 1388534400}}
 		    }).
 
-select_where_4_test_() ->
-    ?_t("select value from response_times where time > 1388534400s",
+select_where_4_sql_test() ->
+    ?sql_test("select value from response_times where time > 1388534400s",
 	#riak_sql_v1{'SELECT' = "value",
-		     'FROM'   = {string, "response_times"},
-		     'WHERE'  = {'>', {"time", {int, 1388534400}}}
+		     'FROM'   = <<"response_times">>,
+		     'WHERE'  = {'>', "time", {int, 1388534400}}
 		    }).
 
-select_where_5_test_() ->
-    ?_t("select * from events where time = 1400497861762723 "++
+select_where_5_sql_test() ->
+    ?sql_test("select * from events where time = 1400497861762723 "++
 	    "and sequence_number = 2321",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "events"},
-		     'WHERE'  = {and_, {
-				   {'=', {"time",            {int, 1400497861762723}}},
-				   {'=', {"sequence_number", {int, 2321}}}
-				  }
+		     'FROM'   = <<"events">>,
+		     'WHERE'  = {and_, 
+				   {'=', "time",            {int, 1400497861762723}},
+				   {'=', "sequence_number", {int, 2321}}
 				}
 		    }).
 
-select_where_6_test_() ->
-    ?_t("select * from /^stats\./i where time > now() - 1h",
+select_where_6_sql_test() ->
+    ?sql_test("select * from /^stats\./i where time > now() - 1h",
 	#riak_sql_v1{'SELECT' = "*",
 		     'FROM'   = {regex, "/^stats\./i"},
-		     'WHERE'  = {'>', {"time",
-				       {'-', {{"now", []}, {int, 3600}}}
-				      }
-				}
+		     'WHERE'  = {'>', "time", {'-', {"now", []}, {int, 3600}}}
 		    }).
 
-select_where_7_test_() ->
-    ?_t("select * from /.*/ limit 1",
+select_where_7_sql_test() ->
+    ?sql_test("select * from /.*/ limit 1",
 	#riak_sql_v1{'SELECT' = "*",
 		     'FROM'   = {regex, "/.*/"},
 		     'LIMIT'  = 1
 		    }).
 
-select_where_8_test_() ->
-    ?_t("select * from events where state = 'NY'",
+select_where_8_sql_test() ->
+    ?sql_test("select * from events where state = 'NY'",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "events"},
-		     'WHERE'  = {'=', {"state", {word, "NY"}}}
+		     'FROM'   = <<"events">>,
+		     'WHERE'  = {'=', "state", {word, "NY"}}
 		    }).
 
-select_where_9_test_() ->
-    ?_t("select * from log_lines where line =~ /error/i",
+select_where_9_sql_test() ->
+    ?sql_test("select * from log_lines where line =~ /error/i",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "log_lines"},
-		     'WHERE'  = {'=~', {"line", {regex, "/error/i"}}}
+		     'FROM'   = <<"log_lines">>,
+		     'WHERE'  = {'=~', "line", {regex, "/error/i"}}
 		    }).
 
-select_where_10_test_() ->
-    ?_t("select * from events where customer_id = 23 and type = 'click'",
+select_where_10_sql_test() ->
+    ?sql_test("select * from events where customer_id = 23 and type = 'click'",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "events"},
-		     'WHERE'  = {and_, {
-				   {'=', {"customer_id", {int,  23}}},
-				   {'=', {"type",        {word, "click"}}}
-				  }
+		     'FROM'   = <<"events">>,
+		     'WHERE'  = {and_, 
+				   {'=', "customer_id", {int,  23}},
+				   {'=', "type",        {word, "click"}}
 				}
 		    }).
 
-select_where_11_test_() ->
-    ?_t("select * from response_times where value > 500",
+select_where_11_sql_test() ->
+    ?sql_test("select * from response_times where value > 500",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "response_times"},
-		     'WHERE'  = {'>', {"value", {int, 500}}}
+		     'FROM'   = <<"response_times">>,
+		     'WHERE'  = {'>', "value", {int, 500}}
 		    }).
 
-select_where_12_test_() ->
-    ?_t("select * from events where email !~ /.*gmail.*/",
+select_where_12_sql_test() ->
+    ?sql_test("select * from events where email !~ /.*gmail.*/",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "events"},
-		     'WHERE'  = {'!~', {"email", {regex, "/.*gmail.*/"}}}
+		     'FROM'   = <<"events">>,
+		     'WHERE'  = {'!~', "email", {regex, "/.*gmail.*/"}}
 		    }).
 
-select_where_13_test_() ->
-    ?_t("select * from nagios_checks where status <> 0",
+select_where_13_sql_test() ->
+    ?sql_test("select * from nagios_checks where status <> 0",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "nagios_checks"},
-		     'WHERE'  = {'<>', {"status", {int, 0}}}
+		     'FROM'   = <<"nagios_checks">>,
+		     'WHERE'  = {'<>', "status", {int, 0}}
 		    }).
 
-select_where_14_test_() ->
-    ?_t("select * from events where signed_in = false",
+select_where_14_sql_test() ->
+    ?sql_test("select * from events where signed_in = false",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "events"},
-		     'WHERE'  = {'=', {"signed_in", {word, "false"}}}
+		     'FROM'   = <<"events">>,
+		     'WHERE'  = {'=', "signed_in", {word, "false"}}
 		    }).
 
-select_where_15_test() ->
-    ?_t("select * from events where (email =~ /.*gmail.*/ or " ++
+select_where_15_sql_test() ->
+    ?sql_test("select * from events where (email =~ /.*gmail.*/ or " ++
 	    "email =~ /.*yahoo.*/) and state = 'ny'",
 	#riak_sql_v1{'SELECT' = "*",
-		     'FROM'   = {string, "events"},
+		     'FROM'   = <<"events">>,
 		     'WHERE'  = {and_,
-				 {conditional, {or_,
-						{'=~', {"email", {regex, "/.*gmail.*/"}}},
-						{'=~', {"email", {regex, "/.*yahoo.*/"}}}
-					       }
+				 {or_,
+				  {'=~', "email", {regex, "/.*gmail.*/"}},
+				  {'=~', "email", {regex, "/.*yahoo.*/"}}
 				 },
-				 {"=", {"state", {word, "ny"}}
-				 }
+				 {'=', "state", {word, "ny"}}
 				}
 		    }).
 
-create_simple_test() ->
-    ?_t("create table temperatures " ++
+create_simple_sql_test() ->
+    ?sql_test("create table temperatures " ++
 	    "(time timestamp not null, " ++
 	    "temperature_k float, " ++
 	    "primary key (time))",
@@ -208,8 +195,8 @@ create_simple_test() ->
 			 }
 	  }).
 
-create_composite_key_test() ->
-    ?_t("create table temperatures " ++
+create_composite_key_sql_test() ->
+    ?sql_test("create table temperatures " ++
 	    "(time timestamp not null, " ++
 	    "user_id varchar not null, " ++
 	    "mytype varchar not null, " ++
@@ -247,8 +234,8 @@ create_composite_key_test() ->
 				]}
 	  }).
 
-create_no_key_test() ->
-    ?_t("create table temperatures " ++
+create_no_key_sql_test() ->
+    ?sql_test("create table temperatures " ++
 	    "(time timestamp not null, " ++
 	    "temperature_k float)",
 	#ddl_v1{
@@ -269,7 +256,7 @@ create_no_key_test() ->
 	  }).
 
 %% need to refactor
-create_timeseries_test() ->
+create_timeseries_sql_test() ->
     String = "CREATE TABLE GeoCheckin "
 	++ "(geohash varchar not null, "
 	++ "user varchar not null, "
@@ -336,7 +323,7 @@ create_timeseries_test() ->
 %%% Failure tests
 %%%
 
-failure_test() ->
+failure_sql_test() ->
     String = "klsdafj kljfd (*((*& 89& 8KHH kJHkj hKJH K K",
     Expected = error,
     Got = case parse(riak_ql_lexer:get_tokens(String)) of

@@ -165,11 +165,17 @@ extract_f2([{Op, LHS, RHS} | T], Acc) when Op =:= '='    orelse
 	   end,
     %% note that the RHS is treated differently to the LHS - the LHS is always
     %% a field - but the RHS terminates on a value
-    Acc3 = case is_tuple(RHS) of
-	       true  -> extract_f2([RHS], Acc2);
-	       false -> Acc2
+    Acc3 = case is_val(RHS) of
+	       false -> extract_f2([RHS], Acc2);
+	       true  -> Acc2
 	   end,
     extract_f2(T, Acc3).
+
+is_val({int,      _}) -> true;
+is_val({float,    _}) -> true; 
+is_val({datetime, _}) -> true; 
+is_val({varchar,  _}) -> true; 
+is_val(_)             -> false.
 
 remove_hooky_chars(Nonce) ->
     re:replace(Nonce, "[/|\+|\.|=]", "", [global, {return, list}]).
@@ -627,7 +633,12 @@ simple_is_query_valid_map_wildcard_test() ->
 simple_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
     Selections  = [["temperature"], ["geohash"]],
-    Filters = [{and_, {'>', "temperature", 1}, {'<', "temperature", 15}}],
+    Filters = [
+	       {and_, 
+		{'>', "temperature", {int, 1}}, 
+		{'<', "temperature", {int, 15}}}
+	       
+	      ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
 			 'SELECT' = Selections,
 			 'WHERE'  = Filters},
@@ -647,7 +658,11 @@ simple_filter_query_test() ->
 simple_filter_query_fail_test() ->
     Bucket = <<"simple_filter_query_fail_test">>,
     Selections  = [["temperature"], ["geohash"]],
-    Filters = [{and_, {'>', "gingerbread", 1}, {'<', "temperature", 15}}],
+    Filters = [
+	       {and_, 
+		{'>', "gingerbread", {int, 1}}, 
+		{'<', "temperature", {int, 15}}}
+	      ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
 			 'SELECT' = Selections,
 			 'WHERE'  = Filters},
