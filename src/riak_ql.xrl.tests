@@ -244,7 +244,7 @@ timeseries_test_() ->
 				   ++ "time timestamp not_null, "
 				   ++ "weather varchar not_null, "
 				   ++ "temperature varchar not_null, "
-				   ++ "PRIMARY KEY ((geohash, quanta(time, 15, m), time, user)"),
+				   ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
     Expected = [
                 {create_table, "CREATE TABLE"},
 		{chars, "Geo"},
@@ -274,7 +274,7 @@ timeseries_test_() ->
 		{openb, "("},
 		{chars, "geohash"},
 		{comma, ","},
-		{quanta,"quanta"},
+		{quantum,"quantum"},
 		{openb,"("},
 		{chars,"time"},
 		{comma,","},

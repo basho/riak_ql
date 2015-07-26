@@ -28,7 +28,7 @@ ON_COMMIT = (O|o)(N|n)\s(C|c)(O|o)(M|m)(M|m)(I|i)(T|t)
 OR = (O|o)(R|r)
 PRIMARY_KEY = (P|p)(R|r)(I|i)(M|m)(A|a)(R|r)(Y|y)\s(K|k)(E|e)(Y|y)
 PRESERVE = (P|p)(R|r)(E|e)(S|s)(E|e)(R|r)(V|v)(E|e)
-QUANTA = (Q|q)(U|u)(A|a)(N|n)(T|t)(A|a)
+QUANTUM = (Q|q)(U|u)(A|a)(N|n)(T|t)(U|u)(M|m)
 ROWS = (R|r)(O|o)(W|w)(S|s)
 SELECT = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
 SYSTEM_VERSIONING = (S|s)(Y|y)(S|s)(T|t)(E|e)(M|m)\s(V|v)(E|e)(R|r)(S|s)(I|i)(O|o)(N|n)(I|i)(N|n)(G|g)
@@ -92,7 +92,7 @@ Rules.
 {OR} : {token, {or_, TokenChars}}.
 {PRIMARY_KEY} : {token, {primary_key, TokenChars}}.
 {PRESERVE} : {token, {preserve, TokenChars}}.
-{QUANTA} : {token, {quanta, TokenChars}}.
+{QUANTUM} : {token, {quantum, TokenChars}}.
 {ROWS} : {token, {rows, TokenChars}}.
 {SELECT} : {token, {select, TokenChars}}.
 {SYSTEM_VERSIONING} : {token, {system_versioning, TokenChars}}.

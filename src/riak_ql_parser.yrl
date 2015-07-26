@@ -77,7 +77,7 @@ primary_key
 timestamp
 varchar
 atom
-quanta
+quantum
 .
 
 Rootsymbol Statement.
@@ -180,7 +180,7 @@ KeyDefinition ->
 KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
 KeyFieldList -> KeyField : make_list({list, []}, '$1').
 
-KeyField -> quanta openb KeyFieldArgList closeb : make_modfun(quanta, '$3').
+KeyField -> quantum openb KeyFieldArgList closeb : make_modfun(quantum, '$3').
 KeyField -> Word : '$1'.
 
 KeyFieldArgList ->
@@ -385,11 +385,12 @@ find_local_key([LocalKey = #local_key_v1{} | _Rest]) ->
 find_local_key([_Head | Rest]) ->
     find_local_key(Rest).
 
-make_modfun(quanta, {list, Args}) ->
+make_modfun(quantum, {list, Args}) ->
+    [Param, Quantity, Unit] = lists:reverse(Args),
     {modfun, #hash_fn_v1{
        mod  = riak_ql_quanta,
-       fn   = quanta,
-       args = lists:reverse(Args)}}.
+       fn   = quantum,
+       args = [#param_v1{name = Param}, Quantity, list_to_existing_atom(Unit)]}}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(1, Elements, []).
