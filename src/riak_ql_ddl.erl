@@ -110,7 +110,7 @@ is_valid_field(#ddl_v1{bucket = B}, Field) when is_list(Field)->
 is_query_valid(#ddl_v1{bucket = B} = DDL,
 	       #riak_sql_v1{'FROM'   = B,
 			    'SELECT' = S,
-			    'WHERE'  = F}) ->
+			    'WHERE'  = F} = Q) ->
     ValidSelection = are_selections_valid(DDL, S, ?CANTBEBLANK),
     ValidFilters   = are_filters_valid(DDL, F),
     case {ValidSelection, ValidFilters} of
@@ -135,6 +135,7 @@ are_selections_valid(#ddl_v1{}, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
 are_selections_valid(#ddl_v1{} = DDL, Selections, _) ->
     CheckFn = fun(X, {Acc, Status}) ->
+		      io:format(user, "Field is ~p~n", [X]),
 		      case is_valid_field(DDL, X) of
 			  true  -> {Acc, Status};
 			  false -> Msg = {invalid_field, X},
@@ -632,16 +633,16 @@ simple_is_query_valid_map_wildcard_test() ->
 %%
 simple_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
-    Selections  = [["temperature"], ["geohash"]],
-    Filters = [
-	       {and_, 
-		{'>', "temperature", {int, 1}}, 
-		{'<', "temperature", {int, 15}}}
-	       
-	      ],
+    Selections = [["temperature"], ["geohash"]],
+    Where = [
+	     {and_, 
+	      {'>', "temperature", {int, 1}}, 
+	      {'<', "temperature", {int, 15}}
+	     }
+	    ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
 			 'SELECT' = Selections,
-			 'WHERE'  = Filters},
+			 'WHERE'  = Where},
     DDL = make_ddl(Bucket,
 		   [
 		    #riak_field_v1{name     = "temperature",
@@ -657,15 +658,16 @@ simple_filter_query_test() ->
 
 simple_filter_query_fail_test() ->
     Bucket = <<"simple_filter_query_fail_test">>,
-    Selections  = [["temperature"], ["geohash"]],
-    Filters = [
-	       {and_, 
-		{'>', "gingerbread", {int, 1}}, 
-		{'<', "temperature", {int, 15}}}
-	      ],
+    Selections = [["temperature"], ["geohash"]],
+    Where = [
+	     {and_, 
+	      {'>', "gingerbread", {int, 1}}, 
+	      {'<', "temperature", {int, 15}}
+	     }
+	    ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
 			 'SELECT' = Selections,
-			 'WHERE'  = Filters},
+			 'WHERE'  = Where},
     DDL = make_ddl(Bucket,
 		   [
 		    #riak_field_v1{name     = "temperature",

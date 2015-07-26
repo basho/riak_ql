@@ -94,7 +94,7 @@ Select -> select Fields from Buckets       : make_clause('$1', '$2', '$3', '$4')
 Where -> where Conds : make_where('$1', '$2').
 
 Fields -> Fields comma Field : make_list('$1', '$3').
-Fields -> Field              : '$1'.
+Fields -> Field              : make_list('$1').
 
 Field -> Word                : '$1'.
 Field -> maybetimes          : '$1'.
@@ -208,6 +208,14 @@ Erlang code.
 -include("riak_ql_sql.hrl").
 -include("riak_ql_ddl.hrl").
 
+%% export the return value function to prevent xref errors
+%% this fun is used during the parsing and is marked as
+%% unused/but not to be exported in the yecc source
+%% no way to stop rebar borking on it AFAIK
+-export([
+	 return_error/2
+	 ]).
+
 -ifdef(TEST).
 -include("riak_ql.yrl.tests").
 -endif.
@@ -249,7 +257,7 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
 		 regex  -> {Type2, D}
 	     end,
     _O = #outputs{type    = list_to_existing_atom(A),
-                  fields  = B,
+                  fields  = [[X] || X <- B],
                   buckets = Bucket,
                   where   = E
                  }.
@@ -280,7 +288,7 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
     {conditional, {B1, A, C2}}.
 
 make_where({where, A}, {conditional, B}) ->
-    {A, remove_conditionals(B)}.
+    {A, [remove_conditionals(B)]}.
 
 remove_conditionals({conditional, A}) ->
     A;
@@ -299,6 +307,10 @@ add_unit({Type, A}, {chars, U}) when U =:= "s" -> {Type, A};
 add_unit({Type, A}, {chars, U}) when U =:= "m" -> {Type, A*60};
 add_unit({Type, A}, {chars, U}) when U =:= "h" -> {Type, A*60*60};
 add_unit({Type, A}, {chars, U}) when U =:= "d" -> {Type, A*60*60*24}.
+
+make_list({maybetimes, A}) -> {list, [A]};
+make_list({word,       A}) -> {list, [A]};
+make_list(A)               -> {list, [A]}.
 
 make_list({list, A}, {_, B}) -> {list, A ++ [B]};
 make_list({_,    A}, {_, B}) -> {list, [A, B]}.

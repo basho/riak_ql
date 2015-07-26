@@ -142,9 +142,7 @@ Erlang code.
          get_tokens/1
         ]).
 
--ifdef(TEST).
 -include("riak_ql.xrl.tests").
--endif.
 
 get_tokens(X) ->
     Toks = lex(X),
