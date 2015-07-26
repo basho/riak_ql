@@ -135,7 +135,6 @@ are_selections_valid(#ddl_v1{}, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
 are_selections_valid(#ddl_v1{} = DDL, Selections, _) ->
     CheckFn = fun(X, {Acc, Status}) ->
-		      io:format(user, "Field is ~p~n", [X]),
 		      case is_valid_field(DDL, X) of
 			  true  -> {Acc, Status};
 			  false -> Msg = {invalid_field, X},
