@@ -110,7 +110,7 @@ is_valid_field(#ddl_v1{bucket = B}, Field) when is_list(Field)->
 is_query_valid(#ddl_v1{bucket = B} = DDL,
 	       #riak_sql_v1{'FROM'   = B,
 			    'SELECT' = S,
-			    'WHERE'  = F} = Q) ->
+			    'WHERE'  = F}) ->
     ValidSelection = are_selections_valid(DDL, S, ?CANTBEBLANK),
     ValidFilters   = are_filters_valid(DDL, F),
     case {ValidSelection, ValidFilters} of
