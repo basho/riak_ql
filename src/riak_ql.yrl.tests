@@ -224,7 +224,7 @@ create_simple_sql_test() ->
 	   partition_key = none,
 	   local_key = #local_key_v1{
 			  ast = [#param_v1{
-				    name = "time"
+				    name = ["time"]
 				   }]
 			 }
 	  }).
@@ -256,14 +256,14 @@ create_composite_key_sql_test() ->
 		    ],
 	   partition_key = #partition_key_v1{
 			      ast = [#param_v1{
-					name = "time"
+					name = ["time"]
 				       },
 				     #param_v1{
-					name = "user_id"
+					name = ["user_id"]
 				       }]},
 	   local_key = #local_key_v1{
 			  ast = [#param_v1{
-				    name = "mytype"
+				    name = ["mytype"]
 				   }
 				]}
 	  }).
@@ -335,21 +335,21 @@ create_timeseries_sql_test() ->
 		  partition_key = #partition_key_v1{
 				     ast = [
 					    #param_v1{
-					       name = "geohash"
+					       name = ["geohash"]
 					      },
 					    #hash_fn_v1{mod = riak_ql_quanta,
 							fn  = quantum,
 							args = [#param_v1{
-								   name = "time"
+								   name = ["time"]
 								  }, 15, m]}
 					   ]},
 		  local_key = #local_key_v1{
 				 ast = [
 					#param_v1{
-					   name = "time"
+					   name = ["time"]
 					  },
 					#param_v1{
-					   name = "user"
+					   name = ["user"]
 					  }
 				       ]}
 		 },

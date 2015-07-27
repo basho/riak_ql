@@ -175,7 +175,7 @@ DataType -> varchar : '$1'.
 KeyDefinition ->
     primary_key       openb KeyFieldList closeb                           : make_local_key('$3').
 KeyDefinition ->
-    primary_key openb openb KeyFieldList closeb comma KeyFieldList closeb : make_partitioned_keys('$4', '$7').
+    primary_key openb openb KeyFieldList closeb comma KeyFieldList closeb : make_partition_keys('$4', '$7').
 
 KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
 KeyFieldList -> KeyField : make_list({list, []}, '$1').
@@ -334,7 +334,7 @@ make_local_key(FieldList) ->
     #local_key_v1{
        ast = lists:reverse(extract_key_field_list(FieldList, []))}.
 
-make_partitioned_keys(PFieldList, LFieldList) ->    
+make_partition_keys(PFieldList, LFieldList) ->    
     [
      #partition_key_v1{
 	ast = lists:reverse(extract_key_field_list(PFieldList, []))},
@@ -354,7 +354,7 @@ extract_key_field_list({list,
                        Extracted) ->
     [Modfun | extract_key_field_list({list, Rest}, Extracted)];
 extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [#param_v1{name = Field} |
+    [#param_v1{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
 make_table_definition({word, BucketName}, Contents) ->
@@ -390,7 +390,7 @@ make_modfun(quantum, {list, Args}) ->
     {modfun, #hash_fn_v1{
        mod  = riak_ql_quanta,
        fn   = quantum,
-       args = [#param_v1{name = Param}, Quantity, list_to_existing_atom(Unit)]}}.
+       args = [#param_v1{name = [Param]}, Quantity, list_to_existing_atom(Unit)]}}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(1, Elements, []).
