@@ -13,6 +13,6 @@
 	  'WHERE'       = []    :: [filter()],
 	  'ORDER BY'    = []    :: [sorter],
 	  'LIMIT'       = []    :: [limit()],
-	  partition_key = <<>>  :: binary(),
+	  partition_key = none  :: none | binary(),
 	  is_executable = false :: boolean()
 	}).
