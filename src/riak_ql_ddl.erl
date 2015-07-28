@@ -43,13 +43,13 @@
 	 is_query_valid/2
 	]).
 
--ifdef(TEST).
+%-ifdef(TEST).
 %% for debugging only
 -export([
 	 make_ddl/2,
 	 are_selections_valid/3
 	]).
--endif.
+%-endif.
 
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
@@ -75,6 +75,7 @@ get_partition_key(#ddl_v1{bucket = B, partition_key = PK}, Obj)
 
 -spec get_local_key(#ddl_v1{}, tuple()) -> binary().
 get_local_key(#ddl_v1{bucket = B, local_key = LK}, Obj) when is_tuple(Obj) ->
+    io:format(user, "Local Key is ~p~n", [LK]),
     Mod = make_module_name(B),
     #local_key_v1{ast = Params} = LK,
     Key = build(Params, Obj, Mod, []),
@@ -180,7 +181,7 @@ is_val(_)             -> false.
 remove_hooky_chars(Nonce) ->
     re:replace(Nonce, "[/|\+|\.|=]", "", [global, {return, list}]).
 
--ifdef(TEST).
+%-ifdef(TEST).
 -compile(export_all).
 
 -define(VALID,   true).
@@ -359,8 +360,6 @@ complex_partition_key_test() ->
 %% get local_key tests
 %%
 
-%% local keys share the same code path as partition keys
-%% so only need the lightest tests
 simplest_local_key_test() ->
     Name = "yando",
     PK = #partition_key_v1{ast = [
@@ -378,7 +377,7 @@ simplest_local_key_test() ->
 		   PK, LK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {<<"yarble">>},
-    Result = (catch get_partition_key(DDL, Obj)),
+    Result = (catch get_local_key(DDL, Obj)),
     ?assertEqual({<<"yarble">>}, sext:decode(Result)).
 
 %%
@@ -685,4 +684,4 @@ simple_filter_query_fail_test() ->
 	       },
     ?assertEqual(Expected, Res).
 
--endif.
+%-endif.
