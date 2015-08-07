@@ -11,7 +11,7 @@
 	  'SELECT'      = []    :: [selection() | operator() | combinator()],
 	  'FROM'        = <<>>  :: binary(),     % TODO fix up
 	  'WHERE'       = []    :: [filter()],
-	  'ORDER BY'    = []    :: [sorter],
+	  'ORDER BY'    = []    :: [sorter()],
 	  'LIMIT'       = []    :: [limit()],
 	  partition_key = none  :: none | binary(),
 	  is_executable = false :: boolean()
