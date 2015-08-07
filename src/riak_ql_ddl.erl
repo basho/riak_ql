@@ -43,13 +43,13 @@
 	 is_query_valid/2
 	]).
 
-%-ifdef(TEST).
+-ifdef(TEST).
 %% for debugging only
 -export([
 	 make_ddl/2,
 	 are_selections_valid/3
 	]).
-%-endif.
+-endif.
 
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
@@ -181,7 +181,7 @@ is_val(_)             -> false.
 remove_hooky_chars(Nonce) ->
     re:replace(Nonce, "[/|\+|\.|=]", "", [global, {return, list}]).
 
-%-ifdef(TEST).
+-ifdef(TEST).
 -compile(export_all).
 
 -define(VALID,   true).
@@ -684,4 +684,4 @@ simple_filter_query_fail_test() ->
 	       },
     ?assertEqual(Expected, Res).
 
-%-endif.
+-endif.
