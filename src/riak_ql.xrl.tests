@@ -70,11 +70,11 @@ keywords_3b_test_() ->
     ?_assertEqual(Expected, Got).
 
 keywords_create_test_() ->
-    Got = riak_ql_lexer:get_tokens("create table not null partition key"),
+    Got = riak_ql_lexer:get_tokens("create table not null primary key"),
     Expected = [
                 {create_table, "create table"},
                 {not_null, "not null"},
-                {partition_key, "partition key"}],
+                {primary_key, "primary key"}],
     ?_assertEqual(Expected, Got).
 
 words_containing_keywords_test_() ->
@@ -235,4 +235,57 @@ general_test_() ->
                ],
     io:format("Expected is ~p~n", [Expected]),
     io:format("Got is ~p~n", [Got]),
+    ?_assertEqual(Expected, Got).
+
+timeseries_test_() ->
+    Got = riak_ql_lexer:get_tokens("CREATE TABLE Geo ("
+				   ++ "geohash varchar not_null, "
+				   ++ "user varchar not_null, "
+				   ++ "time timestamp not_null, "
+				   ++ "weather varchar not_null, "
+				   ++ "temperature varchar not_null, "
+				   ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
+    Expected = [
+                {create_table, "CREATE TABLE"},
+		{chars, "Geo"},
+                {openb, "("},
+		{chars, "geohash"},
+		{varchar, "varchar"},
+		{chars, "not_null"},
+		{comma, ","},
+		{chars, "user"},
+		{varchar, "varchar"},
+		{chars, "not_null"},
+		{comma, ","},
+		{chars, "time"},
+		{timestamp, "timestamp"},
+		{chars, "not_null"},
+		{comma, ","},
+		{chars, "weather"},
+		{varchar, "varchar"},
+		{chars, "not_null"},
+		{comma, ","},
+		{chars, "temperature"},
+		{varchar, "varchar"},
+		{chars, "not_null"},
+		{comma, ","},
+		{primary_key, "PRIMARY KEY"},
+		{openb, "("},
+		{openb, "("},
+		{chars, "geohash"},
+		{comma, ","},
+		{quantum,"quantum"},
+		{openb,"("},
+		{chars,"time"},
+		{comma,","},
+		{int,15},
+		{comma,","},
+		{chars,"m"},
+		{closeb,")"},
+		{comma,","},
+		{chars,"time"},
+		{comma,","},
+		{chars,"user"},
+		{closeb,")"}
+	       ],
     ?_assertEqual(Expected, Got).

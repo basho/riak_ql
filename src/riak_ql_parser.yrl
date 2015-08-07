@@ -73,18 +73,17 @@ comma
 chars
 create_table
 not_null
-partition_key
+primary_key
 timestamp
 varchar
-local_key
-modfun
 atom
+quantum
 .
 
 Rootsymbol Statement.
 Endsymbol '$end'.
 
-Statement -> Query : '$1'.
+Statement -> Query : convert('$1').
 Statement -> TableDefinition : '$1'.
 
 Query -> Select limit int : add_limit('$1', '$2', '$3').
@@ -95,7 +94,7 @@ Select -> select Fields from Buckets       : make_clause('$1', '$2', '$3', '$4')
 Where -> where Conds : make_where('$1', '$2').
 
 Fields -> Fields comma Field : make_list('$1', '$3').
-Fields -> Field              : '$1'.
+Fields -> Field              : make_list('$1').
 
 Field -> Word                : '$1'.
 Field -> maybetimes          : '$1'.
@@ -174,14 +173,14 @@ DataType -> timestamp : '$1'.
 DataType -> varchar : '$1'.
 
 KeyDefinition ->
-    partition_key openb KeyFieldList closeb : make_key_definition('$1', '$3').
+    primary_key       openb KeyFieldList closeb                           : make_local_key('$3').
 KeyDefinition ->
-    local_key openb KeyFieldList closeb : make_key_definition('$1', '$3').
+    primary_key openb openb KeyFieldList closeb comma KeyFieldList closeb : make_partition_keys('$4', '$7').
 
 KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
 KeyFieldList -> KeyField : make_list({list, []}, '$1').
 
-KeyField -> modfun openb KeyFieldArgList closeb : make_modfun('$3').
+KeyField -> quantum openb KeyFieldArgList closeb : make_modfun(quantum, '$3').
 KeyField -> Word : '$1'.
 
 KeyFieldArgList ->
@@ -189,25 +188,50 @@ KeyFieldArgList ->
 KeyFieldArgList ->
     KeyFieldArg : make_list({list, []}, '$1').
 
-KeyFieldArg -> Word : '$1'.
+KeyFieldArg -> int   : '$1'.
+KeyFieldArg -> float : '$1'.
+KeyFieldArg -> Word  : '$1'.
 KeyFieldArg -> atom openb Word closeb : make_atom('$3').
 
 Erlang code.
 
--compile(export_all).
-
 -record(outputs,
         {
-          type    = [] :: select | drop | delete,
-          fields  = [],
+          type    = [] :: select | create,
           buckets = [],
-          limit   = none,
-          where   = none,
+          fields  = [],
+          limit   = [],
+          where   = [],
           ops     = []
          }).
 
+-include("riak_ql_sql.hrl").
 -include("riak_ql_ddl.hrl").
+
+%% export the return value function to prevent xref errors
+%% this fun is used during the parsing and is marked as
+%% unused/but not to be exported in the yecc source
+%% no way to stop rebar borking on it AFAIK
+-export([
+	 return_error/2
+	 ]).
+
+-ifdef(TEST).
 -include("riak_ql.yrl.tests").
+-endif.
+
+convert(#outputs{type    = select,
+		 buckets = B,
+		 fields  = F,
+		 limit   = L,
+		 where   = W}) ->
+    Q = #riak_sql_v1{'SELECT' = F,
+		     'FROM'   = B,
+		     'WHERE'  = W,
+		     'LIMIT'  = L},
+    Q;
+convert(#outputs{type = create} = O) ->
+    O.
 
 process({chars, A}) ->
     {word, A}.
@@ -218,7 +242,7 @@ concatenate({word, A}, {chars, B}) ->
 make_atom({word, SomeWord}) ->
     {atom, list_to_atom(SomeWord)}.
 
-make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, none}).
+make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, []}).
 
 make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
     Type2 = case Type of
@@ -227,9 +251,14 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
                 quoted -> string;
                 regex  -> regex
             end,
+    Bucket = case Type2 of
+		 string -> list_to_binary(D);
+		 list   -> {Type2, [list_to_binary(X) || X <- D]};
+		 regex  -> {Type2, D}
+	     end,
     _O = #outputs{type    = list_to_existing_atom(A),
-                  fields  = B,
-                  buckets = {Type2, D},
+                  fields  = [[X] || X <- B],
+                  buckets = Bucket,
                   where   = E
                  }.
 
@@ -256,23 +285,32 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
              conditional -> C;
              _           -> {Type, C}
          end,
-    {conditional, {B1, {A, C2}}}.
+    {conditional, {B1, A, C2}}.
 
 make_where({where, A}, {conditional, B}) ->
-    {A, B}.
+    {A, [remove_conditionals(B)]}.
+
+remove_conditionals({conditional, A}) ->
+    A;
+remove_conditionals({A, B, C}) ->
+    {A, remove_conditionals(B), remove_conditionals(C)};
+remove_conditionals(A) ->
+    A.
 
 make_funcall({A, B}) ->
      make_funcall({A, B}, []).
 
 make_funcall({_A, B}, C) ->
-    %% Msg = io_lib:format("in make_funcall with ~p and ~p~n", [A, B]),
-    %% bits:log_terms(lists:flatten(Msg)),
     {funcall, {B, C}}.
 
 add_unit({Type, A}, {chars, U}) when U =:= "s" -> {Type, A};
 add_unit({Type, A}, {chars, U}) when U =:= "m" -> {Type, A*60};
 add_unit({Type, A}, {chars, U}) when U =:= "h" -> {Type, A*60*60};
 add_unit({Type, A}, {chars, U}) when U =:= "d" -> {Type, A*60*60*24}.
+
+make_list({maybetimes, A}) -> {list, [A]};
+make_list({word,       A}) -> {list, [A]};
+make_list(A)               -> {list, [A]}.
 
 make_list({list, A}, {_, B}) -> {list, A ++ [B]};
 make_list({_,    A}, {_, B}) -> {list, [A, B]}.
@@ -283,7 +321,7 @@ make_expr(A) ->
 make_column({word, FieldName}, {DataType, _}) ->
     #riak_field_v1{
        name = FieldName,
-       type = DataType,
+       type = canonicalize_field_type(DataType),
        optional = true}.
 
 make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
@@ -292,15 +330,20 @@ make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
        type = canonicalize_field_type(DataType),
        optional = false}.
 
-make_key_definition({partition_key, _}, FieldList) ->
-    #partition_key_v1{
-       ast = lists:reverse(extract_key_field_list(FieldList, []))};
-make_key_definition({local_key, _}, FieldList) ->
+make_local_key(FieldList) ->
     #local_key_v1{
        ast = lists:reverse(extract_key_field_list(FieldList, []))}.
 
+make_partition_keys(PFieldList, LFieldList) ->    
+    [
+     #partition_key_v1{
+	ast = lists:reverse(extract_key_field_list(PFieldList, []))},
+     #local_key_v1{
+	ast = lists:reverse(extract_key_field_list(LFieldList, []))}
+    ].
+    
 make_table_element_list(A, {table_element_list, B}) ->
-    {table_element_list, [A] ++ B};
+    {table_element_list, [A] ++ lists:flatten(B)};
 make_table_element_list(A, B) ->
     {table_element_list, [A, B]}.
 
@@ -311,7 +354,7 @@ extract_key_field_list({list,
                        Extracted) ->
     [Modfun | extract_key_field_list({list, Rest}, Extracted)];
 extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [#param_v1{name = Field} |
+    [#param_v1{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
 make_table_definition({word, BucketName}, Contents) ->
@@ -327,7 +370,7 @@ make_table_definition({word, BucketName}, Contents) ->
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
 find_partition_key([]) ->
-    undefined;
+    none;
 find_partition_key([PartitionKey = #partition_key_v1{} | _Rest]) ->
     PartitionKey;
 find_partition_key([_Head | Rest]) ->
@@ -336,18 +379,18 @@ find_partition_key([_Head | Rest]) ->
 find_local_key({table_element_list, Elements}) ->
     find_local_key(Elements);
 find_local_key([]) ->
-    undefined;
+    none;
 find_local_key([LocalKey = #local_key_v1{} | _Rest]) ->
     LocalKey;
 find_local_key([_Head | Rest]) ->
     find_local_key(Rest).
 
-make_modfun({list, Elements}) ->
-    [Mod, Fn | Args] = lists:reverse(Elements),
+make_modfun(quantum, {list, Args}) ->
+    [Param, Quantity, Unit] = lists:reverse(Args),
     {modfun, #hash_fn_v1{
-       mod = list_to_atom(Mod),
-       fn = list_to_atom(Fn),
-       args = Args}}.
+       mod  = riak_ql_quanta,
+       fn   = quantum,
+       args = [#param_v1{name = [Param]}, Quantity, list_to_existing_atom(Unit)]}}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(1, Elements, []).

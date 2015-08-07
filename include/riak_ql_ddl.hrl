@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% riak_kv_ddl: defines records used in the data description language
-%
+%%
 %% Copyright (c) 2007-2013 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
@@ -36,7 +36,7 @@
          }).
 
 -record(hash_fn_v1, {
-          mod       :: atom(),
+	      mod       :: atom(),
           fn        :: atom(),
           args = [] :: [#param_v1{} | any()]
          }).
@@ -52,6 +52,6 @@
 -record(ddl_v1, {
           bucket             :: binary(),
           fields        = [] :: [#riak_field_v1{}],
-          partition_key      :: #partition_key_v1{},
+          partition_key      :: none | #partition_key_v1{},
           local_key          :: #local_key_v1{}
          }).
