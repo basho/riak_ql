@@ -47,7 +47,7 @@ QUOTED = ("(.*(\")*)")
 
 WHITESPACE = ([\000-\s]*)
 
-INTDEC   = (\-*[0-9]+)
+INTNUM   = (\-*[0-9]+)
 FLOATDEC = (\-*([0-9]+)?\.[0-9]+)
 FLOATSCI = (\-*([0-9]+)?(\.)?[0-9]+(E|e)(\+|\-)?[0-9]+)
 
@@ -104,7 +104,7 @@ Rules.
 {WHERE} : {token, {where, TokenChars}}.
 {WITH} : {token, {with, TokenChars}}.
 
-{INTDEC}   : {token, {int, list_to_integer(TokenChars)}}.
+{INTNUM}   : {token, {int, list_to_integer(TokenChars)}}.
 {FLOATDEC} : {token, {float, list_to_float(TokenChars)}}.
 {FLOATSCI} : {token, {float, list_to_float(TokenChars)}}.
 

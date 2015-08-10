@@ -69,6 +69,12 @@ keywords_3b_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+keyword_int_test_() ->
+    ?_assertEqual(
+        [{int, "int"}, {int, "INT"}, {int, "iNt"}, {int, "InT"}],
+        riak_ql_lexer:get_tokens("int INT iNt InT")
+    ).
+
 keywords_create_test_() ->
     Got = riak_ql_lexer:get_tokens("create table not null primary key"),
     Expected = [
