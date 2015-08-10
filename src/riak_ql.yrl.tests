@@ -229,6 +229,33 @@ create_simple_sql_test() ->
 					     }
 			      }).
 
+create_simple_sql_int_test() ->
+    ?sql_compilation_assert("create table temperatures " ++
+				"(time timestamp not null, " ++
+				"temperature_k int, " ++
+				"primary key (time))",
+			    #ddl_v1{
+			       bucket = <<"temperatures">>,
+			       fields = [
+					 #riak_field_v1{
+					    name = "time",
+					    position = 1,
+					    type = timestamp,
+					    optional = false},
+					 #riak_field_v1{
+					    name = "temperature_k",
+					    position = 2,
+					    type = int,
+					    optional = true}
+					],	
+			       partition_key = none,
+			       local_key = #local_key_v1{
+					      ast = [#param_v1{
+							name = ["time"]
+						       }]
+					     }
+			      }).
+
 create_composite_key_sql_test() ->
     ?sql_compilation_assert("create table temperatures " ++
 				"(time timestamp not null, " ++

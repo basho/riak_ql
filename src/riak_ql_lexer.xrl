@@ -16,6 +16,7 @@ FROM = (F|f)(R|r)(O|o)(M|m)
 GLOBAL = (G|g)(L|l)(O|o)(B|b)(A|a)(L|l)
 GROUPBY = (G|g)(R|r)(O|o)(U|u)(P|p)(B|b)(Y|y)
 INNER = (I|i)(N|n)(N|n)(E|e)(R|r)
+INT = (I|i)(N|n)(T|t)
 JOIN = (J|j)(O|o)(I|i)(N|n)
 LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
 LOCAL = (L|l)(O|o)(C|c)(A|a)(L|l)
@@ -46,7 +47,7 @@ QUOTED = ("(.*(\")*)")
 
 WHITESPACE = ([\000-\s]*)
 
-INT      = (\-*[0-9]+)
+INTDEC   = (\-*[0-9]+)
 FLOATDEC = (\-*([0-9]+)?\.[0-9]+)
 FLOATSCI = (\-*([0-9]+)?(\.)?[0-9]+(E|e)(\+|\-)?[0-9]+)
 
@@ -80,6 +81,7 @@ Rules.
 {GLOBAL} : {token, {global, TokenChars}}.
 {GROUPBY} : {token, {groupby, TokenChars}}.
 {INNER} : {token, {inner, TokenChars}}.
+{INT} : {token, {int, TokenChars}}.
 {JOIN} : {token, {join, TokenChars}}.
 {LIMIT} : {token, {limit, TokenChars}}.
 {LOCAL} : {token, {local, TokenChars}}.
@@ -102,7 +104,7 @@ Rules.
 {WHERE} : {token, {where, TokenChars}}.
 {WITH} : {token, {with, TokenChars}}.
 
-{INT}      : {token, {int,   list_to_integer(TokenChars)}}.
+{INTDEC}   : {token, {int, list_to_integer(TokenChars)}}.
 {FLOATDEC} : {token, {float, list_to_float(TokenChars)}}.
 {FLOATSCI} : {token, {float, list_to_float(TokenChars)}}.
 

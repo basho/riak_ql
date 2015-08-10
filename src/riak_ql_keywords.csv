@@ -9,6 +9,7 @@ from
 global
 groupby
 inner
+int
 join
 limit
 local
