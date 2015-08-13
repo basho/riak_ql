@@ -57,6 +57,7 @@ quoted
 int
 int_type
 float
+float_type
 eq
 gt
 lt
@@ -168,7 +169,7 @@ ColumnDefinition ->
 ColumnConstraint -> not_null : '$1'.
 
 DataType -> datetime : '$1'.
-DataType -> float : '$1'.
+DataType -> float_type : '$1'.
 DataType -> int_type : '$1'.
 DataType -> timestamp : '$1'.
 DataType -> varchar : '$1'.

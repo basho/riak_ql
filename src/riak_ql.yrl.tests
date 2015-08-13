@@ -57,15 +57,27 @@ select_fields_from_lists_sql_test() ->
 
 select_where_int_keyword_not_a_value_sql_test() ->
     ?sql_compilation_fail(
- 		"select value from response_times " ++
-		"where time > '2013-08-12 23:32:01' " ++
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
 		"and time < int"). 
 
 select_where_int_type_keyword_not_a_value_sql_test() ->
     ?sql_compilation_fail(
- 		"select value from response_times " ++
-		"where time > '2013-08-12 23:32:01' " ++
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
 		"and time < int_type"). 
+
+select_where_float_keyword_not_a_value_sql_test() ->
+    ?sql_compilation_fail(
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
+		"and time < float").  
+
+select_where_float_type_keyword_not_a_value_sql_test() ->
+    ?sql_compilation_fail(
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
+		"and time < float_type"). 
 
 select_where_1_sql_test() ->
     ?sql_compilation_assert("select value from response_times " ++
@@ -235,7 +247,7 @@ create_simple_sql_test() ->
 					 #riak_field_v1{
 					    name = "temperature_k",
 					    position = 2,
-					    type = float,
+					    type = float_type,
 					    optional = true}
 					],	
 			       partition_key = none,
@@ -327,7 +339,7 @@ create_no_key_sql_test() ->
 					 #riak_field_v1{
 					    name = "temperature_k",
 					    position = 2,
-					    type = float,
+					    type = float_type,
 					    optional = true}],
 			       partition_key = none,
 			       local_key = none

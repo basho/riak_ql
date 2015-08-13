@@ -71,8 +71,23 @@ keywords_3b_test_() ->
 
 keyword_int_type_test_() ->
     ?_assertEqual(
-        [{int_type, "int"}, {int_type, "INT"}, {int_type, "iNt"}, {int_type, "InT"}],
+        [{int_type, "int"},
+         {int_type, "INT"},
+         {int_type, "iNt"},
+         {int_type, "InT"}],
         riak_ql_lexer:get_tokens("int INT iNt InT")
+    ).
+
+keyword_float_type_test_() ->
+    ?_assertEqual(
+        [{float_type, "float"},
+         {float_type, "Float"},
+         {float_type, "fLoat"},
+         {float_type, "flOat"},
+         {float_type, "floAt"},
+         {float_type, "floaT"},
+         {float_type, "FLOAT"}],
+        riak_ql_lexer:get_tokens("float Float fLoat flOat floAt floaT FLOAT")
     ).
 
 keywords_create_test_() ->

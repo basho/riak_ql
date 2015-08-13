@@ -28,7 +28,7 @@
          }).
 
 -type field_type()         :: simple_field_type() | complex_field_type().
--type simple_field_type()  :: binary | int_type | float | timestamp | boolean | set.
+-type simple_field_type()  :: binary | int_type | float_type | timestamp | boolean | set.
 -type complex_field_type() :: {map, [#riak_field_v1{}]} | any.
 
 -record(param_v1, {
