@@ -11,7 +11,7 @@
 	  'SELECT'      = []    :: [selection() | operator() | combinator()],
 	  'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
 	  'WHERE'       = []    :: [filter()],
-	  'ORDER BY'    = []    :: [sorter],
+	  'ORDER BY'    = []    :: [sorter()],
 	  'LIMIT'       = []    :: [limit()],
 	  helper_mod            :: atom(),
 	  partition_key = none  :: none | binary(),
