@@ -55,6 +55,7 @@ datetime
 regex
 quoted
 int
+int_type
 float
 eq
 gt
@@ -168,7 +169,7 @@ ColumnConstraint -> not_null : '$1'.
 
 DataType -> datetime : '$1'.
 DataType -> float : '$1'.
-DataType -> int : '$1'.
+DataType -> int_type : '$1'.
 DataType -> timestamp : '$1'.
 DataType -> varchar : '$1'.
 
