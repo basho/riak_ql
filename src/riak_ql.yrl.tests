@@ -59,25 +59,31 @@ select_where_int_keyword_not_a_value_sql_test() ->
     ?sql_compilation_fail(
  		"select value from response_times "
 		"where time > '2013-08-12 23:32:01' "
-		"and time < int"). 
+		"and time < int").
 
 select_where_int_type_keyword_not_a_value_sql_test() ->
     ?sql_compilation_fail(
  		"select value from response_times "
 		"where time > '2013-08-12 23:32:01' "
-		"and time < int_type"). 
+		"and time < int_type").
 
 select_where_float_keyword_not_a_value_sql_test() ->
     ?sql_compilation_fail(
  		"select value from response_times "
 		"where time > '2013-08-12 23:32:01' "
-		"and time < float").  
+		"and time < float").
 
 select_where_float_type_keyword_not_a_value_sql_test() ->
     ?sql_compilation_fail(
  		"select value from response_times "
 		"where time > '2013-08-12 23:32:01' "
-		"and time < float_type"). 
+		"and time < float_type").
+
+select_where_timestamp_keyword_not_a_value_sql_test() ->
+    ?sql_compilation_fail(
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
+		"and time < timestamp").
 
 select_where_1_sql_test() ->
     ?sql_compilation_assert("select value from response_times " ++
