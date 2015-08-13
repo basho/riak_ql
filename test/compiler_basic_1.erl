@@ -14,16 +14,20 @@
 %% this test calls into the PRIVATE interface
 %% mk_helper_m2/1
 %%
--define(passing_test(Name, Query, Val), 
+-define(passing_test(Name, Query, Val, ExpectedPK, ExpectedLK), 
 	Name() ->
 	       Lexed = riak_ql_lexer:get_tokens(Query),
 	       {ok, DDL} = riak_ql_parser:parse(Lexed),
-	       case  riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+	       case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
 		   {module, Module}  ->
 		       Result = Module:validate_obj(Val),
-		       ?assertEqual(?VALID, Result);
+		       GotPK = riak_ql_ddl:get_partition_key(DDL, Val),
+		       GotLK = riak_ql_ddl:get_local_key(DDL, Val),
+		       Expected = {?VALID, ExpectedPK, ExpectedLK},
+		       Got = {Result, GotPK, GotLK},
+		       ?assertEqual(Expected, Got);
 		   _Other ->
-		       ?assertEqual(xVALID, 'didnt compile')
+		       ?assertEqual(?VALID, 'didnt compile')
 	       end).
 
 %%
@@ -34,7 +38,7 @@
 	Name() ->
 	       Lexed = riak_ql_lexer:get_tokens(Query),
 	       {ok, DDL} = riak_ql_parser:parse(Lexed),
-	       case  riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+	       case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
 		   {module, Module}  ->
 		       Result = Module:validate_obj(Val),
 		       ?assertEqual(?INVALID, Result);
@@ -51,7 +55,7 @@
 	Name() ->
 	       Lexed = riak_ql_lexer:get_tokens(Query),
 	       {ok, DDL} = riak_ql_parser:parse(Lexed),
-	       case  riak_ql_ddl_compiler:make_helper_mod(DDL) of
+	       case riak_ql_ddl_compiler:make_helper_mod(DDL) of
 		   {error, _} ->
 		       ?assertEqual(?VALID, true);
 		   Other ->
@@ -63,8 +67,9 @@
 		  "(time timestamp not null, " ++
 		  "user_id varchar not null, " ++
 		  "primary key (time, user_id))",
-	      {12345, <<"beeees">>}).
-
+	      {12345, <<"beeees">>},
+	      [{timestamp, 12345}, {binary, <<"beeees">>}],
+	      [{timestamp, 12345}, {binary, <<"beeees">>}]).
 
 ?failing_test(round_trip_fail_test,
 	      "create table temperatures " ++
@@ -73,8 +78,12 @@
 		  "primary key (time, user_id))",
 	      {<<"banjette">>, <<"beeees">>}).
 
-?not_valid_test(no_partition_key_test,
-		"create table temperatures " ++
-		    "(time timestamp not null, " ++
-		    "user_id varchar not null, " ++
-		    "primary key (time, user_id))").
+?passing_test(no_partition_key_test,
+	      "create table temperatures " ++
+		  "(time timestamp not null, " ++
+		  "user_id varchar not null, " ++
+		  "primary key (time, user_id))",
+	      {12345, <<"beeees">>},
+	      [{timestamp, 12345}, {binary, <<"beeees">>}],
+	      [{timestamp, 12345}, {binary, <<"beeees">>}]).
+	    

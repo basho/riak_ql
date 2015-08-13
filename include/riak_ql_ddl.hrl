@@ -32,26 +32,23 @@
 -type complex_field_type() :: {map, [#riak_field_v1{}]} | any.
 
 -record(param_v1, {
-          name :: string()
-         }).
+	  name :: string()
+	 }).
 
 -record(hash_fn_v1, {
-	      mod       :: atom(),
-          fn        :: atom(),
-          args = [] :: [#param_v1{} | any()]
-         }).
+	  mod       :: atom(),
+	  fn        :: atom(),
+	  args = [] :: [#param_v1{} | any()],
+	  type      :: field_type()
+	 }).
 
--record(partition_key_v1, {
-          ast = [] :: [#hash_fn_v1{} | #param_v1{}]
-         }).
-
--record(local_key_v1, {
-          ast = [] :: [#hash_fn_v1{} | #param_v1{}]
-         }).
+-record(key_v1, {
+	  ast = [] :: [#hash_fn_v1{} | #param_v1{}]
+	 }).
 
 -record(ddl_v1, {
           bucket             :: binary(),
           fields        = [] :: [#riak_field_v1{}],
-          partition_key      :: none | #partition_key_v1{},
-          local_key          :: #local_key_v1{}
+          partition_key      :: #key_v1{} | none,
+          local_key          :: #key_v1{}
          }).

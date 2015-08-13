@@ -9,10 +9,13 @@
 -record(riak_sql_v1,
 	{
 	  'SELECT'      = []    :: [selection() | operator() | combinator()],
-	  'FROM'        = <<>>  :: binary(),     % TODO fix up
+	  'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
 	  'WHERE'       = []    :: [filter()],
 	  'ORDER BY'    = []    :: [sorter],
 	  'LIMIT'       = []    :: [limit()],
+	  helper_mod            :: atom(),
 	  partition_key = none  :: none | binary(),
-	  is_executable = false :: boolean()
+	  is_executable = false :: boolean(),
+	  type          = sql   :: sql | timeseries,
+	  local_key                                  % prolly a mistake to put this here - should be in DDL
 	}).
