@@ -236,7 +236,11 @@ split_quanta_test() ->
 
 -ifdef(EQC).
 prop_quantum_bounded_test() ->
-    ?assertEqual(true, eqc:quickcheck(?QC_OUT(prop_quantum_bounded()))).
+    ?assertEqual(
+        true,
+        eqc:quickcheck(
+            eqc:numtests(1000, prop_quantum_bounded()))
+    ).
 
 prop_quantum_month_boundary_test() ->
     ?assertEqual(true, eqc:quickcheck(?QC_OUT(prop_quantum_month_boundary()))).
@@ -244,10 +248,12 @@ prop_quantum_month_boundary_test() ->
 prop_quantum_year_boundary_test() ->
     ?assertEqual(true, eqc:quickcheck(?QC_OUT(prop_quantum_year_boundary()))).
 
-%% Ensure that Quantas are always bounded, meaning that any time is no more than one quantum ahead of
-%% the quantum start.
+%% Ensure that Quantas are always bounded, meaning that any time is no more
+%% than one quantum ahead of the quantum start.
 prop_quantum_bounded() ->
-    ?FORALL({Date, Time, {Quanta, Unit}}, {date_gen(), time_gen(), quantum_gen()},
+    ?FORALL(
+        {Date, Time, {Quanta, Unit}}, 
+        {date_gen(), time_gen(), quantum_gen()},
         begin
             DateTime = {Date, Time},
             SecondsFrom0To1970 = ?DAYS_FROM_0_TO_1970 * (unit_to_ms(d) div 1000),
@@ -282,7 +288,7 @@ quantum_now_from_datetime(DateTime, Quanta, Unit) ->
     ms_to_timestamp(QuantaMs).
 
 quantum_in_ms(Quanta, mo) ->
-    months_since_1970_to_ms(Quanta);
+    months_since_1970_to_ms(Quanta + 1);
 quantum_in_ms(Quanta, y) ->
     %% Just use max # days in year for safety
     Quanta*366*unit_to_ms(d);
