@@ -55,7 +55,9 @@ datetime
 regex
 quoted
 int
+int_type
 float
+float_type
 eq
 gt
 lt
@@ -167,8 +169,8 @@ ColumnDefinition ->
 ColumnConstraint -> not_null : '$1'.
 
 DataType -> datetime : '$1'.
-DataType -> float : '$1'.
-DataType -> int : '$1'.
+DataType -> float_type : canonicalize_data_type('$1').
+DataType -> int_type : canonicalize_data_type('$1').
 DataType -> timestamp : '$1'.
 DataType -> varchar : '$1'.
 
@@ -406,4 +408,11 @@ find_fields(Count, [_Head | Rest], Elements) ->
 canonicalize_field_type(varchar) ->
     binary;
 canonicalize_field_type(Type) ->
+    Type.
+
+canonicalize_data_type({float_type, Tokens}) ->
+    {float, Tokens};
+canonicalize_data_type({int_type, Tokens}) ->
+    {integer, Tokens};
+canonicalize_data_type(Type) ->
     Type.

@@ -23,7 +23,8 @@
 		       Result = Module:validate_obj(Val),
 		       ?assertEqual(?VALID, Result);
 		   _Other ->
-		       ?assertEqual(xVALID, 'didnt compile')
+		       ?debugFmt("~n~p compilation failed:~n~p", [Name, _Other]),
+		       ?assert(false)
 	       end).
 
 %%
@@ -65,6 +66,17 @@
 		  "primary key (time, user_id))",
 	      {12345, <<"beeees">>}).
 
+?passing_test(integer_type_test,
+		    "create table temperatures "
+		    "(counter int not null, "
+		    "primary key (counter))",
+		{12345}).
+
+?passing_test(float_test,
+		    "create table temperatures "
+		    "(real_counter float not null, "
+		    "primary key (real_counter))",
+		{12345.2}).
 
 ?failing_test(round_trip_fail_test,
 	      "create table temperatures " ++

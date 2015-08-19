@@ -3,8 +3,13 @@
 
 -define(sql_compilation_assert(String, Expected),
 	Toks = riak_ql_lexer:get_tokens(String),
-	{ok, Got} = parse(Toks),
-	?assertEqual(Expected, Got)).
+	Got = parse(Toks),
+	?assertEqual({ok, Expected}, Got)).
+
+-define(sql_compilation_fail(QL_string),
+	Toks = riak_ql_lexer:get_tokens(QL_string),
+	Got = parse(Toks),
+	?assertMatch({error, _}, Got)).
 
 %% Tests
 select_sql_test() ->
@@ -49,6 +54,36 @@ select_fields_from_lists_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [["hip"], ["hop"], ["dont"], ["stop"]],
 					 'FROM'   = <<"events">>
 					}).
+
+select_where_int_keyword_not_a_value_sql_test() ->
+    ?sql_compilation_fail(
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
+		"and time < int").
+
+select_where_int_type_keyword_not_a_value_sql_test() ->
+    ?sql_compilation_fail(
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
+		"and time < int_type").
+
+select_where_float_keyword_not_a_value_sql_test() ->
+    ?sql_compilation_fail(
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
+		"and time < float").
+
+select_where_float_type_keyword_not_a_value_sql_test() ->
+    ?sql_compilation_fail(
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
+		"and time < float_type").
+
+select_where_timestamp_keyword_not_a_value_sql_test() ->
+    ?sql_compilation_fail(
+ 		"select value from response_times "
+		"where time > '2013-08-12 23:32:01' "
+		"and time < timestamp").
 
 select_where_1_sql_test() ->
     ?sql_compilation_assert("select value from response_times " ++
@@ -219,6 +254,33 @@ create_simple_sql_test() ->
 					    name = "temperature_k",
 					    position = 2,
 					    type = float,
+					    optional = true}
+					],	
+			       partition_key = none,
+			       local_key = #local_key_v1{
+					      ast = [#param_v1{
+							name = ["time"]
+						       }]
+					     }
+			      }).
+
+create_simple_sql_int_test() ->
+    ?sql_compilation_assert("create table temperatures " ++
+				"(time timestamp not null, " ++
+				"temperature_k int, " ++
+				"primary key (time))",
+			    #ddl_v1{
+			       bucket = <<"temperatures">>,
+			       fields = [
+					 #riak_field_v1{
+					    name = "time",
+					    position = 1,
+					    type = timestamp,
+					    optional = false},
+					 #riak_field_v1{
+					    name = "temperature_k",
+					    position = 2,
+					    type = integer,
 					    optional = true}
 					],	
 			       partition_key = none,
