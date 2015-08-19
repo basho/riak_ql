@@ -287,7 +287,7 @@ timeseries_test_() ->
 		{chars, "not_null"},
 		{comma, ","},
 		{chars, "temperature"},
-		{float, "float"},
+		{float_type, "float"},
 		{chars, "not_null"},
 		{comma, ","},
 		{primary_key, "PRIMARY KEY"},
