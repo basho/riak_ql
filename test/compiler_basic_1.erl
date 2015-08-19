@@ -27,8 +27,23 @@
 		       Got = {Result, GotPK, GotLK},
 		       ?assertEqual(Expected, Got);
 		   _Other ->
-		       ?assertEqual(?VALID, 'didnt compile')
+		       ?debugFmt("~n~p compilation failed:~n~p", [Name, _Other]),
+		       ?assert(false)
 	       end).
+
+-define(passing_short_test(Name, Query, Val), 
+	Name() ->
+	       Lexed = riak_ql_lexer:get_tokens(Query),
+	       {ok, DDL} = riak_ql_parser:parse(Lexed),
+	       case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+		   {module, Module}  ->
+		       Result = Module:validate_obj(Val),
+		       ?assertEqual(?VALID, Result);
+		   _Other ->
+		       ?debugFmt("~n~p compilation failed:~n~p", [Name, _Other]),
+		       ?assert(false)
+	       end).
+
 
 %%
 %% this test calls into the PRIVATE interface
@@ -70,6 +85,18 @@
 	      {12345, <<"beeees">>},
 	      [{timestamp, 12345}, {binary, <<"beeees">>}],
 	      [{timestamp, 12345}, {binary, <<"beeees">>}]).
+
+?passing_short_test(integer_type_test,
+		    "create table temperatures "
+		    "(counter int not null, "
+		    "primary key (counter))",
+	      {12345}).
+
+?passing_short_test(float_test,
+		    "create table temperatures "
+		    "(real_counter float not null, "
+		    "primary key (real_counter))",
+	      {12345.6}).
 
 ?failing_test(round_trip_fail_test,
 	      "create table temperatures " ++
