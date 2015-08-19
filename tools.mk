@@ -6,8 +6,9 @@ REBAR ?= ./rebar
 compile-no-deps:
 	${REBAR} compile skip_deps=true
 
-test: compile
-	${REBAR} eunit skip_deps=true
+#test: compile
+#	${REBAR} eunit skip_deps=true
+## overridden in ../Makefile, with special care to remove ./eunit/* etc.
 
 docs:
 	${REBAR} doc skip_deps=true
