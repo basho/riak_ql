@@ -86,7 +86,7 @@ Rootsymbol Statement.
 Endsymbol '$end'.
 
 Statement -> Query : convert('$1').
-Statement -> TableDefinition : '$1'.
+Statement -> TableDefinition : fix_up_keys('$1').
 
 Query -> Select limit int : add_limit('$1', '$2', '$3').
 Query -> Select           : '$1'.
@@ -114,9 +114,10 @@ Word -> chars      : process('$1').
 Funcall -> Word openb     closeb : make_funcall('$1').
 Funcall -> Word openb Val closeb : make_funcall('$1').
 
-Conds -> openb Conds closeb  : make_expr('$2').
-Conds -> Conds Logic Cond    : make_expr('$1', '$2', '$3').
-Conds -> Cond                : '$1'.
+Conds -> openb Conds closeb             : make_expr('$2').
+Conds -> Conds Logic Cond               : make_expr('$1', '$2', '$3').
+Conds -> Conds Logic openb Conds closeb : make_expr('$1', '$2', '$4').
+Conds -> Cond                           : '$1'.
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
@@ -134,6 +135,7 @@ Val -> int       : '$1'.
 Val -> float     : '$1'.
 Val -> datetime  : '$1'.
 Val -> varchar   : '$1'.
+Val -> quoted    : make_word('$1').
 
 Logic -> and_ : '$1'.
 Logic -> or_  : '$1'.
@@ -177,7 +179,7 @@ DataType -> varchar : '$1'.
 KeyDefinition ->
     primary_key       openb KeyFieldList closeb                           : make_local_key('$3').
 KeyDefinition ->
-    primary_key openb openb KeyFieldList closeb comma KeyFieldList closeb : make_partition_keys('$4', '$7').
+    primary_key openb openb KeyFieldList closeb comma KeyFieldList closeb : make_partition_and_local_keys('$4', '$7').
 
 KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
 KeyFieldList -> KeyField : make_list({list, []}, '$1').
@@ -190,9 +192,9 @@ KeyFieldArgList ->
 KeyFieldArgList ->
     KeyFieldArg : make_list({list, []}, '$1').
 
-KeyFieldArg -> int   : '$1'.
-KeyFieldArg -> float : '$1'.
-KeyFieldArg -> Word  : '$1'.
+KeyFieldArg -> int    : '$1'.
+KeyFieldArg -> float  : '$1'.
+KeyFieldArg -> Word   : '$1'.
 KeyFieldArg -> atom openb Word closeb : make_atom('$3').
 
 Erlang code.
@@ -222,15 +224,30 @@ Erlang code.
 -include("riak_ql.yrl.tests").
 -endif.
 
+%% if no partition key is specified hash on the local key
+fix_up_keys(#ddl_v1{partition_key = none, local_key = LK} = DDL) ->
+    DDL#ddl_v1{partition_key = LK, local_key = LK};
+fix_up_keys(A) ->
+    A.
+
 convert(#outputs{type    = select,
 		 buckets = B,
 		 fields  = F,
 		 limit   = L,
 		 where   = W}) ->
-    Q = #riak_sql_v1{'SELECT' = F,
-		     'FROM'   = B,
-		     'WHERE'  = W,
-		     'LIMIT'  = L},
+    Q = case B of
+	    {Type, _} when Type =:= list orelse Type =:= regex ->
+		#riak_sql_v1{'SELECT' = F,
+			     'FROM'   = B,
+			     'WHERE'  = W,
+			     'LIMIT'  = L};
+	    _ ->
+		#riak_sql_v1{'SELECT'   = F,
+			     'FROM'     = B,
+			     'WHERE'    = W,
+			     'LIMIT'    = L,
+			     helper_mod = riak_ql_ddl:make_module_name(B)}
+	end,
     Q;
 convert(#outputs{type = create} = O) ->
     O.
@@ -289,9 +306,91 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
          end,
     {conditional, {B1, A, C2}}.
 
-make_where({where, A}, {conditional, B}) ->
-    {A, [remove_conditionals(B)]}.
+make_word({quoted, Q}) -> {word, Q}.
 
+make_where({where, A}, {conditional, B}) ->
+    NewB = remove_conditionals(B),
+    {A, [canonicalise(NewB)]}.
+
+%%
+%% rewrite the where clause to have a canonical form
+%% makes query rewriting easier
+%%
+canonicalise(WhereClause) ->
+    Canonical = canon2(WhereClause),
+    _NewWhere = hoist(Canonical).
+
+canon2({Cond, A, B}) when Cond =:= and_ orelse
+			  Cond =:= or_  ->
+    %% this is stack busting non-tail recursion
+    %% but our where clauses are bounded in size so thats OK
+    A1 = canon2(A),
+    B1 = canon2(B),
+    case is_lower(A1, B1) of
+	true  -> {Cond, A1, B1};
+	false -> {Cond, B1, A1}
+    end;
+canon2(A) ->
+    A.
+
+hoist({and_, {and_, A, B}, C}) ->
+    Hoisted = {and_, A, hoist({and_, B, C})},
+    _Sort = sort(Hoisted);
+hoist({A, B, C}) ->
+    B2 = case B of
+	     {and_, _, _} -> hoist(B);
+	     _            -> B
+	 end,
+    C2 = case C of
+	     {and_, _, _} -> hoist(C);
+	     _            -> C
+	 end,
+    {A, B2, C2}.
+
+%% a truly horendous bubble sort algo which is also
+%% not tail recursive
+sort({and_, A, {and_, B, C}}) ->
+    case is_lower(A, B) of
+	true  -> {and_, B1, C1} = sort({and_, B, C}),
+		 case is_lower(A, B1) of
+		     true  -> {and_, A, {and_, B1, C1}};
+		     false -> sort({and_, B1, {and_, A, C1}})
+		 end;
+	false -> sort({and_, B, sort({and_, A, C})})
+    end;
+sort({Op, A, B}) ->
+    case is_lower(A, B) of
+	true  -> {Op, A, B};
+	false -> {Op, B, A}
+    end.
+
+is_lower(Ands, {_, _, _}) when is_list(Ands)->
+    true;
+is_lower({_, _, _}, Ands) when is_list(Ands)->
+    true;
+is_lower(Ands1, Ands2) when is_list(Ands1) andalso is_list(Ands2) ->
+    true;
+is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
+					 Op1 =:= or_  orelse
+					 Op1 =:= '>'  orelse
+					 Op1 =:= '<'  orelse
+					 Op1 =:= '='  orelse
+					 Op1 =:= '<>' orelse
+					 Op1 =:= '=~' orelse
+					 Op1 =:= '!~' orelse
+					 Op1 =:= '!=') 
+					andalso
+					(Op2 =:= and_ orelse
+					 Op2 =:= or_  orelse
+					 Op2 =:= '>'  orelse
+					 Op2 =:= '<'  orelse
+					 Op2 =:= '='  orelse
+					 Op2 =:= '<>' orelse
+					 Op2 =:= '=~' orelse
+					 Op2 =:= '!~' orelse
+					 Op2 =:= '!=') ->
+    (A < B).
+				     
 remove_conditionals({conditional, A}) ->
     A;
 remove_conditionals({A, B, C}) ->
@@ -332,16 +431,21 @@ make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
        type = canonicalize_field_type(DataType),
        optional = false}.
 
+%% if only the local key is defined
+%% use it as the partition key as well
 make_local_key(FieldList) ->
-    #local_key_v1{
-       ast = lists:reverse(extract_key_field_list(FieldList, []))}.
-
-make_partition_keys(PFieldList, LFieldList) ->    
+    Key = #key_v1{ast = lists:reverse(extract_key_field_list(FieldList, []))},
     [
-     #partition_key_v1{
-	ast = lists:reverse(extract_key_field_list(PFieldList, []))},
-     #local_key_v1{
-	ast = lists:reverse(extract_key_field_list(LFieldList, []))}
+     {partition_key, Key},
+     {local_key,     Key}
+    ].
+
+make_partition_and_local_keys(PFieldList, LFieldList) ->    
+    PFields = lists:reverse(extract_key_field_list(PFieldList, [])),
+    LFields = lists:reverse(extract_key_field_list(LFieldList, [])),
+    [
+     {partition_key, #key_v1{ast = PFields}},
+     {local_key,     #key_v1{ast = LFields}}
     ].
     
 make_table_element_list(A, {table_element_list, B}) ->
@@ -369,30 +473,32 @@ make_table_definition({word, BucketName}, Contents) ->
        local_key = LocalKey,
        fields = Fields}.
 
-find_partition_key({table_element_list, Elements}) ->
-    find_partition_key(Elements);
 find_partition_key([]) ->
     none;
-find_partition_key([PartitionKey = #partition_key_v1{} | _Rest]) ->
-    PartitionKey;
+find_partition_key({table_element_list, Elements}) ->
+    find_partition_key(Elements);
+find_partition_key([{partition_key, Key} | _Rest]) ->
+    Key;
 find_partition_key([_Head | Rest]) ->
     find_partition_key(Rest).
 
-find_local_key({table_element_list, Elements}) ->
-    find_local_key(Elements);
 find_local_key([]) ->
     none;
-find_local_key([LocalKey = #local_key_v1{} | _Rest]) ->
-    LocalKey;
+find_local_key({table_element_list, Elements}) ->
+    find_local_key(Elements);
+find_local_key([{local_key, Key} | _Rest]) ->
+    Key;
 find_local_key([_Head | Rest]) ->
     find_local_key(Rest).
 
 make_modfun(quantum, {list, Args}) ->
     [Param, Quantity, Unit] = lists:reverse(Args),
     {modfun, #hash_fn_v1{
-       mod  = riak_ql_quanta,
-       fn   = quantum,
-       args = [#param_v1{name = [Param]}, Quantity, list_to_existing_atom(Unit)]}}.
+		mod  = riak_ql_quanta,
+		fn   = quantum,
+		args = [#param_v1{name = [Param]}, Quantity, list_to_existing_atom(Unit)],
+		type = timestamp
+	       }}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(1, Elements, []).

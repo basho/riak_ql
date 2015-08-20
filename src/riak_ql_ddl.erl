@@ -39,6 +39,7 @@
 -export([
 	 get_partition_key/2,
 	 get_local_key/2,
+	 make_key/3,
 	 is_valid_field/2,
 	 is_query_valid/2
 	]).
@@ -65,34 +66,64 @@ make_module_name(Bucket) when is_binary(Bucket) ->
     ModName = "riak_ql_ddl_helper_mod_" ++ Nonce2,
     list_to_atom(ModName).
 
--spec get_partition_key(#ddl_v1{}, tuple()) -> binary().
+-spec get_partition_key(#ddl_v1{}, tuple()) -> term().
 get_partition_key(#ddl_v1{bucket = B, partition_key = PK}, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(B),
-    #partition_key_v1{ast = Params} = PK,
-    Key = build(Params, Obj, Mod, []),
-    _K = sext:encode(Key).
+    #key_v1{ast = Params} = PK,
+    _Key = build(Params, Obj, Mod, []).
 
--spec get_local_key(#ddl_v1{}, tuple()) -> binary().
-get_local_key(#ddl_v1{bucket = B, local_key = LK}, Obj) when is_tuple(Obj) ->
-    io:format(user, "Local Key is ~p~n", [LK]),
+-spec get_local_key(#ddl_v1{}, tuple()) -> term().
+get_local_key(#ddl_v1{bucket = B, local_key = LK}, Obj) 
+  when is_tuple(Obj) ->
     Mod = make_module_name(B),
-    #local_key_v1{ast = Params} = LK,
-    Key = build(Params, Obj, Mod, []),
-    _K = sext:encode(Key).
+    #key_v1{ast = Params} = LK,
+    _Key = build(Params, Obj, Mod, []).
 
--spec build([#param_v1{}], tuple(), atom(), any()) -> tuple().
+-spec make_key(atom(), #key_v1{}, list()) -> list(). 
+make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso 
+					     is_list(Vals) ->
+    mk_k(AST, Vals, Mod, []).
+
+%% TODO there is a mismatch between how the fields in the where clause
+%% and the fields in the DDL are mapped
+mk_k([], _Vals, _Mod, Acc) ->
+    lists:reverse(Acc);
+mk_k([#hash_fn_v1{mod = Md,
+		 fn   = Fn,
+		 args = Args,
+		 type = Ty} | T1], Vals, Mod, Acc) ->
+    A2 = extract(Args, Vals, []),
+    V  = erlang:apply(Md, Fn, A2),
+    mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
+mk_k([#param_v1{name = [Nm]} | T1], Vals, Mod, Acc) ->
+    {Nm, V} = lists:keyfind(Nm, 1, Vals),
+    Ty = Mod:get_field_type([Nm]),
+    mk_k(T1, Vals, Mod, [{Ty, V} | Acc]).
+
+-spec extract(list(), [{any(), any()}], [any()]) -> any().
+extract([], _Vals, Acc) ->
+    lists:reverse(Acc);
+extract([#param_v1{name = [Nm]} | T], Vals, Acc) ->
+    {Nm, Val} = lists:keyfind(Nm, 1, Vals),
+    extract(T, Vals, [Val | Acc]);
+extract([Constant | T], Vals, Acc) ->
+    extract(T, Vals, [Constant | Acc]).
+
+-spec build([#param_v1{}], tuple(), atom(), any()) -> list().
 build([], _Obj, _Mod, A) ->
-    list_to_tuple(lists:reverse(A));
+    lists:reverse(A);
 build([#param_v1{name = Nm} | T], Obj, Mod, A) ->
     Val = Mod:extract(Obj, Nm),
-    build(T, Obj, Mod, [Val | A]);
+    Type = Mod:get_field_type(Nm),
+    build(T, Obj, Mod, [{Type, Val} | A]);
 build([#hash_fn_v1{mod  = Md,
 		   fn   = Fn,
-		   args = Args} | T], Obj, Mod, A) ->
+		   args = Args,
+		   type = Ty} | T], Obj, Mod, A) ->
     A2 = convert(Args, Obj, Mod, []),
-    Res = erlang:apply(Md, Fn, A2),
-    build(T, Obj, Mod, [Res | A]).
+    Val = erlang:apply(Md, Fn, A2),
+    build(T, Obj, Mod, [{Ty, Val} | A]).
 
 -spec convert([#param_v1{}], tuple(), atom(), [any()]) -> any().
 convert([], _Obj, _Mod, Acc) ->
@@ -100,8 +131,8 @@ convert([], _Obj, _Mod, Acc) ->
 convert([#param_v1{name = Nm} | T], Obj, Mod, Acc) ->
     Val = Mod:extract(Obj, Nm),
     convert(T, Obj, Mod, [Val | Acc]);
-convert([Atom | T], Obj, Mod, Acc) ->
-    convert(T, Obj, Mod, [Atom | Acc]).
+convert([Constant | T], Obj, Mod, Acc) ->
+    convert(T, Obj, Mod, [Constant | Acc]).
 
 -spec is_valid_field(#ddl_v1{}, heirarchicalfieldname()) -> boolean().
 is_valid_field(#ddl_v1{bucket = B}, Field) when is_list(Field)->
@@ -172,6 +203,7 @@ extract_f2([{Op, LHS, RHS} | T], Acc) when Op =:= '='    orelse
 	   end,
     extract_f2(T, Acc3).
 
+is_val({word,     _}) -> true;
 is_val({int,      _}) -> true;
 is_val({float,    _}) -> true; 
 is_val({datetime, _}) -> true; 
@@ -193,15 +225,15 @@ remove_hooky_chars(Nonce) ->
 %% Helper Fn for unit tests
 %%
 
-mock_partition_fn(A, B, C) -> {A, B, C}.
+mock_partition_fn(_A, _B, _C) -> mock_result.
 
 make_ddl(Bucket, Fields) when is_binary(Bucket) ->
-    make_ddl(Bucket, Fields, #partition_key_v1{}, #local_key_v1{}).
+    make_ddl(Bucket, Fields, #key_v1{}, #key_v1{}).
 
 make_ddl(Bucket, Fields, PK) when is_binary(Bucket) ->
-    make_ddl(Bucket, Fields, PK, #local_key_v1{}).
+    make_ddl(Bucket, Fields, PK, #key_v1{}).
 
-make_ddl(Bucket, Fields, #partition_key_v1{} = PK, #local_key_v1{} = LK)
+make_ddl(Bucket, Fields, #key_v1{} = PK, #key_v1{} = LK)
   when is_binary(Bucket) ->
     #ddl_v1{bucket        = Bucket,
 	    fields        = Fields,
@@ -214,9 +246,9 @@ make_ddl(Bucket, Fields, #partition_key_v1{} = PK, #local_key_v1{} = LK)
 
 simplest_partition_key_test() ->
     Name = "yando",
-    PK = #partition_key_v1{ast = [
-				  #param_v1{name = [Name]}
-				 ]},
+    PK = #key_v1{ast = [
+			#param_v1{name = [Name]}
+		       ]},
     DDL = make_ddl(<<"simplest_partition_key_test">>,
 		   [
 		    #riak_field_v1{name     = Name,
@@ -227,15 +259,15 @@ simplest_partition_key_test() ->
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {<<"yarble">>},
     Result = (catch get_partition_key(DDL, Obj)),
-    ?assertEqual({<<"yarble">>}, sext:decode(Result)).
+    ?assertEqual([{binary, <<"yarble">>}], Result).
 
 simple_partition_key_test() ->
     Name1 = "yando",
     Name2 = "buckle",
-    PK = #partition_key_v1{ast = [
-				  #param_v1{name = [Name1]},
-				  #param_v1{name = [Name2]}
-				 ]},
+    PK = #key_v1{ast = [
+			#param_v1{name = [Name1]},
+			#param_v1{name = [Name2]}
+		       ]},
     DDL = make_ddl(<<"simple_partition_key_test">>,
 		   [
 		    #riak_field_v1{name     = Name2,
@@ -252,22 +284,23 @@ simple_partition_key_test() ->
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {<<"one">>, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
-    ?assertEqual({<<"three">>, <<"one">>}, sext:decode(Result)).
+    ?assertEqual([{binary, <<"three">>}, {binary, <<"one">>}], Result).
 
 function_partition_key_test() ->
     Name1 = "yando",
     Name2 = "buckle",
-    PK = #partition_key_v1{ast = [
-				  #param_v1{name = [Name1]},
-				  #hash_fn_v1{mod  = ?MODULE,
-					      fn   = mock_partition_fn,
-					      args = [
-						      #param_v1{name = [Name2]},
-						      15,
-						      m
-						     ]
-					     }
-				 ]},
+    PK = #key_v1{ast = [
+			#param_v1{name = [Name1]},
+			#hash_fn_v1{mod  = ?MODULE,
+				    fn   = mock_partition_fn,
+				    args = [
+					    #param_v1{name = [Name2]},
+					    15,
+					    m
+					   ],
+				    type = timestamp
+				   }
+		       ]},
     DDL = make_ddl(<<"function_partition_key_test">>,
 		   [
 		    #riak_field_v1{name     = Name2,
@@ -284,44 +317,48 @@ function_partition_key_test() ->
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {1234567890, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
-    Expected = {<<"three">>, {1234567890, 15, m}},
-    ?assertEqual(Expected, sext:decode(Result)).
+    %% Yes the mock partition function is actually computed
+    %% read the actual code, lol
+    Expected = [{binary, <<"three">>}, {timestamp, mock_result}],
+    ?assertEqual(Expected, Result).
 
 complex_partition_key_test() ->
     Name0 = "yerp",
     Name1 = "yando",
     Name2 = "buckle",
     Name3 = "doodle",
-    PK = #partition_key_v1{ast = [
-				  #param_v1{name = [Name0, Name1]},
-				  #hash_fn_v1{mod  = ?MODULE,
-					      fn   = mock_partition_fn,
-					      args = [
-						      #param_v1{name = [
-									Name0,
-									Name2,
-									Name3
-								       ]},
-						      "something",
-						      pong
-						     ]
-					     },
-				  #hash_fn_v1{mod  = ?MODULE,
-					      fn   = mock_partition_fn,
-					      args = [
-						      #param_v1{name = [
-									Name0,
-									Name1
-								       ]},
-						      #param_v1{name = [
-									Name0,
-									Name2,
-									Name3
-								       ]},
-						      pang
-						     ]
-					     }
-				 ]},
+    PK = #key_v1{ast = [
+			#param_v1{name = [Name0, Name1]},
+			#hash_fn_v1{mod  = ?MODULE,
+				    fn   = mock_partition_fn,
+				    args = [
+					    #param_v1{name = [
+							      Name0,
+							      Name2,
+							      Name3
+							     ]},
+					    "something",
+					    pong
+					   ],
+				    type = poodle
+				   },
+			#hash_fn_v1{mod  = ?MODULE,
+				    fn   = mock_partition_fn,
+				    args = [
+					    #param_v1{name = [
+							      Name0,
+							      Name1
+							     ]},
+					    #param_v1{name = [
+							      Name0,
+							      Name2,
+							      Name3
+							     ]},
+					    pang
+					   ],
+				    type = wombat
+				   }
+		       ]},
     Map3 = {map, [
 		  #riak_field_v1{name     = "in_Map_2",
 				 position = 1,
@@ -353,8 +390,8 @@ complex_partition_key_test() ->
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {{2, {3}, {4}}},
     Result = (catch get_partition_key(DDL, Obj)),
-    Expected = {2, {3, "something", pong}, {2, 3, pang}},
-    ?assertEqual(Expected, sext:decode(Result)).
+    Expected = [{integer, 2}, {poodle, mock_result}, {wombat, mock_result}],
+    ?assertEqual(Expected, Result).
 
 %%
 %% get local_key tests
@@ -362,12 +399,12 @@ complex_partition_key_test() ->
 
 simplest_local_key_test() ->
     Name = "yando",
-    PK = #partition_key_v1{ast = [
-				  #param_v1{name = [Name]}
-				 ]},
-    LK = #local_key_v1{ast = [
-			      #param_v1{name = [Name]}
-			     ]},
+    PK = #key_v1{ast = [
+			#param_v1{name = [Name]}
+		       ]},
+    LK = #key_v1{ast = [
+			#param_v1{name = [Name]}
+		       ]},
     DDL = make_ddl(<<"simplest_key_key_test">>,
 		   [
 		    #riak_field_v1{name     = Name,
@@ -378,7 +415,7 @@ simplest_local_key_test() ->
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {<<"yarble">>},
     Result = (catch get_local_key(DDL, Obj)),
-    ?assertEqual({<<"yarble">>}, sext:decode(Result)).
+    ?assertEqual([{binary, <<"yarble">>}], Result).
 
 %%
 %% get type of named field
@@ -485,6 +522,71 @@ complex_valid_map_get_type_test() ->
     Path = ["Top_Map", "Level_1_map1", "in_Map_1"],
     Res = (catch Module:get_field_type(Path)),
     ?assertEqual(integer, Res).
+
+%%
+%% make_key tests
+%%
+
+make_plain_key_test() ->
+    Key = #key_v1{ast = [
+			 #param_v1{name = ["user"]},
+			 #param_v1{name = ["time"]}
+			]},
+    DDL = make_ddl(<<"make_plain_key_test">>,
+		   [
+		    #riak_field_v1{name     = "user",
+				   position = 1,
+				   type     = binary},
+		    #riak_field_v1{name     = "time",
+				   position = 2,
+				   type     = timestamp}
+		   ],
+		   Key, %% use the same key for both
+		   Key),
+    Time = 12345,
+    Vals = [
+	    {"user", "user_1"},
+	    {"time", Time}
+	   ],
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Got = make_key(Mod, Key, Vals),
+    Expected = [{binary, "user_1"}, {timestamp, Time}],
+    ?assertEqual(Expected, Got).    
+
+make_functional_key_test() ->
+    Key = #key_v1{ast = [
+			 #param_v1{name = ["user"]},
+			 #hash_fn_v1{mod  = ?MODULE,
+				     fn   = mock_partition_fn,
+				     args = [
+					     #param_v1{name = ["time"]},
+					     15,
+					     m
+					    ],
+				     type = timestamp
+				    }
+			]},
+    DDL = make_ddl(<<"make_plain_key_test">>,
+		   [
+		    #riak_field_v1{name     = "user",
+				   position = 1,
+				   type     = binary},
+		    #riak_field_v1{name     = "time",
+				   position = 2,
+				   type     = timestamp}
+		   ],
+		   Key, %% use the same key for both
+		   Key),
+    Time = 12345,
+    Vals = [
+	    {"user", "user_1"},
+	    {"time", Time}
+	   ],
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Got = make_key(Mod, Key, Vals),
+    Expected = [{binary, "user_1"}, {timestamp, mock_result}],
+    ?assertEqual(Expected, Got).    
+
 
 %%
 %% Validate Query Tests
@@ -653,6 +755,37 @@ simple_filter_query_test() ->
     {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = riak_ql_ddl:is_query_valid(DDL, Query),
     ?assertEqual(true, Res).
+
+timeseries_filter_test() ->
+    Bucket = <<"timeseries_filter_test">>,
+    Selections = [["weather"]],
+    Where = [
+	     {and_,
+	      {and_, 
+	       {'>', "time", {int, 3000}},
+	       {'<', "time", {int, 5000}}
+	      },
+	      {'=', "user", {word, "user_1"}
+	       }
+	      }
+	    ],
+    Query = #riak_sql_v1{'FROM'   = Bucket,
+			 'SELECT' = Selections,
+			 'WHERE'  = Where},
+    DDL = {ddl_v1,<<"timeseries_filter_test">>,
+	   [{riak_field_v1,"geohash",1,binary,false},
+	    {riak_field_v1,"user",2,binary,false},
+	    {riak_field_v1,"time",3,timestamp,false},
+	    {riak_field_v1,"weather",4,binary,false},
+	    {riak_field_v1,"temperature",5,binary,true}],
+	   {key_v1,[{hash_fn_v1,riak_ql_quanta,quantum,
+		     [{param_v1,["time"]},15,s]}]},
+	   {key_v1,[{param_v1,["time"]},{param_v1,["user"]}]}},
+    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(DDL, Query),
+    Expected = true,
+    ?assertEqual(Expected, Res).
+		    
 
 simple_filter_query_fail_test() ->
     Bucket = <<"simple_filter_query_fail_test">>,

@@ -188,10 +188,10 @@ not_a_date_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
-quote_1_test_() ->
-    Got = riak_ql_lexer:get_tokens("\" yardle hoop !@#$%^&*() \""),
+double_quote_1_test_() ->
+    Got = riak_ql_lexer:get_tokens("\" yardle hoop !@#$%^&*() _ -\""),
     Expected = [
-                {quoted, "yardle hoop !@#$%^&*()"}
+                {quoted, "yardle hoop !@#$%^&*() _ -"}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -264,7 +264,7 @@ timeseries_test_() ->
 				   ++ "user varchar not_null, "
 				   ++ "time timestamp not_null, "
 				   ++ "weather varchar not_null, "
-				   ++ "temperature varchar not_null, "
+				   ++ "temperature float not_null, "
 				   ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
     Expected = [
                 {create_table, "CREATE TABLE"},
@@ -287,7 +287,7 @@ timeseries_test_() ->
 		{chars, "not_null"},
 		{comma, ","},
 		{chars, "temperature"},
-		{varchar, "varchar"},
+		{float_type, "float"},
 		{chars, "not_null"},
 		{comma, ","},
 		{primary_key, "PRIMARY KEY"},
