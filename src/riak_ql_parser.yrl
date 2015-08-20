@@ -199,7 +199,7 @@ Erlang code.
 
 -record(outputs,
         {
-          type    = [] :: select | create,
+          type :: select | create,
           buckets = [],
           fields  = [],
           limit   = [],
@@ -258,7 +258,7 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
 		 list   -> {Type2, [list_to_binary(X) || X <- D]};
 		 regex  -> {Type2, D}
 	     end,
-    _O = #outputs{type    = list_to_existing_atom(A),
+    _O = #outputs{type    = list_to_existing_atom(string:to_lower(A)),
                   fields  = [[X] || X <- B],
                   buckets = Bucket,
                   where   = E
