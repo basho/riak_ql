@@ -21,7 +21,7 @@
 %% -------------------------------------------------------------------
 
 -record(riak_field_v1, {
-          name     = <<>>  :: list(),
+          name     = << >> :: binary(),
           position         :: pos_integer(),
           type             :: field_type(),
           optional = false :: boolean()
@@ -32,7 +32,7 @@
 -type complex_field_type() :: {map, [#riak_field_v1{}]} | any.
 
 -record(param_v1, {
-          name :: string()
+          name :: [binary()]
          }).
 
 -record(hash_fn_v1, {

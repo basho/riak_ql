@@ -259,7 +259,7 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
 		 regex  -> {Type2, D}
 	     end,
     _O = #outputs{type    = list_to_existing_atom(A),
-                  fields  = [[X] || X <- B],
+                  fields  = [[list_to_binary(X)] || X <- B],
                   buckets = Bucket,
                   where   = E
                  }.
@@ -290,7 +290,8 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
     {conditional, {B1, A, C2}}.
 
 make_where({where, A}, {conditional, B}) ->
-    {A, [remove_conditionals(B)]}.
+	A2 = list_to_binary(A),
+    {A2, [remove_conditionals(B)]}.
 
 remove_conditionals({conditional, A}) ->
     A;
@@ -322,13 +323,13 @@ make_expr(A) ->
 
 make_column({word, FieldName}, {DataType, _}) ->
     #riak_field_v1{
-       name = FieldName,
+       name = iolist_to_binary(FieldName),
        type = canonicalize_field_type(DataType),
        optional = true}.
 
 make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
     #riak_field_v1{
-       name = FieldName,
+       name = iolist_to_binary(FieldName),
        type = canonicalize_field_type(DataType),
        optional = false}.
 
@@ -356,7 +357,7 @@ extract_key_field_list({list,
                        Extracted) ->
     [Modfun | extract_key_field_list({list, Rest}, Extracted)];
 extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [#param_v1{name = [Field]} |
+    [#param_v1{name = [iolist_to_binary(Field)]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
 make_table_definition({word, BucketName}, Contents) ->
@@ -392,7 +393,7 @@ make_modfun(quantum, {list, Args}) ->
     {modfun, #hash_fn_v1{
        mod  = riak_ql_quanta,
        fn   = quantum,
-       args = [#param_v1{name = [Param]}, Quantity, list_to_existing_atom(Unit)]}}.
+       args = [#param_v1{name = [iolist_to_binary(Param)]}, Quantity, list_to_existing_atom(Unit)]}}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(1, Elements, []).
