@@ -68,7 +68,6 @@
 -type maps()   :: {maps, [[#riak_field_v1{}]]}.
 -type map()    :: {map,  [#riak_field_v1{}]}.
 
-
 -spec make_helper_mod(#ddl_v1{}) -> {module, atom()} | {'error', tuple()}.
 make_helper_mod(#ddl_v1{} = DDL) ->
     make_helper_mod(DDL, "/tmp", ?NODEBUGOUTPUT).

@@ -101,20 +101,20 @@ keywords_create_test_() ->
 words_containing_keywords_test_() ->
     Got = riak_ql_lexer:get_tokens("error or horror and handy andy"),
     Expected = [
-                {chars, "error"},
-                {or_,   "or"},
-                {chars, "horror"},
-                {and_,  "and"},
-                {chars, "handy"},
-                {chars, "andy"}
+                {chars, <<"error">>},
+                {or_,   <<"or">>},
+                {chars, <<"horror">>},
+                {and_,  <<"and">>},
+                {chars, <<"handy">>},
+                {chars, <<"andy">>}
                ],
     ?_assertEqual(Expected, Got).
 
 words_containing_digits_test_() ->
     Got = riak_ql_lexer:get_tokens("'sha512' sha 512"),
     Expected = [
-                {chars, "sha512"},
-                {chars, "sha"},
+                {chars, <<"sha512">>},
+                {chars, <<"sha">>},
                 {int, 512}
                ],
     ?_assertEqual(Expected, Got).
@@ -184,7 +184,7 @@ datetime_1d_test_() ->
 not_a_date_test_() ->
     Got = riak_ql_lexer:get_tokens("'ergle'"),
     Expected = [
-                {chars, "ergle"}
+                {chars, <<"ergle">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -198,14 +198,14 @@ quote_1_test_() ->
 regex_1_test_() ->
     Got = riak_ql_lexer:get_tokens("/*./"),
     Expected = [
-                {regex, "/*./"}
+                {regex, <<"/*./">>}
                ],
     ?_assertEqual(Expected, Got).
 
 regex_2_test_() ->
     Got = riak_ql_lexer:get_tokens("/^*./i"),
     Expected = [
-                {regex, "/^*./i"}
+                {regex, <<"/^*./i">>}
                ],
     io:format("Expected is ~p~n", [Expected]),
     io:format("Got is ~p~n", [Got]),
@@ -214,9 +214,9 @@ regex_2_test_() ->
 regex_3_test_() ->
     Got = riak_ql_lexer:get_tokens("/*./ or /erkle/"),
     Expected = [
-                {regex, "/*./"},
+                {regex, <<"/*./">>},
                 {or_,   "or"},
-                {regex, "/erkle/"}
+                {regex, <<"/erkle/">>}
                ],
     ?_assertEqual(Expected, Got).
 

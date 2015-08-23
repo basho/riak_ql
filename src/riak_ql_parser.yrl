@@ -218,6 +218,7 @@ Erlang code.
 	 return_error/2
 	 ]).
 
+
 -ifdef(TEST).
 -include("riak_ql.yrl.tests").
 -endif.
@@ -254,12 +255,12 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
                 regex  -> regex
             end,
     Bucket = case Type2 of
-		 string -> list_to_binary(D);
-		 list   -> {Type2, [list_to_binary(X) || X <- D]};
-		 regex  -> {Type2, D}
+		 string -> iolist_to_binary(D);
+		 list   -> {Type2, [iolist_to_binary(X) || X <- D]};
+		 regex  -> {Type2, iolist_to_binary(D)}
 	     end,
     _O = #outputs{type    = list_to_existing_atom(A),
-                  fields  = [[list_to_binary(X)] || X <- B],
+                  fields  = [[iolist_to_binary(X)] || X <- B],
                   buckets = Bucket,
                   where   = E
                  }.
@@ -290,13 +291,22 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
     {conditional, {B1, A, C2}}.
 
 make_where({where, A}, {conditional, B}) ->
-	A2 = list_to_binary(A),
-    {A2, [remove_conditionals(B)]}.
+    {A, [remove_conditionals(B)]}.
 
 remove_conditionals({conditional, A}) ->
     A;
 remove_conditionals({A, B, C}) ->
     {A, remove_conditionals(B), remove_conditionals(C)};
+remove_conditionals(A) when is_list(A) ->
+    iolist_to_binary(A);
+remove_conditionals({regex, A}) ->
+    {regex, iolist_to_binary(A)};
+remove_conditionals({word, A}) ->
+    {word, iolist_to_binary(A)};
+remove_conditionals({A, B}) when is_list(A) ->
+    {iolist_to_binary(A), B};
+remove_conditionals({A, B, C}) when is_list(B) ->
+    {A, iolist_to_binary(B), C};
 remove_conditionals(A) ->
     A.
 
@@ -306,10 +316,10 @@ make_funcall({A, B}) ->
 make_funcall({_A, B}, C) ->
     {funcall, {B, C}}.
 
-add_unit({Type, A}, {chars, U}) when U =:= "s" -> {Type, A};
-add_unit({Type, A}, {chars, U}) when U =:= "m" -> {Type, A*60};
-add_unit({Type, A}, {chars, U}) when U =:= "h" -> {Type, A*60*60};
-add_unit({Type, A}, {chars, U}) when U =:= "d" -> {Type, A*60*60*24}.
+add_unit({Type, A}, {chars, U}) when U =:= <<"s">> -> {Type, A};
+add_unit({Type, A}, {chars, U}) when U =:= <<"m">> -> {Type, A*60};
+add_unit({Type, A}, {chars, U}) when U =:= <<"h">> -> {Type, A*60*60};
+add_unit({Type, A}, {chars, U}) when U =:= <<"d">> -> {Type, A*60*60*24}.
 
 make_list({maybetimes, A}) -> {list, [A]};
 make_list({word,       A}) -> {list, [A]};
@@ -365,7 +375,7 @@ make_table_definition({word, BucketName}, Contents) ->
     LocalKey = find_local_key(Contents),
     Fields = find_fields(Contents),
     #ddl_v1{
-       bucket = list_to_binary(BucketName),
+       bucket = iolist_to_binary(BucketName),
        partition_key = PartitionKey,
        local_key = LocalKey,
        fields = Fields}.
@@ -393,7 +403,7 @@ make_modfun(quantum, {list, Args}) ->
     {modfun, #hash_fn_v1{
        mod  = riak_ql_quanta,
        fn   = quantum,
-       args = [#param_v1{name = [iolist_to_binary(Param)]}, Quantity, list_to_existing_atom(Unit)]}}.
+       args = [#param_v1{name = [iolist_to_binary(Param)]}, Quantity, list_to_existing_atom(binary_to_list(Unit))]}}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(1, Elements, []).

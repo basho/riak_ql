@@ -18,7 +18,8 @@
 	Name() ->
 	       Lexed = riak_ql_lexer:get_tokens(Query),
 	       {ok, DDL} = riak_ql_parser:parse(Lexed),
-	       case  riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+	       % case  riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+	       case  riak_ql_ddl_compiler:mk_helper_m2(DDL, ".", true) of % FIXME don't commit outputting source!
 		   {module, Module}  ->
 		       Result = Module:validate_obj(Val),
 		       ?assertEqual(?VALID, Result);

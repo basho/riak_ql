@@ -70,7 +70,7 @@ COMMA = (,)
 
 Rules.
 
-{AND} : {token, {and_, TokenChars}}.
+{AND} : {token, {and_, list_to_binary(TokenChars)}}.
 {AS} : {token, {as, TokenChars}}.
 {ATOM} : {token, {atom, TokenChars}}.
 {CREATE_TABLE} : {token, {create_table, TokenChars}}.
@@ -91,7 +91,7 @@ Rules.
 {NOT_NULL} : {token, {not_null, TokenChars}}.
 {OF} : {token, {of_, TokenChars}}.
 {ON_COMMIT} : {token, {on_commit, TokenChars}}.
-{OR} : {token, {or_, TokenChars}}.
+{OR} : {token, {or_, list_to_binary(TokenChars)}}.
 {PRIMARY_KEY} : {token, {primary_key, TokenChars}}.
 {PRESERVE} : {token, {preserve, TokenChars}}.
 {QUANTUM} : {token, {quantum, TokenChars}}.
@@ -128,7 +128,7 @@ Rules.
 
 {QUOTED} : {token, {quoted, strip_quoted(TokenChars)}}.
 
-{REGEX} : {token, {regex, TokenChars}}.
+{REGEX} : {token, {regex, list_to_binary(TokenChars)}}.
 
 {COMMA} : {token, {comma, TokenChars}}.
 
@@ -184,7 +184,9 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars   orelse
                                                  Word2 =:= inner   orelse
                                                  Word2 =:= join    orelse
                                                  Word2 =:= as      ->
-    post_p([{chars, W1 ++ W2} | T], Acc);
+    post_p([{chars, iolist_to_binary([W1, W2])} | T], Acc);
+post_p([{Word1, W1} | T], Acc) when Word1 =:= chars ->
+    post_p(T, [{chars, iolist_to_binary(W1)} | Acc]);
 post_p([H | T], Acc) ->
     post_p(T, [H | Acc]).
 
