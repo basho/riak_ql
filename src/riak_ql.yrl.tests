@@ -259,6 +259,16 @@ select_interpolated_sql_test() ->
                                          'LIMIT'  = {interp, "lim"}
                                         }).
 
+select_interpolated_where_sql_test() ->
+    ?sql_compilation_assert("select value from response_times where time > :start",
+                            #riak_sql_v1{'SELECT' = [["value"]],
+                                         'FROM'   = <<"response_times">>,
+                                         'WHERE'  = [
+                                                     {'>', "time", {interp, "start"}}
+                                                    ]
+                                        }).
+
+
 select_where_letters_nos_in_strings_1a_test() ->
     ?sql_compilation_assert("select * from events where user = 'user 1'",
                             #riak_sql_v1{'SELECT' = [["*"]],
