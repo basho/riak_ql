@@ -231,15 +231,17 @@ compile(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
 write_src(AST, DDL, SrcFileName) ->
     AST2 = filter_ast(AST, []),
     Syntax = erl_syntax:form_list(AST2),
-    Header = io_lib:format("%%% Generated Module, do NOT edit~n~n" ++
+    Header = io_lib:format("%%% Generated Module, DO NOT EDIT~n~n" ++
                                "Validates the DDL~n~n" ++
                                "Bucket        : ~s~n" ++
                                "Fields        : ~p~n" ++
-                               "Partition_Key : ~p~n~n",
+                               "Partition_Key : ~p~n" ++
+			       "Local_Key     : ~p~n~n",
                            [
                             binary_to_list(DDL#ddl_v1.bucket),
                             DDL#ddl_v1.fields,
-                            DDL#ddl_v1.partition_key
+                            DDL#ddl_v1.partition_key,
+			    DDL#ddl_v1.local_key
                            ]),
     Header2 = re:replace(Header, "\\n", "\\\n%%% ", [global, {return, list}]),
     Src = erl_prettypr:format(Syntax),
@@ -296,7 +298,7 @@ make_extract_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
     make_extract_cls(T, NewLineNo, Prefix, NewA).
 
 -spec build_is_valid_fn([[#riak_field_v1{}]], pos_integer(), ast()) ->
-                              {expr(), pos_integer()}.
+			       {expr(), pos_integer()}.
 build_is_valid_fn([], LineNo, Acc) ->
     {Fail, NewLineNo} = make_fail_clause(LineNo),
     Clauses = lists:flatten(lists:reverse([Fail | Acc])),
@@ -336,7 +338,7 @@ make_is_valid_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
     make_is_valid_cls(T, NewLineNo, Prefix, NewA).
 
 -spec build_get_type_fn([[#riak_field_v1{}]], pos_integer(), ast()) ->
-                              {expr(), pos_integer()}.
+			       {expr(), pos_integer()}.
 build_get_type_fn([], LineNo, Acc) ->
     Clauses = lists:flatten(lists:reverse(Acc)),
     Fn = make_fun(get_field_type, 1, Clauses, LineNo),
@@ -354,9 +356,9 @@ make_get_type_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
     %% you need to reverse the lists of the positions to
     %% get the calls to element to nest correctly
     Body = case Ty of
-                {map, _}  -> make_atom(map, LineNo);
-                _         -> make_atom(Ty, LineNo)
-            end,
+	       {map, _}  -> make_atom(map, LineNo);
+	       _         -> make_atom(Ty, LineNo)
+	   end,
     Guard = [],
     Cl = make_clause([Conses], Guard, Body, LineNo),
     {NewA, NewLineNo} =
@@ -605,12 +607,12 @@ make_ddl(#ddl_v1{bucket = Bucket,
     make_ddl(Bucket, Fields, PK, LK).
 
 make_ddl(Bucket, Fields) when is_binary(Bucket) ->
-    make_ddl(Bucket, Fields, #partition_key_v1{}, #local_key_v1{}).
+    make_ddl(Bucket, Fields, #key_v1{}, #key_v1{}).
 
 make_ddl(Bucket, Fields, PK) when is_binary(Bucket) ->
-    make_ddl(Bucket, Fields, PK, #local_key_v1{}).
+    make_ddl(Bucket, Fields, PK, #key_v1{}).
 
-make_ddl(Bucket, Fields, #partition_key_v1{} = PK, #local_key_v1{} = LK)
+make_ddl(Bucket, Fields, #key_v1{} = PK, #key_v1{} = LK)
   when is_binary(Bucket) ->
     #ddl_v1{bucket        = Bucket,
             fields        = Fields,
@@ -1279,10 +1281,10 @@ complex_invalid_map_1_test() ->
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>,
-                              {<<"erko">>,
-                               {<<"yerk">>, 33.0}
-                              },
-                              4.4}),
+				  {<<"erko">>,
+				   {<<"yerk">>, 33.0}
+				  },
+				  4.4}),
     ?assertEqual(?INVALID, Result).
 
 %%% test the size of the tuples
@@ -1502,25 +1504,16 @@ complex_ddl_test() ->
                           name = <<"user_id">>,
                           position = 2,
                           type = binary,
-                          optional = false}],
-             partition_key = #partition_key_v1{
-                                ast = [#param_v1{
-                                          name = <<"time">>
-                                         },
-                                       #hash_fn_v1{
-                                              mod = crypto,
-                                          fn = hash,
-                                          args = [sha512]
-                                         }]},
-             local_key = #local_key_v1{
-                            ast = [#hash_fn_v1{
-                                          mod = crypto,
-                                      fn = hash,
-                                      args = [ripemd]
-                                     },
-                                   #param_v1{
-                                      name = <<"time">>
-                                     }]}},
+                          optional = false}
+		      ],
+             partition_key = #key_v1{ast = [
+					    #param_v1{name = <<"time">>},
+					    #hash_fn_v1{mod = crypto, fn = hash, args = [sha512]}
+					   ]},
+             local_key = #key_v1{ast = [
+					#hash_fn_v1{mod = crypto, fn = hash, args = [ripemd]},
+					#param_v1{name = <<"time">>}
+				       ]}},
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({12345, <<"beeees">>}),
     ?assertEqual(?VALID, Result).

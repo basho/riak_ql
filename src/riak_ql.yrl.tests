@@ -2,14 +2,29 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(sql_compilation_assert(String, Expected),
+	Exp2 = fix(Expected),
 	Toks = riak_ql_lexer:get_tokens(String),
 	Got = parse(Toks),
-	?assertEqual({ok, Expected}, Got)).
+	?assertEqual({ok, Exp2}, Got)).
+
+-define(where_test(Uncanonical, Expected), 
+	Got = canonicalise(Uncanonical),
+	?assertEqual(Expected, Got)).
 
 -define(sql_compilation_fail(QL_string),
 	Toks = riak_ql_lexer:get_tokens(QL_string),
 	Got = parse(Toks),
 	?assertMatch({error, _}, Got)).
+
+fix(#riak_sql_v1{'FROM' = F} = Expected) ->
+    case F of
+	{regex, _} -> Expected;
+	{list,  _} -> Expected;
+	_          -> Mod = riak_ql_ddl:make_module_name(F),
+		      Expected#riak_sql_v1{helper_mod = Mod}
+    end;
+fix(Other) ->
+    Other.
 
 %% Tests
 select_sql_test() ->
@@ -92,8 +107,8 @@ select_where_1_sql_test() ->
 					 'FROM'   = <<"response_times">>,
 					 'WHERE'  = [
 						     {and_,
-						      {'>', <<"time">>, {datetime, {{2013, 8, 12}, {23, 32, 1}}}},
-						      {'<', <<"time">>, {datetime, {{2013, 8, 13}, {12, 34, 56}}}}
+						      {'<', <<"time">>, {datetime, {{2013, 8, 13}, {12, 34, 56}}}},
+						      {'>', <<"time">>, {datetime, {{2013, 8, 12}, {23, 32, 1}}}}
 						     }
 						    ]
 					}).
@@ -132,9 +147,9 @@ select_where_5_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
-						     {and_, 
-						      {'=', <<"time">>,            {int, 1400497861762723}},
-						      {'=', <<"sequence_number">>, {int, 2321}}
+						     {and_,
+						      {'=', <<"sequence_number">>, {int, 2321}},
+						      {'=', <<"time">>,            {int, 1400497861762723}}
 						     }
 						    ]
 					}).
@@ -174,13 +189,13 @@ select_where_9_sql_test() ->
 					}).
 
 select_where_10_sql_test() ->
-    ?sql_compilation_assert("select * from events where customer_id = 23 and type = 'click'",
+    ?sql_compilation_assert("select * from events where customer_id = 23 and type = 'click10'",
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
 						     {and_, 
 						      {'=', <<"customer_id">>, {int,  23}},
-						      {'=', <<"type">>,        {word, <<"click">>}}
+						      {'=', <<"type">>,        {word, <<"click10">>}}
 						     }
 						    ]
 					}).
@@ -228,14 +243,248 @@ select_where_15_sql_test() ->
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
 						     {and_,
+						      {'=', <<"state">>, {word, <<"ny">>}},
 						      {or_,
 						       {'=~', <<"email">>, {regex, <<"/.*gmail.*/">>}},
 						       {'=~', <<"email">>, {regex, <<"/.*yahoo.*/">>}}
-						      },
-						      {'=', <<"state">>, {word, <<"ny">>}}
+						      }
 						     }
 						    ]
 					}).
+
+select_where_letters_nos_in_strings_1a_test() ->
+    ?sql_compilation_assert("select * from events where user = 'user 1'",
+			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
+					 'FROM'   = <<"events">>,
+					 'WHERE'  = [
+						     {'=', <<"user">>, {word, <<"user 1">>}}
+						    ]
+					}).
+
+%% TODO
+%%
+%% Single quotes don't really work
+%%
+%% select_where_letters_nos_in_strings_2a_test() ->
+%%    ?sql_compilation_assert("select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
+%% 	      #riak_sql_v1{'SELECT' = [["weather"]],
+%% 			   'FROM'   = <<"GeoCheckin">>,
+%% 			   'WHERE'  = [
+%% 				       {and_,
+%% 					{and_,
+%% 					 {'>', "time", {int, 2000}},
+%% 					 {'<', "time", {int, 8000}}
+%% 					},
+%% 					{'=', "user", {word, "user_1"}}
+%% 					}
+%% 				      ]
+%% 			  }).
+
+select_where_letters_nos_in_strings_1b_test() ->
+    ?sql_compilation_assert("select * from events where user = \"user 1\"",
+			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
+					 'FROM'   = <<"events">>,
+					 'WHERE'  = [
+						     {'=', <<"user">>, {word, <<"user 1">>}}
+						    ]
+					}).
+
+select_where_letters_nos_in_strings_2b_test() ->
+    ?sql_compilation_assert("select weather from GeoCheckin where time > 2000 and time < 8000 and user = \"user_1\"",
+			    #riak_sql_v1{'SELECT' = [[<<"weather">>]],
+					 'FROM'   = <<"GeoCheckin">>,
+					 'WHERE'  = [
+						     {and_,
+						      {'=', <<"user">>, {word, <<"user_1">>}},
+						      {and_,
+						       {'<', <<"time">>, {int, 8000}},
+						       {'>', <<"time">>, {int, 2000}}
+						      }
+						     }
+						    ]
+					}).
+
+select_where_brackets_1_test() ->
+    ?sql_compilation_assert("select weather from GeoCheckin where (time > 2000 and time < 8000) and user = \"user_1\"",
+			    #riak_sql_v1{'SELECT' = [[<<"weather">>]],
+					 'FROM'   = <<"GeoCheckin">>,
+					 'WHERE'  = [
+						     {and_,
+						      {'=', <<"user">>, {word, <<"user_1">>}},
+						      {and_,
+						       {'<', <<"time">>, {int, 8000}},
+						       {'>', <<"time">>, {int, 2000}}
+						      }
+						     }
+						    ]
+					}).
+
+select_where_brackets_2_test() ->
+    ?sql_compilation_assert("select weather from GeoCheckin where user = \"user_1\" and (time > 2000 and time < 8000)",
+			    #riak_sql_v1{'SELECT' = [[<<"weather">>]],
+					 'FROM'   = <<"GeoCheckin">>,
+					 'WHERE'  = [
+						     {and_,
+						      {'=', <<"user">>, {word, <<"user_1">>}},
+						      {and_,
+						       {'<', <<"time">>, {int, 8000}},
+						       {'>', <<"time">>, {int, 2000}}
+						      }
+						     }
+						    ]
+					}).
+
+select_where_brackets_2a_test() ->
+    ?sql_compilation_assert("select weather from GeoCheckin where user = \"user_1\" and (time > 2000 and (time < 8000))",
+			    #riak_sql_v1{'SELECT' = [[<<"weather">>]],
+					 'FROM'   = <<"GeoCheckin">>,
+					 'WHERE'  = [
+						     {and_,
+						      {'=', <<"user">>, {word, <<"user_1">>}},
+						      {and_,
+						       {'<', <<"time">>, {int, 8000}},
+						       {'>', <<"time">>, {int, 2000}}
+						      }
+						     }
+						    ]
+					}).
+
+%%
+%% canonicalise WHERE clauses tests
+%%
+
+canonicalise_where_1_test() ->
+    ?where_test({or_, 
+		 {'<', "alpha", {int, 2}}, 
+		 {'>', "beta",  {int, 3}}
+		},
+		{or_, 
+		 {'<', "alpha", {int, 2}},
+		 {'>', "beta",  {int, 3}}
+		}).
+
+canonicalise_where_2_test() ->
+    ?where_test({or_, 
+		 {'>', "beta",  {int, 3}},
+		 {'<', "alpha", {int, 2}} 
+		},
+		{or_, 
+		 {'<', "alpha", {int, 2}},
+		 {'>', "beta",  {int, 3}}
+		}).
+
+canonicalise_where_3_test() ->
+    ?where_test({and_, 
+		 {'>', "beta",  {int, 3}},
+		 {'<', "alpha", {int, 2}} 
+		},
+		{and_, 
+		 {'<', "alpha", {int, 2}},
+		 {'>', "beta",  {int, 3}}
+		}).
+
+canonicalise_where_4_test() ->
+    ?where_test({or_, 
+		 {and_, 
+		  {'>', "beta",  {int, 3}},
+		  {'<', "alpha", {int, 2}} 
+		 },
+		 {'=', "time", {int, 1234}}
+		},
+		{or_,
+		 {'=', "time", {int, 1234}},
+		 {and_, 
+		  {'<', "alpha", {int, 2}},
+		  {'>', "beta",  {int, 3}}
+		 }
+		}).
+
+%%
+%% these are the ones that matters
+%% all the ands float to the front which means
+%% the query rewriter can walk them them and rearange them
+%%
+canonicalise_where_5_test() ->
+    ?where_test({and_, 
+		 {or_, 
+		  {'>', "beta",  {int, 3}},
+		  {'<', "alpha", {int, 2}} 
+		 },
+		 {and_, 
+		  {'>', "gamma", {int, 3}},
+		  {'<', "delta", {int, 2}} 
+		 }
+		},
+		{and_, 
+		 {'<', "delta", {int, 2}},
+		 {and_, 
+		  {'>', "gamma", {int, 3}},
+		  {or_, 
+		   {'<', "alpha", {int, 2}},
+		   {'>', "beta",  {int, 3}}
+		  }
+		 }
+		}).
+
+canonicalise_where_6_test() ->
+    ?where_test({and_, 
+		 {and_, 
+		  {'>', "beta6",  {int, 3}},
+		  {'<', "alpha6", {int, 2}} 
+		 },
+		 {and_, 
+		  {'>', "gamma6", {int, 3}},
+		  {'<', "delta6", {int, 2}} 
+		 }
+		},
+		{and_, 
+		 {'<', "alpha6", {int, 2}},
+		 {and_, 
+		  {'<', "delta6", {int, 2}},
+		  {and_, 
+		   {'>', "beta6",  {int, 3}},
+		   {'>', "gamma6", {int, 3}}
+		  }
+		 }
+		}).
+
+canonicalise_where_7_test() ->
+    ?where_test({and_, 
+		 {and_, 
+		  {or_, 
+		   {'>', "beta7",  {int, 3}},
+		   {'<', "alpha7", {int, 2}} 
+		  },
+		  {and_, 
+		   {'>', "gamma7", {int, 3}},
+		   {'<', "delta7", {int, 2}} 
+		  }
+		 },
+		 {and_, 
+		  {'>', "epsilon7", {int, 3}},
+		  {'<', "zeta7",    {int, 2}} 
+		 }
+		},
+		{and_, 
+		 {'<', "delta7", {int, 2}},
+		 {and_, 
+		  {'<', "zeta7", {int, 2}},
+		  {and_,
+		   {'>', "epsilon7", {int, 3}},
+		   {and_, 
+		    {'>', "gamma7", {int, 3}},
+		    {or_, 
+		     {'<', "alpha7", {int, 2}},
+		     {'>', "beta7",  {int, 3}}
+		    }
+		   }
+		  }
+		 }
+		}).
+
+%%
+%% create table tests
+%%
 
 create_simple_sql_test() ->
     ?sql_compilation_assert("create table temperatures " ++
@@ -256,8 +505,12 @@ create_simple_sql_test() ->
 					    type = float,
 					    optional = true}
 					],	
-			       partition_key = none,
-			       local_key = #local_key_v1{
+			       partition_key = #key_v1{
+						  ast = [#param_v1{
+							    name = [<<"time">>]
+							   }]
+						 },
+			       local_key = #key_v1{
 					      ast = [#param_v1{
 							name = [<<"time">>]
 						       }]
@@ -283,8 +536,12 @@ create_simple_sql_int_test() ->
 					    type = integer,
 					    optional = true}
 					],	
-			       partition_key = none,
-			       local_key = #local_key_v1{
+			       partition_key = #key_v1{
+					      ast = [#param_v1{
+							name = [<<"time">>]
+						       }]
+						 },
+			       local_key = #key_v1{
 					      ast = [#param_v1{
 							name = [<<"time">>]
 						       }]
@@ -316,15 +573,18 @@ create_composite_key_sql_test() ->
 					    type = binary,
 					    optional = false}
 					],
-			       partition_key = #partition_key_v1{
-						  ast = [#param_v1{
+			       partition_key = #key_v1{
+						  ast = [
+							 #param_v1{
 							    name = [<<"time">>]
 							   },
 							 #param_v1{
 							    name = [<<"user_id">>]
-							   }]},
-			       local_key = #local_key_v1{
-					      ast = [#param_v1{
+							   }
+							]},
+			       local_key = #key_v1{
+					      ast = [
+						     #param_v1{
 							name = [<<"mytype">>]
 						       }
 						    ]}
@@ -394,25 +654,20 @@ create_timeseries_sql_test() ->
 			       type = binary,
 			       optional = true}
 			   ],
-		  partition_key = #partition_key_v1{
+		  partition_key = #key_v1{
 				     ast = [
-					    #param_v1{
-					       name = [<<"geohash">>]
-					      },
-					    #hash_fn_v1{mod = riak_ql_quanta,
-							fn  = quantum,
-							args = [#param_v1{
-								   name = [<<"time">>]
-								  }, 15, m]}
+					    #param_v1{name = [<<"geohash">>]},
+					    #hash_fn_v1{mod  = riak_ql_quanta,
+							fn   = quantum,
+							args = [
+								#param_v1{name = [<<"time">>]}, 15, m
+							       ],
+							type = timestamp}
 					   ]},
-		  local_key = #local_key_v1{
+		  local_key = #key_v1{
 				 ast = [
-					#param_v1{
-					   name = [<<"time">>]
-					  },
-					#param_v1{
-					   name = [<<"user">>]
-					  }
+					#param_v1{name = [<<"time">>]},
+					#param_v1{name = [<<"user">>]}
 				       ]}
 		 },
     ?assertEqual(Expected, Got).
