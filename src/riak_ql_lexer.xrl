@@ -70,7 +70,7 @@ COMMA = (,)
 
 Rules.
 
-{AND} : {token, {and_, list_to_binary(TokenChars)}}.
+{AND} : {token, {and_, TokenChars}}.
 {AS} : {token, {as, TokenChars}}.
 {ATOM} : {token, {atom, TokenChars}}.
 {CREATE_TABLE} : {token, {create_table, TokenChars}}.
@@ -91,7 +91,7 @@ Rules.
 {NOT_NULL} : {token, {not_null, TokenChars}}.
 {OF} : {token, {of_, TokenChars}}.
 {ON_COMMIT} : {token, {on_commit, TokenChars}}.
-{OR} : {token, {or_, list_to_binary(TokenChars)}}.
+{OR} : {token, {or_, TokenChars}}.
 {PRIMARY_KEY} : {token, {primary_key, TokenChars}}.
 {PRESERVE} : {token, {preserve, TokenChars}}.
 {QUANTUM} : {token, {quantum, TokenChars}}.
