@@ -72,7 +72,7 @@
 make_helper_mod(#ddl_v1{} = DDL) ->
     make_helper_mod(DDL, "/tmp", ?NODEBUGOUTPUT).
 
--spec make_helper_mod(#ddl_v1{}, string()) -> {module, atom()} | {'error', tuple()}.
+-spec make_helper_mod(#ddl_v1{}, binary()) -> {module, atom()} | {'error', tuple()}.
 make_helper_mod(#ddl_v1{} = DDL, OutputDir) ->
     make_helper_mod(DDL, OutputDir, ?DEBUGOUTPUT).
 
@@ -90,11 +90,11 @@ make_helper_mod(#ddl_v1{} = DDL, Dir, IsDebugOn) ->
 mk_helper_m2(#ddl_v1{} = DDL) ->
     mk_helper_m2(DDL, "/tmp", ?NODEBUGOUTPUT).
 
--spec mk_helper_m2(#ddl_v1{}, string()) -> {module, atom()} | {'error', tuple()}.
+-spec mk_helper_m2(#ddl_v1{}, OutputDir :: string()) -> {module, atom()} | {'error', tuple()}.
 mk_helper_m2(#ddl_v1{} = DDL, OutputDir) ->
     mk_helper_m2(DDL, OutputDir, ?DEBUGOUTPUT).
 
--spec mk_helper_m2(#ddl_v1{}, string(), boolean()) ->
+-spec mk_helper_m2(#ddl_v1{}, OutputDir :: string(), boolean()) ->
                              {module, atom()} | {'error', tuple()}.
 mk_helper_m2(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
     case validate_ddl(DDL) of
@@ -192,7 +192,7 @@ validate_fields([H | T], Acc) ->
 %% funs to compile the DDL to its helper module AST
 %%
 
--spec compile(#ddl_v1{}, string(), boolean()) ->
+-spec compile(#ddl_v1{}, binary(), boolean()) ->
                      {module, ast()} | {'error', tuple()}.
 compile(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
     #ddl_v1{bucket        = Bucket,
@@ -531,7 +531,7 @@ make_names(Fields, LineNo) ->
               end,
     [Make_fn(X) || X <- Fields].
 
--spec make_name(string(), boolean(), pos_integer(), pos_integer()) -> expr().
+-spec make_name(binary(), boolean(), pos_integer(), pos_integer()) -> expr().
 make_name(Name, HasPrefix, LineNo, NPos) ->
     Prefix = if
                  HasPrefix -> "_";

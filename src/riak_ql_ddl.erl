@@ -56,7 +56,7 @@
 
 -type bucket()                :: binary().
 -type modulename()            :: atom().
--type heirarchicalfieldname() :: [string()].
+-type heirarchicalfieldname() :: [binary()].
 
 -spec make_module_name(bucket()) -> modulename().
 make_module_name(Bucket) when is_binary(Bucket) ->
