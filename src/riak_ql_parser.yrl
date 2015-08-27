@@ -243,7 +243,7 @@ concatenate({word, A}, {chars, B}) ->
     {word, A ++ B}.
 
 make_atom({word, SomeWord}) ->
-    {atom, list_to_atom(SomeWord)}.
+    {atom, binary_to_atom(SomeWord, utf8)}.
 
 make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, []}).
 
@@ -255,12 +255,12 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
                 regex  -> regex
             end,
     Bucket = case Type2 of
-		 string -> iolist_to_binary(D);
-		 list   -> {Type2, [iolist_to_binary(X) || X <- D]};
-		 regex  -> {Type2, iolist_to_binary(D)}
+		 string -> D;
+		 list   -> {Type2, [X || X <- D]};
+		 regex  -> {Type2, D}
 	     end,
-    _O = #outputs{type    = list_to_existing_atom(A),
-                  fields  = [[iolist_to_binary(X)] || X <- B],
+    _O = #outputs{type    = binary_to_existing_atom(A, utf8),
+                  fields  = [[X] || X <- B],
                   buckets = Bucket,
                   where   = E
                  }.
@@ -297,16 +297,6 @@ remove_conditionals({conditional, A}) ->
     A;
 remove_conditionals({A, B, C}) ->
     {A, remove_conditionals(B), remove_conditionals(C)};
-remove_conditionals(A) when is_list(A) ->
-    iolist_to_binary(A);
-remove_conditionals({regex, A}) ->
-    {regex, iolist_to_binary(A)};
-remove_conditionals({word, A}) ->
-    {word, iolist_to_binary(A)};
-remove_conditionals({A, B}) when is_list(A) ->
-    {iolist_to_binary(A), B};
-remove_conditionals({A, B, C}) when is_list(B) ->
-    {A, iolist_to_binary(B), C};
 remove_conditionals(A) ->
     A.
 
@@ -333,13 +323,13 @@ make_expr(A) ->
 
 make_column({word, FieldName}, {DataType, _}) ->
     #riak_field_v1{
-       name = iolist_to_binary(FieldName),
+       name = FieldName,
        type = canonicalize_field_type(DataType),
        optional = true}.
 
 make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
     #riak_field_v1{
-       name = iolist_to_binary(FieldName),
+       name = FieldName,
        type = canonicalize_field_type(DataType),
        optional = false}.
 
@@ -367,7 +357,7 @@ extract_key_field_list({list,
                        Extracted) ->
     [Modfun | extract_key_field_list({list, Rest}, Extracted)];
 extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [#param_v1{name = [iolist_to_binary(Field)]} |
+    [#param_v1{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
 make_table_definition({word, BucketName}, Contents) ->
@@ -375,7 +365,7 @@ make_table_definition({word, BucketName}, Contents) ->
     LocalKey = find_local_key(Contents),
     Fields = find_fields(Contents),
     #ddl_v1{
-       bucket = iolist_to_binary(BucketName),
+       bucket = BucketName,
        partition_key = PartitionKey,
        local_key = LocalKey,
        fields = Fields}.
@@ -403,7 +393,7 @@ make_modfun(quantum, {list, Args}) ->
     {modfun, #hash_fn_v1{
        mod  = riak_ql_quanta,
        fn   = quantum,
-       args = [#param_v1{name = [iolist_to_binary(Param)]}, Quantity, list_to_existing_atom(binary_to_list(Unit))]}}.
+       args = [#param_v1{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)]}}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(1, Elements, []).
