@@ -8,6 +8,7 @@ Nonterminals
 Statement
 Query
 Select
+Insert
 Bucket
 Buckets
 Field
@@ -19,7 +20,9 @@ Conds
 Comp
 Logic
 Val
+Val2
 Vals
+Vals2
 Funcall
 TableDefinition
 TableContentsSource
@@ -38,17 +41,20 @@ KeyFieldArg
 
 Terminals
 
+insert_into
 select
 from
 limit
 where
 and_
  or_
+on
 %% delete
 %% drop
 %% groupby
 %% merge
 %% inner
+inner_join
 %% join
 %% as
 datetime
@@ -80,6 +86,7 @@ timestamp
 varchar
 atom
 quantum
+values
 .
 
 Rootsymbol Statement.
@@ -87,7 +94,11 @@ Endsymbol '$end'.
 
 Statement -> Query : convert('$1').
 Statement -> TableDefinition : fix_up_keys('$1').
+Statement -> Insert : '$1'.
 
+Insert -> insert_into Bucket openb Fields closeb values openb Vals2 closeb : make_insert('$2', '$4', '$8').
+
+Query -> Select inner_join Bucket on Field eq Field : add_inner('$1', '$3', '$5', '$7').
 Query -> Select limit int : add_limit('$1', '$2', '$3').
 Query -> Select           : '$1'.
 
@@ -120,6 +131,12 @@ Conds -> Conds Logic openb Conds closeb : make_expr('$1', '$2', '$4').
 Conds -> Cond                           : '$1'.
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
+
+Vals2 -> Vals2 comma Val2 : make_list('$1', '$3').
+Vals2 -> Val2 : make_list('$1').
+
+Val2 -> Val  : '$1'.
+Val2 -> Word : '$1'.
 
 Vals -> Vals plus       Val : make_expr('$1', '$2', '$3').
 Vals -> Vals minus      Val : make_expr('$1', '$2', '$3').
@@ -201,12 +218,14 @@ Erlang code.
 
 -record(outputs,
         {
-          type    = [] :: select | create,
-          buckets = [],
-          fields  = [],
-          limit   = [],
-          where   = [],
-          ops     = []
+          type       = [] :: select | create,
+          buckets    = [],
+          fields     = [],
+	  inner_join = [],
+	  on         = [],
+          limit      = [],
+          where      = [],
+          ops        = []
          }).
 
 -include("riak_ql_sql.hrl").
@@ -224,33 +243,52 @@ Erlang code.
 -include("riak_ql.yrl.tests").
 -endif.
 
+make_insert({word, Bucket}, {list, Fields}, {list, Vals}) ->
+    Len1 = length(Fields),
+    Len2 = length(Vals),
+    case Len1 of
+	Len2 -> #riak_sql_insert_v1{'INSERT INTO' = Bucket,
+			'VALUES' = lists:zip(Fields, Vals)}
+		    ;
+	_ -> exit("field list doesn't maket values list")
+    end.
+
 %% if no partition key is specified hash on the local key
 fix_up_keys(#ddl_v1{partition_key = none, local_key = LK} = DDL) ->
     DDL#ddl_v1{partition_key = LK, local_key = LK};
 fix_up_keys(A) ->
     A.
 
-convert(#outputs{type    = select,
-		 buckets = B,
-		 fields  = F,
-		 limit   = L,
-		 where   = W}) ->
+convert(#outputs{type       = select,
+		 buckets    = B,
+		 fields     = F,
+		 inner_join = II,
+		 on         = O,
+		 limit      = L,
+		 where      = W}) ->
     Q = case B of
 	    {Type, _} when Type =:= list orelse Type =:= regex ->
-		#riak_sql_v1{'SELECT' = F,
-			     'FROM'   = B,
-			     'WHERE'  = W,
-			     'LIMIT'  = L};
+		#riak_sql_v1{'SELECT'     = F,
+			     'FROM'       = B,
+			     'WHERE'      = W,
+			     'INNER JOIN' = II,
+			     'ON'         = O,
+			     'LIMIT'      = L};
 	    _ ->
-		#riak_sql_v1{'SELECT'   = F,
-			     'FROM'     = B,
-			     'WHERE'    = W,
-			     'LIMIT'    = L,
+		#riak_sql_v1{'SELECT'     = F,
+			     'FROM'       = B,
+			     'WHERE'      = W,
+			     'INNER JOIN' = II,
+			     'ON'         = O,
+			     'LIMIT'      = L,
 			     helper_mod = riak_ql_ddl:make_module_name(B)}
 	end,
     Q;
 convert(#outputs{type = create} = O) ->
-    O.
+    O;
+convert(X) ->
+    io:format("X is ~p~n", [X]),
+    X.
 
 process({chars, A}) ->
     {word, A}.
@@ -263,7 +301,7 @@ make_atom({word, SomeWord}) ->
 
 make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, []}).
 
-make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
+make_clause({select, _A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
     Type2 = case Type of
                 list   -> list;
                 word   -> string;
@@ -275,11 +313,15 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
 		 list   -> {Type2, [list_to_binary(X) || X <- D]};
 		 regex  -> {Type2, D}
 	     end,
-    _O = #outputs{type    = list_to_existing_atom(A),
+    _O = #outputs{type    = select,
                   fields  = [[X] || X <- B],
                   buckets = Bucket,
                   where   = E
                  }.
+
+add_inner(A, {word, B}, {word, C}, {word, D}) ->
+    A#outputs{inner_join = list_to_binary(B),
+	      on         = {C, D}}.
 
 add_limit(A, _B, {int, C}) ->
     A#outputs{limit = C}.

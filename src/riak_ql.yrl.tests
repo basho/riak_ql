@@ -673,6 +673,26 @@ create_timeseries_sql_test() ->
     ?assertEqual(Expected, Got).
 
 %%%
+%%% Insert Into Query
+%%%
+
+simple_insert_sql_test() ->
+    ?sql_compilation_assert("INSERT INTO Custs (CustomerName, ContactName) "
+			    ++ "VALUES ('Cardinal','Tom B. Erichsen')",
+			    #riak_sql_insert_v1{'INSERT INTO' = "Custs",
+						'VALUES'      = [
+								{"CustomerName", "Cardinal"},
+								 {"ContactName", "Tom B. Erichsen"}
+								]}).
+
+simple_join_sql_test() ->
+    ?sql_compilation_assert("select * FROM bish INNER JOIN bash ON bish.erk = bash.erk",
+			    #riak_sql_v1{'SELECT'     = [["*"]],
+					 'FROM'       = <<"bish">>,
+					 'INNER JOIN' = <<"bash">>,
+					 'ON'         = {"bish.erk", "bash.erk"}}).
+
+%%%
 %%% Failure tests
 %%%
 

@@ -16,6 +16,8 @@ FROM = (F|f)(R|r)(O|o)(M|m)
 GLOBAL = (G|g)(L|l)(O|o)(B|b)(A|a)(L|l)
 GROUPBY = (G|g)(R|r)(O|o)(U|u)(P|p)(B|b)(Y|y)
 INNER = (I|i)(N|n)(N|n)(E|e)(R|r)
+INNER_JOIN = (I|i)(N|n)(N|n)(E|e)(R|r)\s(J|j)(O|o)(I|i)(N|n)
+INSERT_INTO = (I|i)(N|n)(S|s)(E|e)(R|r)(T|t)\s(I|i)(N|n)(T|t)(O|o)
 INT = (I|i)(N|n)(T|t)
 JOIN = (J|j)(O|o)(I|i)(N|n)
 LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
@@ -25,6 +27,7 @@ MERGE = (M|m)(E|e)(R|r)(G|g)(E|e)
 MODFUN = (M|m)(O|o)(D|d)(F|f)(U|u)(N|n)
 NOT_NULL = (N|n)(O|o)(T|t)\s(N|n)(U|u)(L|l)(L|l)
 OF = (O|o)(F|f)
+ON = (O|o)(N|n)
 ON_COMMIT = (O|o)(N|n)\s(C|c)(O|o)(M|m)(M|m)(I|i)(T|t)
 OR = (O|o)(R|r)
 PRIMARY_KEY = (P|p)(R|r)(I|i)(M|m)(A|a)(R|r)(Y|y)\s(K|k)(E|e)(Y|y)
@@ -35,6 +38,7 @@ SELECT = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
 SYSTEM_VERSIONING = (S|s)(Y|y)(S|s)(T|t)(E|e)(M|m)\s(V|v)(E|e)(R|r)(S|s)(I|i)(O|o)(N|n)(I|i)(N|n)(G|g)
 TEMPORARY = (T|t)(E|e)(M|m)(P|p)(O|o)(R|r)(A|a)(R|r)(Y|y)
 TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
+VALUES = (V|v)(A|a)(L|l)(U|u)(E|e)(S|s)
 VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
 WITH = (W|w)(I|i)(T|t)(H|h)
@@ -81,6 +85,8 @@ Rules.
 {GLOBAL} : {token, {global, TokenChars}}.
 {GROUPBY} : {token, {groupby, TokenChars}}.
 {INNER} : {token, {inner, TokenChars}}.
+{INNER_JOIN} : {token, {inner_join, TokenChars}}.
+{INSERT_INTO} : {token, {insert_into, TokenChars}}.
 {INT} : {token, {int_type, TokenChars}}.
 {JOIN} : {token, {join, TokenChars}}.
 {LIMIT} : {token, {limit, TokenChars}}.
@@ -90,6 +96,7 @@ Rules.
 {MODFUN} : {token, {modfun, TokenChars}}.
 {NOT_NULL} : {token, {not_null, TokenChars}}.
 {OF} : {token, {of_, TokenChars}}.
+{ON} : {token, {on, TokenChars}}.
 {ON_COMMIT} : {token, {on_commit, TokenChars}}.
 {OR} : {token, {or_, TokenChars}}.
 {PRIMARY_KEY} : {token, {primary_key, TokenChars}}.
@@ -100,6 +107,7 @@ Rules.
 {SYSTEM_VERSIONING} : {token, {system_versioning, TokenChars}}.
 {TEMPORARY} : {token, {temporary, TokenChars}}.
 {TIMESTAMP} : {token, {timestamp, TokenChars}}.
+{VALUES} : {token, {values, TokenChars}}.
 {VARCHAR} : {token, {varchar, TokenChars}}.
 {WHERE} : {token, {where, TokenChars}}.
 {WITH} : {token, {with, TokenChars}}.
@@ -164,6 +172,7 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars   orelse
                                                  Word1 =:= limit   orelse
                                                  Word1 =:= and_    orelse
                                                  Word1 =:= or_     orelse
+                                                 Word1 =:= on      orelse
                                                  Word1 =:= delete  orelse
                                                  Word1 =:= drop    orelse
                                                  Word1 =:= groupby orelse

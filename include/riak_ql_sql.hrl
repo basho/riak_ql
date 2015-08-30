@@ -13,9 +13,17 @@
 	  'WHERE'       = []    :: [filter()],
 	  'ORDER BY'    = []    :: [sorter()],
 	  'LIMIT'       = []    :: [limit()],
+	  'INNER JOIN'  = [],
+	  'ON'          = [],
 	  helper_mod            :: atom(),
 	  partition_key = none  :: none | binary(),
 	  is_executable = false :: boolean(),
 	  type          = sql   :: sql | timeseries,
 	  local_key                                  % prolly a mistake to put this here - should be in DDL
+	}).
+
+-record(riak_sql_insert_v1,
+	{
+	  'INSERT INTO' = [],
+	  'VALUES'      = []
 	}).
