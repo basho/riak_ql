@@ -11,6 +11,14 @@
 	Got = canonicalise(Uncanonical),
 	?assertEqual(Expected, Got)).
 
+% assert match is useful for only matching part of the output, that
+% is being tested and not the whole state to prevent tests failing
+% on irrelevant changes.
+-define(sql_compilation_assert_match(String, Expected),
+	Toks = riak_ql_lexer:get_tokens(String),
+	Got = parse(Toks),
+	?assertMatch({ok, Expected}, Got)).
+
 -define(sql_compilation_fail(QL_string),
 	Toks = riak_ql_lexer:get_tokens(QL_string),
 	Got = parse(Toks),
@@ -671,6 +679,14 @@ create_timeseries_sql_test() ->
 				       ]}
 		 },
     ?assertEqual(Expected, Got).
+
+select_sql_case_insensitive_1_test() ->
+    ?sql_compilation_assert_match("SELECT * from argle",
+				  #riak_sql_v1{'SELECT' = [["*"]]}).
+
+select_sql_case_insensitive_2_test() ->
+    ?sql_compilation_assert_match("seLEct * from argle",
+				  #riak_sql_v1{'SELECT' = [["*"]]}).
 
 %%%
 %%% Failure tests
