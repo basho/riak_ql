@@ -6,115 +6,113 @@
 keywords_1_test_() ->
     Str = "select",
     Got = riak_ql_lexer:get_tokens(Str),
-    Expected = [{select, Str}],
-    ?_assertEqual(Expected, Got).
+    ?_assertEqual([{select, <<"select">>}], Got).
 
 keywords_2_test_() ->
     Str = "seLEct",
     Got = riak_ql_lexer:get_tokens(Str),
-    Expected = [{select, Str}],
-    ?_assertEqual(Expected, Got).
+    ?_assertEqual([{select, <<"seLEct">>}], Got).
 
 keywords_3_test_() ->
     Got = riak_ql_lexer:get_tokens("from LiMit Where anD oR delETe DROP Groupby MeRge InneR JOIn As"),
     Expected = [
-                {from,    "from"},
-                {limit,   "LiMit"},
-                {where,   "Where"},
-                {and_,    "anD"},
-                {or_,     "oR"},
-                {delete,  "delETe"},
-                {drop,    "DROP"},
-                {groupby, "Groupby"},
-                {merge,   "MeRge"},
-                {inner,   "InneR"},
-                {join,    "JOIn"},
-                {as,      "As"}
+                {from,    <<"from">>},
+                {limit,   <<"LiMit">>},
+                {where,   <<"Where">>},
+                {and_,    <<"anD">>},
+                {or_,     <<"oR">>},
+                {delete,  <<"delETe">>},
+                {drop,    <<"DROP">>},
+                {groupby, <<"Groupby">>},
+                {merge,   <<"MeRge">>},
+                {inner,   <<"InneR">>},
+                {join,    <<"JOIn">>},
+                {as,      <<"As">>}
                ],
     ?_assertEqual(Expected, Got).
 
 keywords_3a_test_() ->
     Got = riak_ql_lexer:get_tokens("from limit where and or delete drop groupby merge inner join as"),
     Expected = [
-                {from,    "from"},
-                {limit,   "limit"},
-                {where,   "where"},
-                {and_,    "and"},
-                {or_,     "or"},
-                {delete,  "delete"},
-                {drop,    "drop"},
-                {groupby, "groupby"},
-                {merge,   "merge"},
-                {inner,   "inner"},
-                {join,    "join"},
-                {as,      "as"}
+                {from,    <<"from">>},
+                {limit,   <<"limit">>},
+                {where,   <<"where">>},
+                {and_,    <<"and">>},
+                {or_,     <<"or">>},
+                {delete,  <<"delete">>},
+                {drop,    <<"drop">>},
+                {groupby, <<"groupby">>},
+                {merge,   <<"merge">>},
+                {inner,   <<"inner">>},
+                {join,    <<"join">>},
+                {as,      <<"as">>}
                ],
     ?_assertEqual(Expected, Got).
 
 keywords_3b_test_() ->
     Got = riak_ql_lexer:get_tokens("FROM LIMIT WHERE AND OR DELETE DROP GROUPBY MERGE INNER JOIN AS"),
     Expected = [
-                {from,    "FROM"},
-                {limit,   "LIMIT"},
-                {where,   "WHERE"},
-                {and_,    "AND"},
-                {or_,     "OR"},
-                {delete,  "DELETE"},
-                {drop,    "DROP"},
-                {groupby, "GROUPBY"},
-                {merge,   "MERGE"},
-                {inner,   "INNER"},
-                {join,    "JOIN"},
-                {as,      "AS"}
+                {from,    <<"FROM">>},
+                {limit,   <<"LIMIT">>},
+                {where,   <<"WHERE">>},
+                {and_,    <<"AND">>},
+                {or_,     <<"OR">>},
+                {delete,  <<"DELETE">>},
+                {drop,    <<"DROP">>},
+                {groupby, <<"GROUPBY">>},
+                {merge,   <<"MERGE">>},
+                {inner,   <<"INNER">>},
+                {join,    <<"JOIN">>},
+                {as,      <<"AS">>}
                ],
     ?_assertEqual(Expected, Got).
 
 keyword_int_type_test_() ->
     ?_assertEqual(
-        [{int_type, "int"},
-         {int_type, "INT"},
-         {int_type, "iNt"},
-         {int_type, "InT"}],
+        [{int_type, <<"int">>},
+         {int_type, <<"INT">>},
+         {int_type, <<"iNt">>},
+         {int_type, <<"InT">>}],
         riak_ql_lexer:get_tokens("int INT iNt InT")
     ).
 
 keyword_float_type_test_() ->
     ?_assertEqual(
-        [{float_type, "float"},
-         {float_type, "Float"},
-         {float_type, "fLoat"},
-         {float_type, "flOat"},
-         {float_type, "floAt"},
-         {float_type, "floaT"},
-         {float_type, "FLOAT"}],
+        [{float_type, <<"float">>},
+         {float_type, <<"Float">>},
+         {float_type, <<"fLoat">>},
+         {float_type, <<"flOat">>},
+         {float_type, <<"floAt">>},
+         {float_type, <<"floaT">>},
+         {float_type, <<"FLOAT">>}],
         riak_ql_lexer:get_tokens("float Float fLoat flOat floAt floaT FLOAT")
     ).
 
 keywords_create_test_() ->
     Got = riak_ql_lexer:get_tokens("create table not null primary key"),
     Expected = [
-                {create_table, "create table"},
-                {not_null, "not null"},
-                {primary_key, "primary key"}],
+                {create_table, <<"create table">>},
+                {not_null, <<"not null">>},
+                {primary_key, <<"primary key">>}],
     ?_assertEqual(Expected, Got).
 
 words_containing_keywords_test_() ->
     Got = riak_ql_lexer:get_tokens("error or horror and handy andy"),
     Expected = [
-                {chars, "error"},
-                {or_,   "or"},
-                {chars, "horror"},
-                {and_,  "and"},
-                {chars, "handy"},
-                {chars, "andy"}
+                {chars, <<"error">>},
+                {or_,   <<"or">>},
+                {chars, <<"horror">>},
+                {and_,  <<"and">>},
+                {chars, <<"handy">>},
+                {chars, <<"andy">>}
                ],
     ?_assertEqual(Expected, Got).
 
 words_containing_digits_test_() ->
     Got = riak_ql_lexer:get_tokens("'sha512' sha 512"),
     Expected = [
-                {chars, "sha512"},
-                {chars, "sha"},
+                {chars, <<"sha512">>},
+                {chars, <<"sha">>},
                 {int, 512}
                ],
     ?_assertEqual(Expected, Got).
@@ -134,21 +132,21 @@ nums_test_() ->
 ops_test_() ->
     Got = riak_ql_lexer:get_tokens("> < <> != !~ = =~"),
     Expected = [
-                {gt,        ">"},
-                {lt,        "<"},
-                {ne,        "<>"},
-                {nomatch,   "!="},
-                {notapprox, "!~"},
-                {eq,        "="},
-                {approx,    "=~"}
+                {gt,        <<">">>},
+                {lt,        <<"<">>},
+                {ne,        <<"<>">>},
+                {nomatch,   <<"!=">>},
+                {notapprox, <<"!~">>},
+                {eq,        <<"=">>},
+                {approx,    <<"=~">>}
                ],
     ?_assertEqual(Expected, Got).
 
 brackets_test_() ->
     Got = riak_ql_lexer:get_tokens(" ( )"),
     Expected = [
-                {openb,  "("},
-                {closeb, ")"}
+                {openb,  <<"(">>},
+                {closeb, <<")">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -192,28 +190,28 @@ datetime_1d_test_() ->
 not_a_date_test_() ->
     Got = riak_ql_lexer:get_tokens("'ergle'"),
     Expected = [
-                {chars, "ergle"}
+                {chars, <<"ergle">>}
                ],
     ?_assertEqual(Expected, Got).
 
 double_quote_1_test_() ->
     Got = riak_ql_lexer:get_tokens("\" yardle hoop !@#$%^&*() _ -\""),
     Expected = [
-                {quoted, "yardle hoop !@#$%^&*() _ -"}
+                {quoted, <<"yardle hoop !@#$%^&*() _ -">>}
                ],
     ?_assertEqual(Expected, Got).
 
 regex_1_test_() ->
     Got = riak_ql_lexer:get_tokens("/*./"),
     Expected = [
-                {regex, "/*./"}
+                {regex, <<"/*./">>}
                ],
     ?_assertEqual(Expected, Got).
 
 regex_2_test_() ->
     Got = riak_ql_lexer:get_tokens("/^*./i"),
     Expected = [
-                {regex, "/^*./i"}
+                {regex, <<"/^*./i">>}
                ],
     io:format("Expected is ~p~n", [Expected]),
     io:format("Got is ~p~n", [Got]),
@@ -222,19 +220,19 @@ regex_2_test_() ->
 regex_3_test_() ->
     Got = riak_ql_lexer:get_tokens("/*./ or /erkle/"),
     Expected = [
-                {regex, "/*./"},
-                {or_,   "or"},
-                {regex, "/erkle/"}
+                {regex, <<"/*./">>},
+                {or_,   <<"or">>},
+                {regex, <<"/erkle/">>}
                ],
     ?_assertEqual(Expected, Got).
 
 chars_test_() ->
     Got = riak_ql_lexer:get_tokens("r_t , ee where"),
     Expected = [
-                {chars, "r_t"},
-                {comma, ","},
-                {chars, "ee"},
-                {where, "where"}
+                {chars, <<"r_t">>},
+                {comma, <<",">>},
+                {chars, <<"ee">>},
+                {where, <<"where">>}
                ],
     io:format("Expected is ~p~n", [Expected]),
     io:format("Got is ~p~n", [Got]),
@@ -243,23 +241,23 @@ chars_test_() ->
 arithmatic_test_() ->
     Got = riak_ql_lexer:get_tokens(" + - * / "),
     Expected = [
-                {plus,       "+"},
-                {minus,      "-"},
-                {maybetimes, "*"},
-                {div_,       "/"}
+                {plus,       <<"+">>},
+                {minus,      <<"-">>},
+                {maybetimes, <<"*">>},
+                {div_,       <<"/">>}
                ],
     ?_assertEqual(Expected, Got).
 
 general_test_() ->
     Got = riak_ql_lexer:get_tokens("select v from r_t where time > '23 April 63 1:2:3'"),
     Expected = [
-                {select, "select"},
-                {chars,  "v"},
-                {from, "from"},
-                {chars, "r_t"},
-                {where, "where"},
-                {chars, "time"},
-                {gt, ">"},
+                {select, <<"select">>},
+                {chars,  <<"v">>},
+                {from, <<"from">>},
+                {chars, <<"r_t">>},
+                {where, <<"where">>},
+                {chars, <<"time">>},
+                {gt, <<">">>},
                 {datetime, {{63, 4, 23}, {1, 2, 3}}}
                ],
     io:format("Expected is ~p~n", [Expected]),
@@ -275,46 +273,46 @@ timeseries_test_() ->
                                    ++ "temperature float not_null, "
                                    ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
     Expected = [
-                {create_table, "CREATE TABLE"},
-                {chars, "Geo"},
-                {openb, "("},
-                {chars, "geohash"},
-                {varchar, "varchar"},
-                {chars, "not_null"},
-                {comma, ","},
-                {chars, "user"},
-                {varchar, "varchar"},
-                {chars, "not_null"},
-                {comma, ","},
-                {chars, "time"},
-                {timestamp, "timestamp"},
-                {chars, "not_null"},
-                {comma, ","},
-                {chars, "weather"},
-                {varchar, "varchar"},
-                {chars, "not_null"},
-                {comma, ","},
-                {chars, "temperature"},
-                {float_type, "float"},
-                {chars, "not_null"},
-                {comma, ","},
-                {primary_key, "PRIMARY KEY"},
-                {openb, "("},
-                {openb, "("},
-                {chars, "geohash"},
-                {comma, ","},
-                {quantum,"quantum"},
-                {openb,"("},
-                {chars,"time"},
-                {comma,","},
+                {create_table, <<"CREATE TABLE">>},
+                {chars,<<"Geo">>},
+                {openb, <<"(">>},
+                {chars,<<"geohash">>},
+                {varchar, <<"varchar">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"user">>},
+                {varchar, <<"varchar">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"time">>},
+                {timestamp, <<"timestamp">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"weather">>},
+                {varchar, <<"varchar">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"temperature">>},
+                {float_type, <<"float">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {primary_key, <<"PRIMARY KEY">>},
+                {openb, <<"(">>},
+                {openb, <<"(">>},
+                {chars,<<"geohash">>},
+                {comma, <<",">>},
+                {quantum, <<"quantum">>},
+                {openb, <<"(">>},
+                {chars,<<"time">>},
+                {comma, <<",">>},
                 {int,15},
-                {comma,","},
-                {chars,"m"},
-                {closeb,")"},
-                {comma,","},
-                {chars,"time"},
-                {comma,","},
-                {chars,"user"},
-                {closeb,")"}
+                {comma, <<",">>},
+                {chars,<<"m">>},
+                {closeb, <<")">>},
+                {comma, <<",">>},
+                {chars,<<"time">>},
+                {comma, <<",">>},
+                {chars,<<"user">>},
+                {closeb, <<")">>}
                ],
     ?_assertEqual(Expected, Got).

@@ -72,74 +72,74 @@ COMMA = (,)
 
 Rules.
 
-{AND} : {token, {and_, TokenChars}}.
-{AS} : {token, {as, TokenChars}}.
-{ATOM} : {token, {atom, TokenChars}}.
-{CREATE_TABLE} : {token, {create_table, TokenChars}}.
-{DELETE} : {token, {delete, TokenChars}}.
-{DROP} : {token, {drop, TokenChars}}.
-{FLOAT} : {token, {float_type, TokenChars}}.
-{FROM} : {token, {from, TokenChars}}.
-{GLOBAL} : {token, {global, TokenChars}}.
-{GROUPBY} : {token, {groupby, TokenChars}}.
-{INNER} : {token, {inner, TokenChars}}.
-{INT} : {token, {int_type, TokenChars}}.
-{JOIN} : {token, {join, TokenChars}}.
-{LIMIT} : {token, {limit, TokenChars}}.
-{LOCAL} : {token, {local, TokenChars}}.
-{LOCAL_KEY} : {token, {local_key, TokenChars}}.
-{MERGE} : {token, {merge, TokenChars}}.
-{MODFUN} : {token, {modfun, TokenChars}}.
-{NOT_NULL} : {token, {not_null, TokenChars}}.
-{OF} : {token, {of_, TokenChars}}.
-{ON_COMMIT} : {token, {on_commit, TokenChars}}.
-{OR} : {token, {or_, TokenChars}}.
-{PRIMARY_KEY} : {token, {primary_key, TokenChars}}.
-{PRESERVE} : {token, {preserve, TokenChars}}.
-{QUANTUM} : {token, {quantum, TokenChars}}.
-{ROWS} : {token, {rows, TokenChars}}.
-{SELECT} : {token, {select, TokenChars}}.
-{SYSTEM_VERSIONING} : {token, {system_versioning, TokenChars}}.
-{TEMPORARY} : {token, {temporary, TokenChars}}.
-{TIMESTAMP} : {token, {timestamp, TokenChars}}.
-{VARCHAR} : {token, {varchar, TokenChars}}.
-{WHERE} : {token, {where, TokenChars}}.
-{WITH} : {token, {with, TokenChars}}.
+{AND} : {token, {and_, list_to_binary(TokenChars)}}.
+{AS} : {token, {as, list_to_binary(TokenChars)}}.
+{ATOM} : {token, {atom, list_to_binary(TokenChars)}}.
+{CREATE_TABLE} : {token, {create_table, list_to_binary(TokenChars)}}.
+{DELETE} : {token, {delete, list_to_binary(TokenChars)}}.
+{DROP} : {token, {drop, list_to_binary(TokenChars)}}.
+{FLOAT} : {token, {float_type, list_to_binary(TokenChars)}}.
+{FROM} : {token, {from, list_to_binary(TokenChars)}}.
+{GLOBAL} : {token, {global, list_to_binary(TokenChars)}}.
+{GROUPBY} : {token, {groupby, list_to_binary(TokenChars)}}.
+{INNER} : {token, {inner, list_to_binary(TokenChars)}}.
+{INT} : {token, {int_type, list_to_binary(TokenChars)}}.
+{JOIN} : {token, {join, list_to_binary(TokenChars)}}.
+{LIMIT} : {token, {limit, list_to_binary(TokenChars)}}.
+{LOCAL} : {token, {local, list_to_binary(TokenChars)}}.
+{LOCAL_KEY} : {token, {local_key, list_to_binary(TokenChars)}}.
+{MERGE} : {token, {merge, list_to_binary(TokenChars)}}.
+{MODFUN} : {token, {modfun, list_to_binary(TokenChars)}}.
+{NOT_NULL} : {token, {not_null, list_to_binary(TokenChars)}}.
+{OF} : {token, {of_, list_to_binary(TokenChars)}}.
+{ON_COMMIT} : {token, {on_commit, list_to_binary(TokenChars)}}.
+{OR} : {token, {or_, list_to_binary(TokenChars)}}.
+{PRIMARY_KEY} : {token, {primary_key, list_to_binary(TokenChars)}}.
+{PRESERVE} : {token, {preserve, list_to_binary(TokenChars)}}.
+{QUANTUM} : {token, {quantum, list_to_binary(TokenChars)}}.
+{ROWS} : {token, {rows, list_to_binary(TokenChars)}}.
+{SELECT} : {token, {select, list_to_binary(TokenChars)}}.
+{SYSTEM_VERSIONING} : {token, {system_versioning, list_to_binary(TokenChars)}}.
+{TEMPORARY} : {token, {temporary, list_to_binary(TokenChars)}}.
+{TIMESTAMP} : {token, {timestamp, list_to_binary(TokenChars)}}.
+{VARCHAR} : {token, {varchar, list_to_binary(TokenChars)}}.
+{WHERE} : {token, {where, list_to_binary(TokenChars)}}.
+{WITH} : {token, {with, list_to_binary(TokenChars)}}.
 
 {INTNUM}   : {token, {int, list_to_integer(TokenChars)}}.
 {FLOATDEC} : {token, {float, list_to_float(TokenChars)}}.
 {FLOATSCI} : {token, {float, list_to_float(TokenChars)}}.
 
-{EQ}          : {token, {eq,     TokenChars}}.
-{APPROXMATCH} : {token, {approx, TokenChars}}.
-{GT}          : {token, {gt,        TokenChars}}.
-{LT}          : {token, {lt,        TokenChars}}.
-{NE}          : {token, {ne,        TokenChars}}.
-{NOMATCH}     : {token, {nomatch,   TokenChars}}.
-{NOTAPPROX}   : {token, {notapprox,   TokenChars}}.
+{EQ}          : {token, {eq,     list_to_binary(TokenChars)}}.
+{APPROXMATCH} : {token, {approx, list_to_binary(TokenChars)}}.
+{GT}          : {token, {gt,        list_to_binary(TokenChars)}}.
+{LT}          : {token, {lt,        list_to_binary(TokenChars)}}.
+{NE}          : {token, {ne,        list_to_binary(TokenChars)}}.
+{NOMATCH}     : {token, {nomatch,   list_to_binary(TokenChars)}}.
+{NOTAPPROX}   : {token, {notapprox,   list_to_binary(TokenChars)}}.
 
-{OPEN}  :  {token, {openb,  TokenChars}}.
-{CLOSE} :  {token, {closeb, TokenChars}}.
+{OPEN}  :  {token, {openb,  list_to_binary(TokenChars)}}.
+{CLOSE} :  {token, {closeb, list_to_binary(TokenChars)}}.
 
-{PLUS}  : {token, {plus,       TokenChars}}.
-{MINUS} : {token, {minus,      TokenChars}}.
-{TIMES} : {token, {maybetimes, TokenChars}}.
-{DIV}   : {token, {div_,       TokenChars}}.
+{PLUS}  : {token, {plus,       list_to_binary(TokenChars)}}.
+{MINUS} : {token, {minus,      list_to_binary(TokenChars)}}.
+{TIMES} : {token, {maybetimes, list_to_binary(TokenChars)}}.
+{DIV}   : {token, {div_,       list_to_binary(TokenChars)}}.
 
 {DATETIME} : {token, fix_up_date(TokenChars)}.
 {INTERP} : {token, fix_up_interp(TokenChars)}.
 
 {QUOTED} : {token, {quoted, strip_quoted(TokenChars)}}.
 
-{REGEX} : {token, {regex, TokenChars}}.
+{REGEX} : {token, {regex, list_to_binary(TokenChars)}}.
 
-{COMMA} : {token, {comma, TokenChars}}.
+{COMMA} : {token, {comma, list_to_binary(TokenChars)}}.
 
-{WHITESPACE} : {token, {whitespace, TokenChars}}.
+{WHITESPACE} : {token, {whitespace, list_to_binary(TokenChars)}}.
 
 \n : {end_token, {'$end'}}.
 
-.  : {token, {chars, TokenChars}}.
+.  : {token, {chars, list_to_binary(TokenChars)}}.
 
 Erlang code.
 
@@ -187,7 +187,9 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars   orelse
                                                  Word2 =:= inner   orelse
                                                  Word2 =:= join    orelse
                                                  Word2 =:= as      ->
-    post_p([{chars, W1 ++ W2} | T], Acc);
+    post_p([{chars, <<W1/binary, W2/binary>>} | T], Acc);
+post_p([{chars, TokenChars} | T], Acc) when is_list(TokenChars)->
+    post_p(T, [{chars, list_to_binary(TokenChars)} | Acc]);
 post_p([H | T], Acc) ->
     post_p(T, [H | Acc]).
 
@@ -207,4 +209,4 @@ fix_up_interp([$: | InterpName]) ->
 
 strip_quoted(Date) ->
     Date2 = string:strip(Date, both, $"), %"
-    string:strip(Date2).
+    list_to_binary(string:strip(Date2)).
