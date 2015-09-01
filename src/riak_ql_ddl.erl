@@ -80,7 +80,8 @@ get_local_key(#ddl_v1{bucket = B, local_key = LK}, Obj)
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
 
--spec make_key(atom(), #key_v1{}, list()) -> list(). 
+-spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}]. 
+make_key(_Mod, none, _Vals) -> [];
 make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso 
 					     is_list(Vals) ->
     mk_k(AST, Vals, Mod, []).

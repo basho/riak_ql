@@ -201,7 +201,7 @@ Erlang code.
 
 -record(outputs,
         {
-          type    = [] :: select | create,
+          type :: select | create,
           buckets = [],
           fields  = [],
           limit   = [],
@@ -264,7 +264,7 @@ make_atom({word, SomeWord}) ->
 
 make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, []}).
 
-make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
+make_clause({select, _}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
     Type2 = case Type of
                 list   -> list;
                 word   -> string;
@@ -276,7 +276,7 @@ make_clause({select, A}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
 		 list   -> {Type2, [X || X <- D]};
 		 regex  -> {Type2, D}
 	     end,
-    _O = #outputs{type    = binary_to_existing_atom(A, utf8),
+    _O = #outputs{type    = select,
                   fields  = [[X] || X <- B],
                   buckets = Bucket,
                   where   = E
