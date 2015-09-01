@@ -483,6 +483,44 @@ canonicalise_where_7_test() ->
 		}).
 
 %%
+%% create table tests with foreign key
+%%
+
+create_simple_sql_FK_test() ->
+    ?sql_compilation_assert("create table temperatures " ++
+				"(time timestamp not null, " ++
+				"temperature_k float, " ++
+				"primary key (time), " ++
+				"foreign key (yando, time))",
+			    #ddl_v1{
+			       bucket = <<"temperatures">>,
+			       fields = [
+					 #riak_field_v1{
+					    name = "time",
+					    position = 1,
+					    type = timestamp,
+					    optional = false},
+					 #riak_field_v1{
+					    name = "temperature_k",
+					    position = 2,
+					    type = float,
+					    optional = true}
+					],	
+			       partition_key = #key_v1{
+						  ast = [#param_v1{
+							    name = ["time"]
+							   }]
+						 },
+			       local_key = #key_v1{
+					      ast = [#param_v1{
+							name = ["time"]
+						       }]
+					     },
+			       foreign_bucket = "yando",
+			       foreign_key    = "time"
+			      }).
+
+%%
 %% create table tests
 %%
 

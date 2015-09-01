@@ -5,6 +5,7 @@ create table
 delete
 drop
 float
+foreign key
 from
 global
 groupby

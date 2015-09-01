@@ -31,6 +31,7 @@ TableElements
 TableElement
 ColumnDefinition
 ColumnConstraint
+ForeignKeyDefinition
 KeyDefinition
 DataType
 KeyFieldList
@@ -64,6 +65,7 @@ int
 int_type
 float
 float_type
+foreign_key
 eq
 gt
 lt
@@ -180,6 +182,7 @@ TableElements -> TableElement : '$1'.
 
 TableElement -> ColumnDefinition : '$1'.
 TableElement -> KeyDefinition : '$1'.
+TableElement -> ForeignKeyDefinition : '$1'.
 
 ColumnDefinition ->
     Field DataType ColumnConstraint : make_column('$1', '$2', '$3').
@@ -193,6 +196,9 @@ DataType -> int_type : canonicalize_data_type('$1').
 DataType -> timestamp : '$1'.
 DataType -> varchar : '$1'.
 
+ForeignKeyDefinition ->
+    foreign_key openb Bucket comma KeyField closeb : make_foreign_key('$3', '$5').
+    
 KeyDefinition ->
     primary_key       openb KeyFieldList closeb                           : make_local_key('$3').
 KeyDefinition ->
@@ -473,6 +479,10 @@ make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
        type = canonicalize_field_type(DataType),
        optional = false}.
 
+make_foreign_key({word, Bucket}, {word, Field}) ->
+    gg:format("in make_FK Bucket is ~p~n- Field is ~p~n", [Bucket, Field]),
+    {foreign_key, Bucket, Field}.
+
 %% if only the local key is defined
 %% use it as the partition key as well
 make_local_key(FieldList) ->
@@ -505,20 +515,28 @@ extract_key_field_list({list, [Field | Rest]}, Extracted) ->
     [#param_v1{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
-make_table_definition({word, BucketName}, Contents) ->
+make_table_definition({word, BucketName}, {table_element_list, Contents}) ->
     PartitionKey = find_partition_key(Contents),
     LocalKey = find_local_key(Contents),
+    {foreign_key, Bucket, FKField} = find_foreign_key(Contents),
     Fields = find_fields(Contents),
     #ddl_v1{
-       bucket = list_to_binary(BucketName),
-       partition_key = PartitionKey,
-       local_key = LocalKey,
-       fields = Fields}.
+       bucket         = list_to_binary(BucketName),
+       partition_key  = PartitionKey,
+       local_key      = LocalKey,
+       fields         = Fields,
+       foreign_bucket = Bucket,
+       foreign_key    = FKField}.
+
+find_foreign_key([]) ->
+    {foreign_key, none, none};
+find_foreign_key([{foreign_key, _, _} = FK | _Rest]) ->
+    FK;
+find_foreign_key([_Head | Rest]) ->
+    find_foreign_key(Rest).
 
 find_partition_key([]) ->
     none;
-find_partition_key({table_element_list, Elements}) ->
-    find_partition_key(Elements);
 find_partition_key([{partition_key, Key} | _Rest]) ->
     Key;
 find_partition_key([_Head | Rest]) ->
@@ -526,8 +544,6 @@ find_partition_key([_Head | Rest]) ->
 
 find_local_key([]) ->
     none;
-find_local_key({table_element_list, Elements}) ->
-    find_local_key(Elements);
 find_local_key([{local_key, Key} | _Rest]) ->
     Key;
 find_local_key([_Head | Rest]) ->
@@ -542,7 +558,7 @@ make_modfun(quantum, {list, Args}) ->
 		type = timestamp
 	       }}.
 
-find_fields({table_element_list, Elements}) ->
+find_fields(Elements) ->
     find_fields(1, Elements, []).
 
 find_fields(_Count, [], Found) ->

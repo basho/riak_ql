@@ -12,6 +12,7 @@ CREATE_TABLE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)\s(T|t)(A|a)(B|b)(L|l)(E|e)
 DELETE = (D|d)(E|e)(L|l)(E|e)(T|t)(E|e)
 DROP = (D|d)(R|r)(O|o)(P|p)
 FLOAT = (F|f)(L|l)(O|o)(A|a)(T|t)
+FOREIGN_KEY = (F|f)(O|o)(R|r)(E|e)(I|i)(G|g)(N|n)\s(K|k)(E|e)(Y|y)
 FROM = (F|f)(R|r)(O|o)(M|m)
 GLOBAL = (G|g)(L|l)(O|o)(B|b)(A|a)(L|l)
 GROUPBY = (G|g)(R|r)(O|o)(U|u)(P|p)(B|b)(Y|y)
@@ -81,6 +82,7 @@ Rules.
 {DELETE} : {token, {delete, TokenChars}}.
 {DROP} : {token, {drop, TokenChars}}.
 {FLOAT} : {token, {float_type, TokenChars}}.
+{FOREIGN_KEY} : {token, {foreign_key, TokenChars}}.
 {FROM} : {token, {from, TokenChars}}.
 {GLOBAL} : {token, {global, TokenChars}}.
 {GROUPBY} : {token, {groupby, TokenChars}}.
