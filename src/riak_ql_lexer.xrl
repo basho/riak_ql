@@ -190,8 +190,9 @@ post_p([{chars, TokenChars} | T], Acc) when is_list(TokenChars)->
 post_p([H | T], Acc) ->
     post_p(T, [H | Acc]).
 
-lex(String) -> {ok, Toks, 1} = string(String),
-               Toks.
+lex(String) ->
+    {ok, Toks, _} = string(String),
+    Toks.
 
 fix_up_date(Date) ->
     Date2 = string:strip(Date, both, $'), %'

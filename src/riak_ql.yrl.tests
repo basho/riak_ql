@@ -688,6 +688,11 @@ select_sql_case_insensitive_2_test() ->
     ?sql_compilation_assert_match("seLEct * from argle",
 				  #riak_sql_v1{'SELECT' = [[<<"*">>]]}).
 
+
+sql_first_char_is_newline_test() ->
+    ?sql_compilation_assert_match("\nselect * from argle",
+				  #riak_sql_v1{'SELECT' = [[<<"*">>]]}).
+
 %%%
 %%% Failure tests
 %%%
