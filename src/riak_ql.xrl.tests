@@ -27,8 +27,7 @@ keywords_3_test_() ->
                 {drop,    "DROP"},
                 {groupby, "Groupby"},
                 {merge,   "MeRge"},
-                {inner,   "InneR"},
-                {join,    "JOIn"},
+                {inner_join,   "InneR JOIn"},
                 {as,      "As"}
                ],
     ?_assertEqual(Expected, Got).
@@ -45,8 +44,7 @@ keywords_3a_test_() ->
                 {drop,    "drop"},
                 {groupby, "groupby"},
                 {merge,   "merge"},
-                {inner,   "inner"},
-                {join,    "join"},
+                {inner_join,   "inner join"},
                 {as,      "as"}
                ],
     ?_assertEqual(Expected, Got).
@@ -63,8 +61,7 @@ keywords_3b_test_() ->
                 {drop,    "DROP"},
                 {groupby, "GROUPBY"},
                 {merge,   "MERGE"},
-                {inner,   "INNER"},
-                {join,    "JOIN"},
+                {inner_join,   "INNER JOIN"},
                 {as,      "AS"}
                ],
     ?_assertEqual(Expected, Got).
