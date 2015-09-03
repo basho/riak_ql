@@ -2,7 +2,7 @@
 %%
 %% riak_kv_ddl: defines records used in the data description language
 %%
-%% Copyright (c) 2007-2013 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2015 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -19,6 +19,9 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+
+-ifndef(RIAK_QL_DDL_HRL).
+-define(RIAK_QL_DDL_HRL, included).
 
 -record(riak_field_v1, {
           name     = << >> :: binary(),
@@ -52,3 +55,5 @@
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
          }).
+
+-endif.
