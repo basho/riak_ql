@@ -22,14 +22,14 @@
 
 -record(riak_field_v1, {
           name     = <<>>  :: list(),
-          position         :: pos_integer(),
-          type             :: field_type(),
+          position         :: undefined | pos_integer(),
+          type             :: undefined | field_type(),
           optional = false :: boolean()
          }).
 
 -type field_type()         :: simple_field_type() | complex_field_type().
 -type simple_field_type()  :: binary | integer | float | timestamp | boolean | set.
--type complex_field_type() :: {map, [#riak_field_v1{}]} | any.
+-type complex_field_type() :: {map, [#riak_field_v1{}]} | any().
 
 -record(param_v1, {
 	  name :: string()
