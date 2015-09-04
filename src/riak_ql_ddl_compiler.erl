@@ -122,11 +122,11 @@ validate_ddl(#ddl_v1{fields = Fields}) ->
 
 validate_positions(Fields) ->
     SortFn = fun(#riak_field_v1{position = A}, #riak_field_v1{position = B}) ->
-                     if
-                         A =< B -> true;
-                         A >  B -> false
-                     end
-             end,
+		     if
+			 A =< B -> true;
+			 A >  B -> false
+		     end
+	     end,
     Fs2 = lists:sort(SortFn, Fields),
     validate_pos2(Fs2, ?POSNOSTART, []).
 
@@ -199,16 +199,18 @@ compile(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
     #ddl_v1{bucket        = Bucket,
             fields        = Fields} = DDL,
     {ModName, Attrs, LineNo} = make_attrs(Bucket, ?LINENOSTART),
-    {VFns, LineNo2} = build_validn_fns([Fields], LineNo, ?POSNOSTART, [], []),
-    {ExtractFn, LineNo3} = build_extract_fn([Fields],  LineNo2, []),
-    {GetTypeFn, LineNo4} = build_get_type_fn([Fields], LineNo3, []),
-    {IsValidFn, LineNo5} = build_is_valid_fn([Fields], LineNo4, []),
+    {VFns,  LineNo2} = build_validn_fns([Fields],   LineNo,  ?POSNOSTART, [], []),
+    {ACFns, LineNo3} = build_add_cols_fns(Fields, LineNo2),
+    {ExtractFn, LineNo4} = build_extract_fn([Fields],  LineNo3, []),
+    {GetTypeFn, LineNo5} = build_get_type_fn([Fields], LineNo4, []),
+    {IsValidFn, LineNo6} = build_is_valid_fn([Fields], LineNo5, []),
     AST = Attrs
         ++ VFns
+	++ ACFns
         ++ [ExtractFn]
         ++ [GetTypeFn]
         ++ [IsValidFn]
-        ++ [{eof, LineNo5}],
+        ++ [{eof, LineNo6}],
     if HasDebugOutput ->
             ASTFileName = filename:join([OutputDir, ModName]) ++ ".ast",
             write_file(ASTFileName, io_lib:format("~p", [AST]));
@@ -381,7 +383,30 @@ make_elem_calls([H | T], LineNo, Acc) -> E = make_atom(element, LineNo),
                                          NewA = make_call(E, [H, Acc], LineNo),
                                          make_elem_calls(T, LineNo, NewA).
 
-%%% this is the messiest function because the first validation clause has
+build_add_cols_fns(Fields, LineNo) ->
+    {Args, Success} = make_args_and_fields(Fields, LineNo),
+    {ClauseS, LineNo2} = make_success_clause(Args, [], Success, LineNo),
+    Fun = make_fun(add_column_info, 1, [ClauseS], LineNo2),
+    {[Fun], LineNo2}.
+
+make_args_and_fields(Fields, LineNo) ->
+    make_ar2(Fields, LineNo, [], []).
+
+make_ar2([], LineNo, Acc1, Acc2) ->
+    {make_tuple(lists:flatten(lists:reverse(Acc1)), LineNo), 
+     make_conses(lists:flatten(Acc2), LineNo, {nil, LineNo})};
+make_ar2([#riak_field_v1{name = Nm,
+			 type = {map, M}} | T], LineNo, Acc1, Acc2) ->
+    {NewArg1, NewF1} = make_args_and_fields(M, LineNo),
+    NewNm = make_string(Nm, LineNo),
+    NewF2 = make_tuple([NewNm, NewF1], LineNo),
+    make_ar2(T, LineNo, [NewArg1 | Acc1], [NewF2 | Acc2]);
+make_ar2([#riak_field_v1{name = Nm} = F | T], LineNo, Acc1, Acc2) ->
+    [NewAcc1] = make_names([F], LineNo),
+    NewAcc2 = make_tuple([make_string(Nm, LineNo), NewAcc1], LineNo),
+    make_ar2(T, LineNo, [NewAcc1 | Acc1], [NewAcc2 | Acc2]).
+    
+%%% this is a messy function because the first validation clause has
 %%% a simple tuple as an arguement, but the subsequent ones (that validate
 %% the data in embedded maps) take a tuple of tuples
 -spec build_validn_fns([[#riak_field_v1{}] | [maps()]],
@@ -430,7 +455,7 @@ make_validation_funs(Fields, LineNo, FunNo) ->
               end,
     {ClauseS, _LineNo3} = make_success_clause(Args, Guards, Success, LineNo2),
     {ClauseF, _LineNo4} = make_fail_clause(LineNo2),
-    FunName = get_fn_name(FunNo),
+    FunName = get_fn_name(validate_obj, FunNo),
     Fun = make_fun(FunName, 1, [ClauseS, ClauseF], LineNo2),
     {[Fun], LineNo2, Maps, FunNo + 1}.
 
@@ -442,7 +467,7 @@ make_fun(FunName, Arity, Clause, LineNo) ->
                            expr().
 make_map_call(Fields, LineNo, FunNo) ->
     Arg = make_tuple([make_var(X, LineNo) || {{_, _, X}, _} <- Fields], LineNo),
-    Name = get_fn_name(FunNo),
+    Name = get_fn_name(validate_obj, FunNo),
     Fn = make_atom(Name, LineNo),
     _Expr = make_call(Fn, [Arg], LineNo).
 
@@ -558,11 +583,12 @@ make_fail_clause(LineNo) ->
     Clause = make_clause([Var], [], False, LineNo),
     {Clause, LineNo + 1}.
 
--spec get_fn_name(pos_integer()) -> atom().
-get_fn_name(1) ->
-    validate_obj;
-get_fn_name(FunNo) when is_integer(FunNo) ->
-    list_to_atom("validate_obj" ++ integer_to_list(FunNo)).
+-spec get_fn_name(atom(), pos_integer()) -> atom().
+get_fn_name(Root, 1) when is_atom(Root) ->
+    Root;
+get_fn_name(Root, FunNo) when is_atom(Root) andalso
+			      is_integer(FunNo) ->
+    list_to_atom(atom_to_list(Root) ++ integer_to_list(FunNo)).
 
 -spec make_clause(ast(), guards(), expr(), pos_integer()) -> expr().
 make_clause(Args, Guards, Body, LineNo) ->
@@ -579,10 +605,11 @@ make_module_attr(ModName, LineNo) ->
 
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
-                                  {validate_obj,   1},
-                                  {get_field_type, 1},
-                                  {is_field_valid, 1},
-                                  {extract,        2}
+                                  {validate_obj,    1},
+				  {add_column_info, 1},
+                                  {get_field_type,  1},
+                                  {is_field_valid,  1},
+                                  {extract,         2}
                                  ]}, LineNo + 1}.
 
 -ifdef(TEST).
@@ -1515,4 +1542,35 @@ complex_ddl_test() ->
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({12345, <<"beeees">>}),
     ?assertEqual(?VALID, Result).
+
+%%
+%% Test the add column info functionality
+%%
+
+simple_valid_map_add_cols_test() ->
+    Map = {map, [
+                 #riak_field_v1{name     = "yarple",
+                                position = 1,
+                                type     = binary},
+                 #riak_field_v1{name     = "yoplait",
+                                position = 2,
+                                type     = integer}
+                ]},
+    DDL = make_ddl(<<"simple_valid_map_2_test">>,
+                   [
+                    #riak_field_v1{name     = "yando",
+                                   position = 1,
+                                   type     = binary},
+                    #riak_field_v1{name     = "erko",
+                                   position = 2,
+                                   type     = Map},
+                    #riak_field_v1{name     = "erkle",
+                                   position = 3,
+                                   type     = float}
+                   ]),
+    {module, Module} = mk_helper_m2(DDL, "/tmp"),
+    Result = Module:add_column_info({1, {2, 3}, 4}),
+    Expected = [{"yando", 1}, {"erko", [{"yarple", 2}, {"yoplait", 3}]}, {"erkle", 4}],
+    ?assertEqual(Expected, Result).
+
 -endif.
