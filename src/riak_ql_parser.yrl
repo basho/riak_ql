@@ -253,7 +253,7 @@ make_insert({word, Bucket}, {list, Fields}, {list, Vals}) ->
     Len1 = length(Fields),
     Len2 = length(Vals),
     case Len1 of
-	Len2 -> #riak_sql_insert_v1{'INSERT INTO' = Bucket,
+	Len2 -> #riak_sql_insert_v1{'INSERT INTO' = list_to_binary(Bucket)
 			'VALUES' = lists:zip(Fields, Vals)}
 		    ;
 	_ -> exit("field list doesn't maket values list")

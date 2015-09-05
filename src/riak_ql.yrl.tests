@@ -717,7 +717,7 @@ create_timeseries_sql_test() ->
 simple_insert_sql_test() ->
     ?sql_compilation_assert("INSERT INTO Custs (CustomerName, ContactName) "
 			    ++ "VALUES ('Cardinal','Tom B. Erichsen')",
-			    #riak_sql_insert_v1{'INSERT INTO' = "Custs",
+			    #riak_sql_insert_v1{'INSERT INTO' = <<"Custs">>,
 						'VALUES'      = [
 								{"CustomerName", "Cardinal"},
 								 {"ContactName", "Tom B. Erichsen"}
