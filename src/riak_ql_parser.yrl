@@ -253,10 +253,10 @@ make_insert({word, Bucket}, {list, Fields}, {list, Vals}) ->
     Len1 = length(Fields),
     Len2 = length(Vals),
     case Len1 of
-	Len2 -> #riak_sql_insert_v1{'INSERT INTO' = list_to_binary(Bucket)
-			'VALUES' = lists:zip(Fields, Vals)}
+	Len2 -> #riak_sql_insert_v1{'INSERT INTO' = list_to_binary(Bucket),
+				    'VALUES'      = lists:zip(Fields, Vals)}
 		    ;
-	_ -> exit("field list doesn't maket values list")
+	_ -> exit("field list doesn't match values list")
     end.
 
 %% if no partition key is specified hash on the local key
