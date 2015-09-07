@@ -183,8 +183,15 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars   orelse
                                                  Word2 =:= merge   orelse
                                                  Word2 =:= inner   orelse
                                                  Word2 =:= join    orelse
-                                                 Word2 =:= as      ->
-    post_p([{chars, <<W1/binary, W2/binary>>} | T], Acc);
+                                                 Word2 =:= as      orelse
+                                                 Word2 =:= int ->
+    % the int type can appear after preceeding chars but not before so hi5
+    % is ok but 5hi is not.
+    case is_integer(W2) of
+        true  -> W2_bin = integer_to_binary(W2);
+        false -> W2_bin = W2
+    end,
+    post_p([{chars, <<W1/binary, W2_bin/binary>>} | T], Acc);
 post_p([{chars, TokenChars} | T], Acc) when is_list(TokenChars)->
     post_p(T, [{chars, list_to_binary(TokenChars)} | Acc]);
 post_p([H | T], Acc) ->
