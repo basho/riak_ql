@@ -480,8 +480,7 @@ make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
        optional = false}.
 
 make_foreign_key({word, Bucket}, {word, Field}) ->
-    gg:format("in make_FK Bucket is ~p~n- Field is ~p~n", [Bucket, Field]),
-    {foreign_key, Bucket, Field}.
+    {foreign_key, list_to_binary(Bucket), Field}.
 
 %% if only the local key is defined
 %% use it as the partition key as well
