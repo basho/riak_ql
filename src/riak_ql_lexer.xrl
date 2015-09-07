@@ -45,6 +45,8 @@ REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
 QUOTED = ("(.*(\")*)")
 
+INTERP = (:[a-zA-Z][0-9a-zA-Z_]*)
+
 WHITESPACE = ([\000-\s]*)
 
 INTNUM   = (\-*[0-9]+)
@@ -125,6 +127,7 @@ Rules.
 {DIV}   : {token, {div_,       list_to_binary(TokenChars)}}.
 
 {DATETIME} : {token, fix_up_date(TokenChars)}.
+{INTERP} : {token, fix_up_interp(TokenChars)}.
 
 {QUOTED} : {token, {quoted, strip_quoted(TokenChars)}}.
 
@@ -202,6 +205,8 @@ fix_up_date(Date) ->
         Date4             -> {datetime, Date4}
     end.
 
+fix_up_interp([$: | InterpName]) ->
+    {interp, InterpName}.
 
 strip_quoted(Date) ->
     Date2 = string:strip(Date, both, $"), %"

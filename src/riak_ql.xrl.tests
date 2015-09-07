@@ -164,6 +164,14 @@ datetime_1b_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+interpolation_test_() ->
+    Got = riak_ql_lexer:get_tokens(":alpha :alnum123 :al_uscore"),
+    Expected = [
+                {interp, "alpha"},
+                {interp, "alnum123"},
+                {interp, "al_uscore"}],
+    ?_assertEqual(Expected, Got).
+
 %% this test can never pass becuz the date parser substitutes the H:M:s from now() if there is not time in the string
 %% datetime_1c_test_() ->
 %%     Got = riak_ql_lexer:get_tokens("'2013-08-13'"),
@@ -258,53 +266,53 @@ general_test_() ->
 
 timeseries_test_() ->
     Got = riak_ql_lexer:get_tokens("CREATE TABLE Geo ("
-				   ++ "geohash varchar not_null, "
-				   ++ "user varchar not_null, "
-				   ++ "time timestamp not_null, "
-				   ++ "weather varchar not_null, "
-				   ++ "temperature float not_null, "
-				   ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
+                                   ++ "geohash varchar not_null, "
+                                   ++ "user varchar not_null, "
+                                   ++ "time timestamp not_null, "
+                                   ++ "weather varchar not_null, "
+                                   ++ "temperature float not_null, "
+                                   ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
     Expected = [
-		{create_table, <<"CREATE TABLE">>},
-		{chars,<<"Geo">>},
-		{openb, <<"(">>},
-		{chars,<<"geohash">>},
-		{varchar, <<"varchar">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{chars,<<"user">>},
-		{varchar, <<"varchar">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{chars,<<"time">>},
-		{timestamp, <<"timestamp">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{chars,<<"weather">>},
-		{varchar, <<"varchar">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{chars,<<"temperature">>},
-		{float_type, <<"float">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{primary_key, <<"PRIMARY KEY">>},
-		{openb, <<"(">>},
-		{openb, <<"(">>},
-		{chars,<<"geohash">>},
-		{comma, <<",">>},
-		{quantum, <<"quantum">>},
-		{openb, <<"(">>},
-		{chars,<<"time">>},
-		{comma, <<",">>},
-		{int,15},
-		{comma, <<",">>},
-		{chars,<<"m">>},
-		{closeb, <<")">>},
-		{comma, <<",">>},
-		{chars,<<"time">>},
-		{comma, <<",">>},
-		{chars,<<"user">>},
-		{closeb, <<")">>}
-	       ],
+                {create_table, <<"CREATE TABLE">>},
+                {chars,<<"Geo">>},
+                {openb, <<"(">>},
+                {chars,<<"geohash">>},
+                {varchar, <<"varchar">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"user">>},
+                {varchar, <<"varchar">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"time">>},
+                {timestamp, <<"timestamp">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"weather">>},
+                {varchar, <<"varchar">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"temperature">>},
+                {float_type, <<"float">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {primary_key, <<"PRIMARY KEY">>},
+                {openb, <<"(">>},
+                {openb, <<"(">>},
+                {chars,<<"geohash">>},
+                {comma, <<",">>},
+                {quantum, <<"quantum">>},
+                {openb, <<"(">>},
+                {chars,<<"time">>},
+                {comma, <<",">>},
+                {int,15},
+                {comma, <<",">>},
+                {chars,<<"m">>},
+                {closeb, <<")">>},
+                {comma, <<",">>},
+                {chars,<<"time">>},
+                {comma, <<",">>},
+                {chars,<<"user">>},
+                {closeb, <<")">>}
+               ],
     ?_assertEqual(Expected, Got).
