@@ -4,6 +4,7 @@ require 'csv'
 require 'pp'
 
 ERLANG_RESERVED = %w{and of or}
+DISAMBIGUATED = %W{float int}
 
 csv_filename =
   ARGV[0] ||
@@ -41,3 +42,45 @@ keywords.each do |kw_name, keyword|
   end
   puts "{#{kw_name}} : {token, {#{kw_token}, TokenChars}}."
 end
+
+puts
+
+# these two sets generate the when guard for the 
+# token post processor that concatenates the token
+
+# char concatenator (1)
+# this generates the post-processor clauses in the lexer
+# needs to start with chars
+puts "Word1 =:= chars orelse"
+keywords.each do |kw_name, keyword|
+  kw_token = kw_name.downcase
+  if ERLANG_RESERVED.include? kw_token
+    kw_token += '_'
+  end
+  if DISAMBIGUATED.include? kw_token
+    kw_token += '_type'
+  end
+  puts "Word1 =:= #{kw_token} orelse"
+end
+
+puts
+puts "%% add the rest of the where clause here"
+puts "%% a comma should seperate these clauses"
+puts
+# char concatenator (2)
+# this generates the post-processor clauses in the lexer
+# needs to start with chars
+puts "Word2 =:= chars orelse"
+keywords.each do |kw_name, keyword|
+  kw_token = kw_name.downcase
+  if ERLANG_RESERVED.include? kw_token
+    kw_token += '_'
+  end
+  if DISAMBIGUATED.include? kw_token
+    kw_token += '_type'
+  end
+  puts "Word2 =:= #{kw_token} orelse"
+end
+
+# also need to add the int type to the second half the guard clause
+puts "Word2 =:= int -> % additional check added for Word2 only"
