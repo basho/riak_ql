@@ -490,6 +490,20 @@ canonicalise_where_7_test() ->
                  }
                 }).
 
+select_interp_where_test() ->
+    ?sql_compilation_assert("select * from argle where time > :param",
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM' = <<"argle">>,
+                                         'WHERE' = [
+                                                    {'>', <<"time">>, {interp, "param"}}
+                                                   ]}).
+
+select_interp_limit_test() ->
+    ?sql_compilation_assert("select * from argle limit :param",
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM' = <<"argle">>,
+                                         'LIMIT' = {interp, "param"}}).
+
 %%
 %% create table tests
 %%
