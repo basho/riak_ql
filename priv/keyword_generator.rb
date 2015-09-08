@@ -83,4 +83,4 @@ keywords.each do |kw_name, keyword|
 end
 
 # also need to add the int type to the second half the guard clause
-puts "Word2 =:= int ->"
+puts "Word2 =:= int -> % additional check added for Word2 only"
