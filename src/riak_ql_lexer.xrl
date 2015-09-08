@@ -224,8 +224,13 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word2 =:= varchar orelse
 						 Word2 =:= where orelse
 						 Word2 =:= with orelse
-						 Word2 =:= quantum ->
-    post_p([{chars, <<W1/binary, W2/binary>>} | T], Acc);
+						 Word2 =:= quantum orelse
+						 Word2 =:= int ->
+    W2a = case Word2 of
+	      int -> integer_to_binary(W2);
+	      _   -> <<W2/binary>>
+	  end,
+    post_p([{chars, <<W1/binary, W2a/binary>>} | T], Acc);
 post_p([{chars, TokenChars} | T], Acc) when is_list(TokenChars)->
     post_p(T, [{chars, list_to_binary(TokenChars)} | Acc]);
 post_p([H | T], Acc) ->

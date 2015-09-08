@@ -81,3 +81,6 @@ keywords.each do |kw_name, keyword|
   end
   puts "Word2 =:= #{kw_token} orelse"
 end
+
+# also need to add the int type to the second half the guard clause
+puts "Word2 =:= int ->"

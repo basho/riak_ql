@@ -97,7 +97,8 @@ keywords_create_test_() ->
     ?_assertEqual(Expected, Got).
 
 words_containing_keywords_test_() ->
-    Got = riak_ql_lexer:get_tokens("error or horror and handy andy or zfloatcintxcreateyb"),
+    Got = riak_ql_lexer:get_tokens("error or horror and handy andy or "
+				   "zfloatcintxcreateyb or jimmy3boy or jimmy4"),
     Expected = [
                 {chars, <<"error">>},
                 {or_,   <<"or">>},
@@ -106,7 +107,11 @@ words_containing_keywords_test_() ->
                 {chars, <<"handy">>},
                 {chars, <<"andy">>},
                 {or_,   <<"or">>},
-		{chars, <<"zfloatcintxcreateyb">>}
+		{chars, <<"zfloatcintxcreateyb">>},
+                {or_,   <<"or">>},
+                {chars, <<"jimmy3boy">>},
+                {or_,   <<"or">>},
+                {chars, <<"jimmy4">>}
                ],
     ?_assertEqual(Expected, Got).
 
