@@ -36,6 +36,7 @@
 -include("riak_ql_ddl.hrl").
 
 -export([
+         compile/1,
          make_helper_mod/1,
          make_helper_mod/2
         ]).
@@ -191,6 +192,12 @@ validate_fields([H | T], Acc) ->
 %%
 %% funs to compile the DDL to its helper module AST
 %%
+
+-spec compile(#ddl_v1{}) ->
+                     {module, ast()} | {'error', tuple()}.
+compile(DDL) ->
+    Debug = false,
+    compile(DDL, << >>, Debug).
 
 -spec compile(#ddl_v1{}, binary(), boolean()) ->
                      {module, ast()} | {'error', tuple()}.
