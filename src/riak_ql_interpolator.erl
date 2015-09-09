@@ -38,10 +38,11 @@ parse_value({binary, Value}) ->
 parse_value({integer, Value}) ->
     {int, Value};
 parse_value({numeric, ValueStr}) ->
-    case list_to_integer(ValueStr) of
-        badarg -> {float, list_to_float(ValueStr)};
-        SomeInteger ->
+    try list_to_integer(ValueStr) of
+        SomeInteger when is_integer(SomeInteger) ->
             {int, SomeInteger}
+    catch
+        error:badarg -> {float, list_to_float(ValueStr)}
     end;
 parse_value({timestamp, Value}) ->
     {integer, Value};
@@ -85,8 +86,8 @@ where_multi_interpolation_test_() ->
                                    }
                                   ]},
     GivenInterp = [
-                   {"time_start_param", {integer, 12345}},
-                   {"time_end_param", {integer, 23456}},
+                   {"time_start_param", {numeric, "12345"}},
+                   {"time_end_param", {numeric, "2.3456"}},
                    {"pizza_param", {binary, "pepperoni"}},
                    {"username_param", {binary, "rockatansky"}}
                   ],
@@ -96,7 +97,7 @@ where_multi_interpolation_test_() ->
                                    {and_,
                                     {and_,
                                      {'>', <<"time">>, {int, 12345}},
-                                     {'<', <<"time">>, {int, 23456}}
+                                     {'<', <<"time">>, {float, 2.3456}}
                                     },
                                     {or_,
                                      {'=', <<"username">>, {word, <<"rockatansky">>}},
