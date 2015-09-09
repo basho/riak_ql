@@ -26,7 +26,9 @@ interpolate(Stmt = #riak_sql_v1{'WHERE' = [WhereTree]}, Interpolations) ->
 interpolate_where({Cond, A, B}, Interpolations) ->
     {Cond, interpolate_where(A, Interpolations), interpolate_where(B, Interpolations)};
 interpolate_where({interp, InterpName}, Interpolations) ->
-    find_value(InterpName, Interpolations).
+    find_value(InterpName, Interpolations);
+interpolate_where(OtherThing, _Interpolations) ->
+    OtherThing.
 
 find_value(_Name, []) ->
     notfound;
@@ -51,11 +53,40 @@ parse_value({boolean, Value}) ->
     Value.
 
 
-
-
 -ifdef(TEST).
 null_interpolation_test_() ->
     Stmt = #riak_sql_v1{'SELECT' = [[<<"*">>]],
                         'FROM' = <<"argle">>},
     ?_assertEqual(Stmt, interpolate(Stmt, [])).
+
+where_interpolation_test_() ->
+    GivenStmt = #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                        'FROM' = <<"argle">>,
+                        'WHERE' = [
+                                   {'>', <<"time">>, {interp, "where_param"}}
+                                  ]},
+    GivenInterp = [{"where_param", {integer, 12345}}],
+    ExpectedStmt = #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                        'FROM' = <<"argle">>,
+                        'WHERE' = [
+                                   {'>', <<"time">>, {int, 12345}}
+                                  ]},
+    ?_assertEqual(ExpectedStmt, interpolate(GivenStmt, GivenInterp)).
+    
+
+limit_interpolation_test_() ->
+    GivenStmt = #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                             'FROM' = <<"argle">>,
+                             'WHERE' = [
+                                        {'>', <<"time">>, {int, 12345}}
+                                        ],
+                             'LIMIT' = {interp, "limit_param"}},
+    GivenInterp = [{"limit_param", {integer, 12345}}],
+    ExpectedStmt = #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                             'FROM' = <<"argle">>,
+                             'WHERE' = [
+                                        {'>', <<"time">>, {int, 12345}}
+                                        ],
+                             'LIMIT' = {int, 12345}},
+    ?_assertEqual(ExpectedStmt, interpolate(GivenStmt, GivenInterp)).
 -endif.
