@@ -38,7 +38,7 @@ find_value(Name, [_NotFound | Rest]) ->
     find_value(Name, Rest).
 
 parse_value({binary, Value}) ->
-    {word, <<Value>>};
+    {word, list_to_binary(Value)};
 parse_value({integer, Value}) ->
     {int, Value};
 parse_value({numeric, ValueStr}) ->
@@ -59,7 +59,7 @@ null_interpolation_test_() ->
                         'FROM' = <<"argle">>},
     ?_assertEqual(Stmt, interpolate(Stmt, [])).
 
-where_interpolation_test_() ->
+where_single_interpolation_test_() ->
     GivenStmt = #riak_sql_v1{'SELECT' = [[<<"*">>]],
                         'FROM' = <<"argle">>,
                         'WHERE' = [
@@ -73,6 +73,42 @@ where_interpolation_test_() ->
                                   ]},
     ?_assertEqual(ExpectedStmt, interpolate(GivenStmt, GivenInterp)).
     
+where_multi_interpolation_test_() ->
+        GivenStmt = #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                        'FROM' = <<"argle">>,
+                        'WHERE' = [
+                                   {and_,
+                                    {and_,
+                                     {'>', <<"time">>, {interp, "time_start_param"}},
+                                     {'<', <<"time">>, {interp, "time_end_param"}}
+                                    },
+                                    {or_,
+                                     {'=', <<"username">>, {interp, "username_param"}},
+                                     {'<>', <<"favorite_pizza">>, {interp, "pizza_param"}}
+                                    }
+                                   }
+                                  ]},
+    GivenInterp = [
+                   {"time_start_param", {integer, 12345}},
+                   {"time_end_param", {integer, 23456}},
+                   {"pizza_param", {binary, "pepperoni"}},
+                   {"username_param", {binary, "rockatansky"}}
+                  ],
+    ExpectedStmt = #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                        'FROM' = <<"argle">>,
+                                'WHERE' = [
+                                   {and_,
+                                    {and_,
+                                     {'>', <<"time">>, {int, 12345}},
+                                     {'<', <<"time">>, {int, 23456}}
+                                    },
+                                    {or_,
+                                     {'=', <<"username">>, {word, <<"rockatansky">>}},
+                                     {'<>', <<"favorite_pizza">>, {word, <<"pepperoni">>}}
+                                    }
+                                   }
+                                  ]},
+    ?_assertEqual(ExpectedStmt, interpolate(GivenStmt, GivenInterp)).
 
 limit_interpolation_test_() ->
     GivenStmt = #riak_sql_v1{'SELECT' = [[<<"*">>]],
