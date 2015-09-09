@@ -30,12 +30,8 @@ interpolate_where({interp, InterpName}, Interpolations) ->
 interpolate_where(OtherThing, _Interpolations) ->
     OtherThing.
 
-find_value(_Name, []) ->
-    notfound;
-find_value(Name, [{Name, Value}|_Rest]) ->
-    parse_value(Value);
-find_value(Name, [_NotFound | Rest]) ->
-    find_value(Name, Rest).
+find_value(InterpName, Interpolations) ->
+    parse_value(proplists:get_value(InterpName, Interpolations)).
 
 parse_value({binary, Value}) ->
     {word, list_to_binary(Value)};
