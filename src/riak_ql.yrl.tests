@@ -504,6 +504,14 @@ select_interp_limit_test() ->
                                          'FROM' = <<"argle">>,
                                          'LIMIT' = {interp, "param"}}).
 
+select_interp_where_and_limit_test() ->
+    ?sql_compilation_assert("select * from argle where time > :where_param limit :limit_param",
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM' = <<"argle">>,
+                                         'WHERE' = [
+                                                    {'>', <<"time">>, {interp, "where_param"}}
+                                                   ],
+                                         'LIMIT' = {interp, "limit_param"}}).
 %%
 %% create table tests
 %%
