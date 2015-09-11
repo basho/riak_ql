@@ -365,6 +365,8 @@ expand_field(#riak_field_v1{name     = Nm,
 					    ])),
     make_tuple(List, LineNo).
 
+expand_key(none, LineNo) ->
+    make_atom(none, LineNo);
 expand_key(#key_v1{ast = []}, LineNo) ->
     make_tuple([make_atom(key_v1, LineNo) ,{nil, LineNo}], LineNo);
 expand_key(#key_v1{ast = AST}, LineNo) ->
@@ -376,7 +378,9 @@ expand_ast(AST, LineNo) when is_list(AST) ->
     make_conses(lists:reverse(Fields), LineNo, {nil, LineNo}).
 
 expand_a2(#param_v1{name = Nm}, LineNo) ->
-    make_tuple([make_atom(param_v1, LineNo), make_binary(Nm, LineNo)], LineNo);
+    Bins = [make_binary(X, LineNo) || X <- Nm],
+    Conses = make_conses(Bins, LineNo, {nil, LineNo}),
+    make_tuple([make_atom(param_v1, LineNo) | [Conses]], LineNo);
 expand_a2(#hash_fn_v1{mod  = Mod,
 		      fn   = Fn,
 		      args = Args,
@@ -395,14 +399,21 @@ expand_a2(#hash_fn_v1{mod  = Mod,
     make_tuple(List, LineNo).
 
 expand_args(Args, LineNo) ->
-    make_conses([expand_args2(X, LineNo) || X <- Args], LineNo, {nil, LineNo}).
+    Args2 = lists:reverse([expand_args2(X, LineNo) || X <- Args]),
+    make_conses(Args2, LineNo, {nil, LineNo}).
 
+%% this first clause jumps out to a different expansion tree
+%% to expand the parameter in the fuction args
+expand_args2(Arg, LineNo) when is_record(Arg, param_v1) ->
+    expand_a2(Arg, LineNo);
 expand_args2(Arg, LineNo) when is_binary(Arg) ->
     make_binary(Arg, LineNo);
 expand_args2(Arg, LineNo) when is_integer(Arg) ->
     make_integer(Arg, LineNo);
 expand_args2(Arg, LineNo) when is_float(Arg) ->
     make_float(Arg, LineNo);
+expand_args2(Arg, LineNo) when is_list(Arg) ->
+    make_string(Arg, LineNo);
 expand_args2(Arg, LineNo) when is_atom(Arg) ->
     make_atom(Arg, LineNo).
 
@@ -1722,16 +1733,25 @@ make_complex_ddl_ddl() ->
 		    optional = false}
 		],
        partition_key = #key_v1{ast = [
-				      #param_v1{name = <<"time">>},
+				      #param_v1{name = [<<"time">>]},
 				      #hash_fn_v1{mod  = crypto,
 						  fn   = hash,
-						  args = [sha512]}
+						  %% list isn't a valid arg 
+						  %% type output from the 
+						  %% lexer/parser
+						  args = [
+							  sha512,
+							  true,
+							  1,
+							  1.0,
+							  <<"abc">>
+							 ]}
 				     ]},
        local_key = #key_v1{ast = [
 				  #hash_fn_v1{mod  = crypto,
 					      fn   = hash,
 					      args = [ripemd]},
-				  #param_v1{name = <<"time">>}
+				  #param_v1{name = [<<"time">>]}
 				 ]}}.
 
 %%
@@ -1776,8 +1796,6 @@ simple_valid_map_add_cols_test() ->
 	DDL = erlang:apply(?MODULE, MakeDDLFunName, []),
 	{module, Module} = mk_helper_m2(DDL),
 	Got = Module:get_ddl(),
-	gg:format("in ~p~n- Got:~n- ~p~n- DDL:~n- ~p~n",
-		  [MakeDDLFunName, Got, DDL]),
 	?assertEqual(DDL, Got)).
 
 simplest_valid_get_test() ->
@@ -1836,5 +1854,50 @@ simple_valid_mixed_get_test() ->
 
 complex_ddl_get_test() ->
     ?ddl_roundtrip_assert(make_complex_ddl_ddl).
+
+timeseries_ddl_get_test() ->
+    ?ddl_roundtrip_assert(make_timeseries_ddl).
+
+make_timeseries_ddl() ->
+    Fields = [
+	      #riak_field_v1{name     = <<"geohash">>,
+			     position = 1,
+			     type     = binary,
+			     optional = false},
+	      #riak_field_v1{name     = <<"user">>,
+			     position = 2,
+			     type     = binary,
+			     optional = false},
+	      #riak_field_v1{name     = <<"time">>,
+			     position = 3,
+			     type     = timestamp,
+			     optional = false},
+	      #riak_field_v1{name     = <<"weather">>,
+			     position = 4,
+			     type     = binary,
+			     optional = false},
+	      #riak_field_v1{name     = <<"temperature">>,
+			     position = 5,
+			     type     = binary,
+			     optional = true}
+	     ],
+    PK = #key_v1{ ast = [
+			 #hash_fn_v1{mod  = riak_ql_quanta,
+				     fn   = quantum,
+				     args = [
+					     #param_v1{name = [<<"time">>]},
+					     15,
+					     s
+					    ]}
+			]},
+    LK = #key_v1{ast = [
+			#param_v1{name = [<<"time">>]},
+			#param_v1{name = [<<"user">>]}]
+		},
+    _DDL = #ddl_v1{bucket        = <<"timeseries_filter_test">>,
+		   fields        = Fields,
+		   partition_key = PK,
+		   local_key     = LK
+		  }.
 
 -endif.

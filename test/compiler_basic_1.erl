@@ -77,6 +77,25 @@
 		       ?assertEqual(?VALID, Other) % didn't compile
 	       end).
 
+
+%%
+%% this test tests that the DDL returned by the helper fun is
+%% the same as the DDL that the helper fun was compiled from
+%%
+-define(ddl_roundtrip_assert(Name, Query),
+	Name() ->
+	       Lexed = riak_ql_lexer:get_tokens(Query),
+	       {ok, DDL} = riak_ql_parser:parse(Lexed),
+	       gg:format("in ~p~n- DDL is:~n -~p~n", [Name, DDL]),
+	       {module, Module} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
+	       Got = Module:get_ddl(),
+	       gg:format("in ~p~n- Got is:~n -~p~n", [Name, Got]),
+	       ?assertEqual(DDL, Got)).
+
+%%
+%% round trip passing tests
+%%
+
 ?passing_test(round_trip_test,
 	      "create table temperatures " ++
 		  "(time timestamp not null, " ++
@@ -113,4 +132,35 @@
 	      {12345, <<"beeees">>},
 	      [{timestamp, 12345}, {binary, <<"beeees">>}],
 	      [{timestamp, 12345}, {binary, <<"beeees">>}]).
+
+%%
+%% roundtrip DDL tests
+%%
+?ddl_roundtrip_assert(round_trip_ddl_test,
+	      "create table temperatures " ++
+		  "(time timestamp not null, " ++
+		  "user_id varchar not null, " ++
+		  "primary key (time, user_id))").
+
+?ddl_roundtrip_assert(integer_type_ddl_test,
+		    "create table temperatures "
+		    "(counter int not null, "
+		    "primary key (counter))").
+
+?ddl_roundtrip_assert(float_ddl_test,
+		    "create table temperatures "
+		    "(real_counter float not null, "
+		    "primary key (real_counter))").
+
+?ddl_roundtrip_assert(round_trip_ddl_2_test,
+	      "create table temperatures " ++
+		  "(time timestamp not null, " ++
+		  "user_id varchar not null, " ++
+		  "primary key (time, user_id))").
+
+?ddl_roundtrip_assert(no_partition_key_ddl_test,
+	      "create table temperatures " ++
+		  "(time timestamp not null, " ++
+		  "user_id varchar not null, " ++
+		  "primary key (time, user_id))").
 	    

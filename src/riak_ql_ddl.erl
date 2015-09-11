@@ -91,9 +91,9 @@ make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso
 mk_k([], _Vals, _Mod, Acc) ->
     lists:reverse(Acc);
 mk_k([#hash_fn_v1{mod = Md,
-		 fn   = Fn,
-		 args = Args,
-		 type = Ty} | T1], Vals, Mod, Acc) ->
+		  fn   = Fn,
+		  args = Args,
+		  type = Ty} | T1], Vals, Mod, Acc) ->
     A2 = extract(Args, Vals, []),
     V  = erlang:apply(Md, Fn, A2),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
@@ -767,26 +767,56 @@ timeseries_filter_test() ->
 	       {'<', <<"time">>, {int, 5000}}
 	      },
 	      {'=', <<"user">>, {word, <<"user_1">>}
-	       }
 	      }
+	     }
 	    ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
 			 'SELECT' = Selections,
 			 'WHERE'  = Where},
-    DDL = {ddl_v1,<<"timeseries_filter_test">>,
-	   [{riak_field_v1,<<"geohash">>,1,binary,false},
-	    {riak_field_v1,<<"user">>,2,binary,false},
-	    {riak_field_v1,<<"time">>,3,timestamp,false},
-	    {riak_field_v1,<<"weather">>,4,binary,false},
-	    {riak_field_v1,<<"temperature">>,5,binary,true}],
-	   {key_v1,[{hash_fn_v1,riak_ql_quanta,quantum,
-		     [{param_v1,[<<"time">>]},15,s]}]},
-	   {key_v1,[{param_v1,[<<"time">>]},{param_v1,[<<"user">>]}]}},
+    Fields = [
+	      #riak_field_v1{name     = <<"geohash">>,
+			     position = 1,
+			     type     = binary,
+			     optional = false},
+	      #riak_field_v1{name     = <<"user">>,
+			     position = 2,
+			     type     = binary,
+			     optional = false},
+	      #riak_field_v1{name     = <<"time">>,
+			     position = 3,
+			     type     = timestamp,
+			     optional = false},
+	      #riak_field_v1{name     = <<"weather">>,
+			     position = 4,
+			     type     = binary,
+			     optional = false},
+	      #riak_field_v1{name     = <<"temperature">>,
+			     position = 5,
+			     type     = binary,
+			     optional = true}
+	     ],
+    PK = #key_v1{ast = [
+			#hash_fn_v1{mod  = riak_ql_quanta,
+				    fn   = quantum,
+				    args = [
+					    #param_v1{name = [<<"time">>]},
+					    15,
+					    s
+					   ]}
+		       ]},
+    LK = #key_v1{ast = [
+			#param_v1{name = [<<"time">>]},
+			#param_v1{name = [<<"user">>]}]
+		},
+    DDL = #ddl_v1{bucket        = <<"timeseries_filter_test">>,
+		  fields        = Fields,
+		  partition_key = PK,
+		  local_key     = LK
+		 },
     {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = riak_ql_ddl:is_query_valid(DDL, Query),
     Expected = true,
     ?assertEqual(Expected, Res).
-		    
 
 simple_filter_query_fail_test() ->
     Bucket = <<"simple_filter_query_fail_test">>,
