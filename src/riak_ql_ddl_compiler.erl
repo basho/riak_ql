@@ -586,7 +586,7 @@ make_validation_funs(Fields, LineNo, FunNo) ->
     Fun = make_fun(FunName, 1, [ClauseS, ClauseF], LineNo2),
     {[Fun], LineNo2, Maps, FunNo + 1}.
 
--spec make_fun(atom(), pos_integer(), ast(), pos_integer()) -> expr().
+-spec make_fun(atom(), 0 | pos_integer(), ast(), pos_integer()) -> expr().
 make_fun(FunName, Arity, Clause, LineNo) ->
     {function, LineNo, FunName, Arity, Clause}.
 
@@ -1736,8 +1736,8 @@ make_complex_ddl_ddl() ->
 				      #param_v1{name = [<<"time">>]},
 				      #hash_fn_v1{mod  = crypto,
 						  fn   = hash,
-						  %% list isn't a valid arg 
-						  %% type output from the 
+						  %% list isn't a valid arg
+						  %% type output from the
 						  %% lexer/parser
 						  args = [
 							  sha512,

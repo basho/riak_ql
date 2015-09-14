@@ -22,7 +22,6 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_ddl).
 
--include("riak_ql_sql.hrl").
 -include("riak_ql_ddl.hrl").
 
 %% this function can be used to work out which Module to use

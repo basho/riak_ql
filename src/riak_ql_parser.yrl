@@ -209,7 +209,6 @@ Erlang code.
           ops     = []
          }).
 
--include("riak_ql_sql.hrl").
 -include("riak_ql_ddl.hrl").
 
 %% export the return value function to prevent xref errors
@@ -219,7 +218,6 @@ Erlang code.
 -export([
 	 return_error/2
 	 ]).
-
 
 -ifdef(TEST).
 -include("riak_ql.yrl.tests").
