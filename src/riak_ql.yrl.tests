@@ -7,7 +7,7 @@
 	Got = parse(Toks),
 	?assertEqual({ok, Exp2}, Got)).
 
--define(where_test(Uncanonical, Expected), 
+-define(where_test(Uncanonical, Expected),
 	Got = canonicalise(Uncanonical),
 	?assertEqual(Expected, Got)).
 
@@ -172,7 +172,7 @@ select_where_10_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
-						     {and_, 
+						     {and_,
 						      {'=', <<"customer_id">>, {int,  23}},
 						      {'=', <<"type">>,        {word, <<"click10">>}}
 						     }
@@ -185,6 +185,24 @@ select_where_11_sql_test() ->
 					 'FROM'   = <<"response_times">>,
 					 'WHERE'  = [
 						     {'>', <<"value">>, {int, 500}}
+						    ]
+					}).
+
+select_where_11a_sql_test() ->
+    ?sql_compilation_assert("select * from response_times where value >= 500",
+			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
+					 'FROM'   = <<"response_times">>,
+					 'WHERE'  = [
+						     {'>=', <<"value">>, {int, 500}}
+						    ]
+					}).
+
+select_where_11b_sql_test() ->
+    ?sql_compilation_assert("select * from response_times where value <= 500",
+			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
+					 'FROM'   = <<"response_times">>,
+					 'WHERE'  = [
+						     {'<=', <<"value">>, {int, 500}}
 						    ]
 					}).
 
@@ -333,46 +351,67 @@ select_where_brackets_2a_test() ->
 %%
 
 canonicalise_where_1_test() ->
-    ?where_test({or_, 
-		 {'<', "alpha", {int, 2}}, 
+    ?where_test({or_,
+		 {'<', "alpha", {int, 2}},
 		 {'>', "beta",  {int, 3}}
 		},
-		{or_, 
+		{or_,
 		 {'<', "alpha", {int, 2}},
 		 {'>', "beta",  {int, 3}}
 		}).
 
 canonicalise_where_2_test() ->
-    ?where_test({or_, 
+    ?where_test({or_,
 		 {'>', "beta",  {int, 3}},
-		 {'<', "alpha", {int, 2}} 
+		 {'<', "alpha", {int, 2}}
 		},
-		{or_, 
+		{or_,
 		 {'<', "alpha", {int, 2}},
 		 {'>', "beta",  {int, 3}}
 		}).
 
-canonicalise_where_3_test() ->
-    ?where_test({and_, 
-		 {'>', "beta",  {int, 3}},
-		 {'<', "alpha", {int, 2}} 
+canonicalise_where_2a_test() ->
+    ?where_test({or_,
+		 {'>=', "beta",  {int, 3}},
+		 {'<', "alpha", {int, 2}}
 		},
-		{and_, 
+		{or_,
+		 {'<', "alpha", {int, 2}},
+		 {'>=', "beta",  {int, 3}}
+		}).
+
+canonicalise_where_2b_test() ->
+    ?where_test({or_,
+		 {'>', "beta",  {int, 3}},
+		 {'<=', "alpha", {int, 2}}
+		},
+		{or_,
+		 {'<=', "alpha", {int, 2}},
+		 {'>', "beta",  {int, 3}}
+		}).
+
+
+canonicalise_where_3_test() ->
+    ?where_test({and_,
+		 {'>', "beta",  {int, 3}},
+		 {'<', "alpha", {int, 2}}
+		},
+		{and_,
 		 {'<', "alpha", {int, 2}},
 		 {'>', "beta",  {int, 3}}
 		}).
 
 canonicalise_where_4_test() ->
-    ?where_test({or_, 
-		 {and_, 
+    ?where_test({or_,
+		 {and_,
 		  {'>', "beta",  {int, 3}},
-		  {'<', "alpha", {int, 2}} 
+		  {'<', "alpha", {int, 2}}
 		 },
 		 {'=', "time", {int, 1234}}
 		},
 		{or_,
 		 {'=', "time", {int, 1234}},
-		 {and_, 
+		 {and_,
 		  {'<', "alpha", {int, 2}},
 		  {'>', "beta",  {int, 3}}
 		 }
@@ -384,21 +423,21 @@ canonicalise_where_4_test() ->
 %% the query rewriter can walk them them and rearange them
 %%
 canonicalise_where_5_test() ->
-    ?where_test({and_, 
-		 {or_, 
+    ?where_test({and_,
+		 {or_,
 		  {'>', "beta",  {int, 3}},
-		  {'<', "alpha", {int, 2}} 
+		  {'<', "alpha", {int, 2}}
 		 },
-		 {and_, 
+		 {and_,
 		  {'>', "gamma", {int, 3}},
-		  {'<', "delta", {int, 2}} 
+		  {'<', "delta", {int, 2}}
 		 }
 		},
-		{and_, 
+		{and_,
 		 {'<', "delta", {int, 2}},
-		 {and_, 
+		 {and_,
 		  {'>', "gamma", {int, 3}},
-		  {or_, 
+		  {or_,
 		   {'<', "alpha", {int, 2}},
 		   {'>', "beta",  {int, 3}}
 		  }
@@ -406,21 +445,21 @@ canonicalise_where_5_test() ->
 		}).
 
 canonicalise_where_6_test() ->
-    ?where_test({and_, 
-		 {and_, 
+    ?where_test({and_,
+		 {and_,
 		  {'>', "beta6",  {int, 3}},
-		  {'<', "alpha6", {int, 2}} 
+		  {'<', "alpha6", {int, 2}}
 		 },
-		 {and_, 
+		 {and_,
 		  {'>', "gamma6", {int, 3}},
-		  {'<', "delta6", {int, 2}} 
+		  {'<', "delta6", {int, 2}}
 		 }
 		},
-		{and_, 
+		{and_,
 		 {'<', "alpha6", {int, 2}},
-		 {and_, 
+		 {and_,
 		  {'<', "delta6", {int, 2}},
-		  {and_, 
+		  {and_,
 		   {'>', "beta6",  {int, 3}},
 		   {'>', "gamma6", {int, 3}}
 		  }
@@ -428,31 +467,31 @@ canonicalise_where_6_test() ->
 		}).
 
 canonicalise_where_7_test() ->
-    ?where_test({and_, 
-		 {and_, 
-		  {or_, 
+    ?where_test({and_,
+		 {and_,
+		  {or_,
 		   {'>', "beta7",  {int, 3}},
-		   {'<', "alpha7", {int, 2}} 
+		   {'<', "alpha7", {int, 2}}
 		  },
-		  {and_, 
+		  {and_,
 		   {'>', "gamma7", {int, 3}},
-		   {'<', "delta7", {int, 2}} 
+		   {'<', "delta7", {int, 2}}
 		  }
 		 },
-		 {and_, 
+		 {and_,
 		  {'>', "epsilon7", {int, 3}},
-		  {'<', "zeta7",    {int, 2}} 
+		  {'<', "zeta7",    {int, 2}}
 		 }
 		},
-		{and_, 
+		{and_,
 		 {'<', "delta7", {int, 2}},
-		 {and_, 
+		 {and_,
 		  {'<', "zeta7", {int, 2}},
 		  {and_,
 		   {'>', "epsilon7", {int, 3}},
-		   {and_, 
+		   {and_,
 		    {'>', "gamma7", {int, 3}},
-		    {or_, 
+		    {or_,
 		     {'<', "alpha7", {int, 2}},
 		     {'>', "beta7",  {int, 3}}
 		    }
@@ -483,7 +522,7 @@ create_simple_sql_test() ->
 					    position = 2,
 					    type = float,
 					    optional = true}
-					],	
+					],
 			       partition_key = #key_v1{
 						  ast = [#param_v1{
 							    name = [<<"time">>]
@@ -514,7 +553,7 @@ create_simple_sql_int_test() ->
 					    position = 2,
 					    type = integer,
 					    optional = true}
-					],	
+					],
 			       partition_key = #key_v1{
 					      ast = [#param_v1{
 							name = [<<"time">>]

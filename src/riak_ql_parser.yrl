@@ -61,6 +61,8 @@ float_type
 eq
 gt
 lt
+gte
+lte
 ne
 nomatch
 approx
@@ -144,6 +146,8 @@ Comp -> approx    : '$1'.
 Comp -> eq        : '$1'.
 Comp -> gt        : '$1'.
 Comp -> lt        : '$1'.
+Comp -> gte       : '$1'.
+Comp -> lte       : '$1'.
 Comp -> ne        : '$1'.
 Comp -> nomatch   : '$1'.
 Comp -> notapprox : '$1'.
@@ -293,7 +297,9 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
              div_      -> '/';
              gt        -> '>';
              lt        -> '<';
-             eq        -> '=';
+	     gte       -> '>=';
+	     lte       -> '<=';
+	     eq        -> '=';
              ne        -> '<>';
              approx    -> '=~';
              notapprox -> '!~';
@@ -373,6 +379,8 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
 					 Op1 =:= or_  orelse
 					 Op1 =:= '>'  orelse
 					 Op1 =:= '<'  orelse
+					 Op1 =:= '>='  orelse
+					 Op1 =:= '<='  orelse
 					 Op1 =:= '='  orelse
 					 Op1 =:= '<>' orelse
 					 Op1 =:= '=~' orelse
@@ -383,6 +391,8 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
 					 Op2 =:= or_  orelse
 					 Op2 =:= '>'  orelse
 					 Op2 =:= '<'  orelse
+					 Op2 =:= '>='  orelse
+					 Op2 =:= '<='  orelse
 					 Op2 =:= '='  orelse
 					 Op2 =:= '<>' orelse
 					 Op2 =:= '=~' orelse

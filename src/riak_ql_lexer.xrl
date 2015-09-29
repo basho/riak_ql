@@ -55,6 +55,8 @@ APPROXMATCH = (=\~)
 EQ          = (=)
 GT          = (>)
 LT          = (<)
+GTE         = (>=)
+LTE         = (<=)
 NE          = (<>)
 NOMATCH     = (!=)
 NOTAPPROX   = (!\~)
@@ -112,9 +114,11 @@ Rules.
 {APPROXMATCH} : {token, {approx, list_to_binary(TokenChars)}}.
 {GT}          : {token, {gt,        list_to_binary(TokenChars)}}.
 {LT}          : {token, {lt,        list_to_binary(TokenChars)}}.
+{GTE}         : {token, {gte,       list_to_binary(TokenChars)}}.
+{LTE}         : {token, {lte,       list_to_binary(TokenChars)}}.
 {NE}          : {token, {ne,        list_to_binary(TokenChars)}}.
 {NOMATCH}     : {token, {nomatch,   list_to_binary(TokenChars)}}.
-{NOTAPPROX}   : {token, {notapprox,   list_to_binary(TokenChars)}}.
+{NOTAPPROX}   : {token, {notapprox, list_to_binary(TokenChars)}}.
 
 {OPEN}  :  {token, {openb,  list_to_binary(TokenChars)}}.
 {CLOSE} :  {token, {closeb, list_to_binary(TokenChars)}}.
