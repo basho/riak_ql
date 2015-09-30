@@ -188,7 +188,7 @@ extract_f2([{Op, LHS, RHS} | T], Acc) when Op =:= '='    orelse
 					   Op =:= 'or_'  orelse
 					   Op =:= '>'    orelse
 					   Op =:= '<'    orelse
-					   Op =:= '=<'   orelse
+					   Op =:= '<='   orelse
 					   Op =:= '>=' ->
     %% you have to double wrap the variable name inside the list of names
     Acc2 = case is_tuple(LHS) of
