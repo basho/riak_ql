@@ -73,15 +73,15 @@ get_partition_key(#ddl_v1{bucket = B, partition_key = PK}, Obj)
     _Key = build(Params, Obj, Mod, []).
 
 -spec get_local_key(#ddl_v1{}, tuple()) -> term().
-get_local_key(#ddl_v1{bucket = B, local_key = LK}, Obj) 
+get_local_key(#ddl_v1{bucket = B, local_key = LK}, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(B),
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
 
--spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}]. 
+-spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
 make_key(_Mod, none, _Vals) -> [];
-make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso 
+make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso
 					     is_list(Vals) ->
     mk_k(AST, Vals, Mod, []).
 
@@ -183,7 +183,8 @@ extract_fields(Fields) ->
 
 extract_f2([], Acc) ->
     lists:reverse(Acc);
-extract_f2([{Op, LHS, RHS} | T], Acc) when Op =:= '='    orelse
+extract_f2([{Op, LHS, RHS} | T], Acc) when Op =:= '!='    orelse
+					   Op =:= '='    orelse
 					   Op =:= 'and_' orelse
 					   Op =:= 'or_'  orelse
 					   Op =:= '>'    orelse
@@ -205,9 +206,9 @@ extract_f2([{Op, LHS, RHS} | T], Acc) when Op =:= '='    orelse
 
 is_val({word,     _}) -> true;
 is_val({int,      _}) -> true;
-is_val({float,    _}) -> true; 
-is_val({datetime, _}) -> true; 
-is_val({varchar,  _}) -> true; 
+is_val({float,    _}) -> true;
+is_val({datetime, _}) -> true;
+is_val({varchar,  _}) -> true;
 is_val(_)             -> false.
 
 remove_hooky_chars(Nonce) ->
@@ -551,7 +552,7 @@ make_plain_key_test() ->
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Got = make_key(Mod, Key, Vals),
     Expected = [{binary, <<"user_1">>}, {timestamp, Time}],
-    ?assertEqual(Expected, Got).    
+    ?assertEqual(Expected, Got).
 
 make_functional_key_test() ->
     Key = #key_v1{ast = [
@@ -585,7 +586,7 @@ make_functional_key_test() ->
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Got = make_key(Mod, Key, Vals),
     Expected = [{binary, <<"user_1">>}, {timestamp, mock_result}],
-    ?assertEqual(Expected, Got).    
+    ?assertEqual(Expected, Got).
 
 
 %%
@@ -735,8 +736,8 @@ simple_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
     Selections = [[<<"temperature">>], [<<"geohash">>]],
     Where = [
-	     {and_, 
-	      {'>', <<"temperature">>, {int, 1}}, 
+	     {and_,
+	      {'>', <<"temperature">>, {int, 1}},
 	      {'<', <<"temperature">>, {int, 15}}
 	     }
 	    ],
@@ -756,12 +757,49 @@ simple_filter_query_test() ->
     Res = riak_ql_ddl:is_query_valid(DDL, Query),
     ?assertEqual(true, Res).
 
+full_filter_query_test() ->
+    Bucket = <<"simple_filter_query_test">>,
+    Selections = [[<<"temperature">>]],
+    Where = [
+	     {and_,
+	      {'>', <<"temperature">>, {int, 1}},
+	      {and_,
+	       {'<', <<"temperature">>, {int, 15}},
+	       {or_,
+		{'!=', <<"ne field">>,   {int, 15}},
+		{and_,
+		 {'<=', <<"lte field">>,  {int, 15}},
+		 {'>=', <<"gte field">>,  {int, 15}}}}}}
+	    ],
+    Query = #riak_sql_v1{'FROM'   = Bucket,
+			 'SELECT' = Selections,
+			 'WHERE'  = Where},
+    DDL = make_ddl(Bucket,
+		   [
+		    #riak_field_v1{name     = <<"temperature">>,
+				   position = 1,
+				   type     = integer},
+		    #riak_field_v1{name     = <<"ne field">>,
+				   position = 2,
+				   type     = integer},
+		    #riak_field_v1{name     = <<"lte field">>,
+				   position = 3,
+				   type     = integer},
+		    #riak_field_v1{name     = <<"gte field">>,
+				   position = 4,
+				   type     = integer}
+		   ]),
+    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(DDL, Query),
+    ?assertEqual(true, Res).
+
+
 timeseries_filter_test() ->
     Bucket = <<"timeseries_filter_test">>,
     Selections = [[<<"weather">>]],
     Where = [
 	     {and_,
-	      {and_, 
+	      {and_,
 	       {'>', <<"time">>, {int, 3000}},
 	       {'<', <<"time">>, {int, 5000}}
 	      },
@@ -821,8 +859,8 @@ simple_filter_query_fail_test() ->
     Bucket = <<"simple_filter_query_fail_test">>,
     Selections = [[<<"temperature">>], [<<"geohash">>]],
     Where = [
-	     {and_, 
-	      {'>', <<"gingerbread">>, {int, 1}}, 
+	     {and_,
+	      {'>', <<"gingerbread">>, {int, 1}},
 	      {'<', <<"temperature">>, {int, 15}}
 	     }
 	    ],
