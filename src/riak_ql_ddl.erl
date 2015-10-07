@@ -139,17 +139,19 @@ is_valid_field(#ddl_v1{bucket = B}, Field) when is_list(Field)->
     Mod = riak_ql_ddl:make_module_name(B),
     Mod:is_field_valid(Field).
 
-is_query_valid(#ddl_v1{bucket = B} = DDL,
-	       #riak_sql_v1{'FROM'   = B,
-			    'SELECT' = S,
+-spec is_query_valid(#ddl_v1{}, #riak_sql_v1{}) ->
+        true | {false, [Error::any()]}.
+is_query_valid(#ddl_v1{ bucket = B1 },
+               #riak_sql_v1{ 'FROM' = B2 }) when B1 =/= B2 ->
+    Msg = io_lib:format("DDL bucket type was ~s "
+                        "but query selected from bucket type ~s", [B1, B2]),
+    {false, [{bucket_type_mismatch, iolist_to_binary(Msg)}]};
+is_query_valid(DDL,
+	       #riak_sql_v1{'SELECT' = S,
 			    'WHERE'  = Where}) ->
     ValidSelection = are_selections_valid(DDL, S, ?CANTBEBLANK),
     ValidFilters   = are_filters_valid(DDL, Where),
-    is_query_valid_result(ValidSelection, ValidFilters);
-is_query_valid(#ddl_v1{bucket = B1}, #riak_sql_v1{'FROM' = B2}) ->
-    Msg = io_lib:format("DDL has a bucket of ~p "
-			"but query has a bucket of ~p~n", [B1, B2]),
-    {false, {ddl_mismatch, lists:flatten(Msg)}}.
+    is_query_valid_result(ValidSelection, ValidFilters).
 
 %%
 is_query_valid_result(true,       true)        -> true;
