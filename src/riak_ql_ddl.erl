@@ -142,20 +142,20 @@ is_valid_field(#ddl_v1{bucket = B}, Field) when is_list(Field)->
 is_query_valid(#ddl_v1{bucket = B} = DDL,
 	       #riak_sql_v1{'FROM'   = B,
 			    'SELECT' = S,
-			    'WHERE'  = F}) ->
+			    'WHERE'  = Where}) ->
     ValidSelection = are_selections_valid(DDL, S, ?CANTBEBLANK),
-    ValidFilters   = are_filters_valid(DDL, F),
-    case {ValidSelection, ValidFilters} of
-	{true, true} -> true;
-	_            -> {false, [
-				 {are_selections_valid, ValidSelection},
-				 {are_filters_valid,    ValidFilters}
-				]}
-    end;
+    ValidFilters   = are_filters_valid(DDL, Where),
+    is_query_valid_result(ValidSelection, ValidFilters);
 is_query_valid(#ddl_v1{bucket = B1}, #riak_sql_v1{'FROM' = B2}) ->
     Msg = io_lib:format("DDL has a bucket of ~p "
 			"but query has a bucket of ~p~n", [B1, B2]),
     {false, {ddl_mismatch, lists:flatten(Msg)}}.
+
+%%
+is_query_valid_result(true,       true)        -> true;
+is_query_valid_result(true,       {false, L})  -> {false, L};
+is_query_valid_result({false,L},  true)        -> {false, L};
+is_query_valid_result({false,L1}, {false, L2}) -> {false, L1++L2}.
 
 are_filters_valid(#ddl_v1{}, []) ->
     true;
@@ -178,38 +178,21 @@ are_selections_valid(#ddl_v1{} = DDL, Selections, _) ->
 	{Msgs, false} -> {false, Msgs}
     end.
 
-extract_fields(Fields) ->
-    extract_f2(Fields, []).
+extract_fields(Where) ->
+    lists:reverse(
+        fold_where_tree(Where, [], 
+                fun({_, Field, _}, Acc) when is_binary(Field) ->
+                    [[Field] | Acc]
+                end)).
 
-extract_f2([], Acc) ->
-    lists:reverse(Acc);
-extract_f2([{Op, LHS, RHS} | T], Acc) when Op =:= '!='    orelse
-					   Op =:= '='    orelse
-					   Op =:= 'and_' orelse
-					   Op =:= 'or_'  orelse
-					   Op =:= '>'    orelse
-					   Op =:= '<'    orelse
-					   Op =:= '<='   orelse
-					   Op =:= '>=' ->
-    %% you have to double wrap the variable name inside the list of names
-    Acc2 = case is_tuple(LHS) of
-	       true  -> extract_f2([LHS], Acc);
-	       false -> [[LHS] | Acc]
-	   end,
-    %% note that the RHS is treated differently to the LHS - the LHS is always
-    %% a field - but the RHS terminates on a value
-    Acc3 = case is_val(RHS) of
-	       false -> extract_f2([RHS], Acc2);
-	       true  -> Acc2
-	   end,
-    extract_f2(T, Acc3).
-
-is_val({word,     _}) -> true;
-is_val({int,      _}) -> true;
-is_val({float,    _}) -> true;
-is_val({datetime, _}) -> true;
-is_val({varchar,  _}) -> true;
-is_val(_)             -> false.
+%% Fold over a the syntax tree for a where clause.
+fold_where_tree([Where], Acc1, Fn) ->
+    fold_where_tree(Where, Acc1, Fn);
+fold_where_tree({Op, LHS, RHS}, Acc1, Fn) when Op == and_; Op == or_ ->
+    Acc2 = fold_where_tree(LHS, Acc1, Fn),
+    fold_where_tree(RHS, Acc2, Fn);
+fold_where_tree(Clause, Acc, Fn) ->
+    Fn(Clause, Acc).
 
 remove_hooky_chars(Nonce) ->
     re:replace(Nonce, "[/|\+|\.|=]", "", [global, {return, list}]).
@@ -623,6 +606,7 @@ partial_wildcard_are_selections_valid_test() ->
     Res = are_selections_valid(DDL, Selections, ?CANTBEBLANK),
     ?assertEqual(true, Res).
 
+% FIXME this cannot happen because SQL without selections cannot be lexed
 partial_are_selections_valid_fail_test() ->
     Selections  = [],
     DDL = make_ddl(<<"partial_are_selections_valid_fail_test">>,
@@ -878,11 +862,103 @@ simple_filter_query_fail_test() ->
 		   ]),
     {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = riak_ql_ddl:is_query_valid(DDL, Query),
-    Expected = {false, [
-			{are_selections_valid, true},
-			{are_filters_valid, {false, [{invalid_field, [<<"gingerbread">>]}]}}
-		       ]
-	       },
-    ?assertEqual(Expected, Res).
+    ?assertEqual(
+        {false, [{invalid_field, [<<"gingerbread">>]}]},
+        Res
+    ).
+
+
+
+test_parse(SQL) ->
+    element(2,
+        riak_ql_parser:parse(
+            riak_ql_lexer:get_tokens(SQL))).
+
+is_query_valid_test_helper(Table_name, Table_def, Query) ->
+    Mod_name = make_module_name(iolist_to_binary(Table_name)),
+    catch code:purge(Mod_name),
+    catch code:purge(Mod_name),
+    DDL = test_parse(Table_def),
+    % ?debugFmt("QUERY is ~p", [test_parse(Query)]),
+    {module,_} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    is_query_valid(DDL, test_parse(Query)).
+
+-define(TEST_TABLE_DEF,
+    "CREATE TABLE mytab"
+    "   (time     TIMESTAMP NOT NULL, "
+    "    temp_f   FLOAT, "
+    "    loc_name VARCHAR, "
+    "    PRIMARY KEY (time))"
+).
+
+my_is_query_valid_1_test() ->
+    ?assertEqual(
+        true,
+        is_query_valid_test_helper("mytab", ?TEST_TABLE_DEF,
+            "SELECT * FROM mytab "
+            "WHERE time > 10 AND time < 11")
+    ).
+
+my_is_query_valid_2_test() ->
+    ?assertEqual(
+        {false, [{invalid_field, [<<"locname">>]}]},
+        is_query_valid_test_helper("mytab", ?TEST_TABLE_DEF, 
+            "SELECT * FROM mytab "
+            "WHERE time > 10 AND time < 11 AND locname = 1")
+    ).
+
+-define(LARGE_TABLE_DEF,
+    "CREATE TABLE mytab"
+    "   (myfamily    VARCHAR   NOT NULL, "
+    "    myseries    VARCHAR   NOT NULL, "
+    "    time        TIMESTAMP NOT NULL, "
+    "    weather     VARCHAR   NOT NULL, "
+    "    temperature FLOAT, "
+    "    PRIMARY KEY ((QUANTUM(time, 15, 'm'), myfamily, myseries), "
+    "    time, myfamily, myseries))"
+).
+
+% my_is_query_valid_3_test() ->
+%     ?assertEqual(
+%         {false, [{invalid_field, [<<"myseries">>]}]},
+%         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+%             "SELECT * FROM mytab "
+%             "WHERE time > 1 AND time < 10 "
+%             "AND myfamily = 'family1' "
+%             "AND myseries = 10 ")
+%     ).
+
+% my_is_query_valid_4_test() ->
+%     ?assertEqual(
+%         {false, [{invalid_field, [<<"myseries">>]}]},
+%         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+%             "SELECT * FROM mytab "
+%             "WHERE time > 1 AND time < 10 "
+%             "AND myfamily = 12 "
+%             "AND myseries = 10 ")
+%     ).
+
+extract_fields_2_test() ->
+    #riak_sql_v1{ 'WHERE' = Where } = test_parse(
+        "SELECT * FROM mytab "
+        "WHERE time > 1 AND time < 10 "
+        "AND myfamily = 'family1' "
+        "AND myseries = 10 "),
+    ?assertEqual(
+        [[<<"myseries">>], [<<"myfamily">>], [<<"time">>], [<<"time">>]],
+        extract_fields(Where)
+    ).
+
+fol_where_tree_test() ->
+    #riak_sql_v1{ 'WHERE' = [Where] } = test_parse(
+        "SELECT * FROM mytab "
+        "WHERE time > 1 AND time < 10 "
+        "AND myfamily = 'family1' "
+        "AND myseries = 10 "),
+    ?assertEqual(
+        [<<"myseries">>, <<"myfamily">>, <<"time">>, <<"time">>],
+        lists:reverse(fold_where_tree(Where, [], 
+                fun({_, Field, _}, Acc) -> [Field | Acc] end))
+    ).
 
 -endif.
