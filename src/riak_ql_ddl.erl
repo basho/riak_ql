@@ -40,7 +40,7 @@
 	 get_local_key/2,
 	 make_key/3,
 	 is_valid_field/2,
-	 is_query_valid/2
+	 is_query_valid/3
 	]).
 
 -ifdef(TEST).
@@ -139,18 +139,23 @@ is_valid_field(#ddl_v1{bucket = B}, Field) when is_list(Field)->
     Mod = riak_ql_ddl:make_module_name(B),
     Mod:is_field_valid(Field).
 
--spec is_query_valid(#ddl_v1{}, #riak_sql_v1{}) ->
+-spec is_valid_field(module(), #ddl_v1{}, heirarchicalfieldname()) ->
+        boolean().
+is_valid_field(Module, _, Field) when is_list(Field)->
+    Module:is_field_valid(Field).
+
+-spec is_query_valid(module(),#ddl_v1{}, #riak_sql_v1{}) ->
         true | {false, [Error::any()]}.
-is_query_valid(#ddl_v1{ bucket = B1 },
+is_query_valid(_,   #ddl_v1{ bucket = B1 },
                #riak_sql_v1{ 'FROM' = B2 }) when B1 =/= B2 ->
     Msg = io_lib:format("DDL bucket type was ~s "
                         "but query selected from bucket type ~s", [B1, B2]),
     {false, [{bucket_type_mismatch, iolist_to_binary(Msg)}]};
-is_query_valid(DDL,
-	       #riak_sql_v1{'SELECT' = S,
+is_query_valid(_Mod, DDL,
+	       #riak_sql_v1{'SELECT' = Selection,
 			    'WHERE'  = Where}) ->
-    ValidSelection = are_selections_valid(DDL, S, ?CANTBEBLANK),
-    ValidFilters   = are_filters_valid(DDL, Where),
+    ValidSelection = are_selections_valid(DDL, Selection, ?CANTBEBLANK),
+    ValidFilters   = are_filters_valid( DDL, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
 
 %%
@@ -158,6 +163,7 @@ is_query_valid_result(true,       true)        -> true;
 is_query_valid_result(true,       {false, L})  -> {false, L};
 is_query_valid_result({false,L},  true)        -> {false, L};
 is_query_valid_result({false,L1}, {false, L2}) -> {false, L1++L2}.
+
 
 are_filters_valid(#ddl_v1{}, []) ->
     true;
@@ -641,8 +647,8 @@ simple_is_query_valid_test() ->
 				   position = 2,
 				   type     = integer}
 		   ]),
-    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_ql_ddl:is_query_valid(DDL, Query),
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
 
 simple_is_query_valid_fail_test() ->
@@ -659,8 +665,8 @@ simple_is_query_valid_fail_test() ->
 				   position = 2,
 				   type     = integer}
 		   ]),
-    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    {Res, _} = riak_ql_ddl:is_query_valid(DDL, Query),
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {Res, _} = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(false, Res).
 
 simple_is_query_valid_map_test() ->
@@ -685,8 +691,8 @@ simple_is_query_valid_map_test() ->
 				   position = 2,
 				   type     = Map}
 		   ]),
-    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_ql_ddl:is_query_valid(DDL, Query),
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
 
 simple_is_query_valid_map_wildcard_test() ->
@@ -711,8 +717,8 @@ simple_is_query_valid_map_wildcard_test() ->
 				   position = 2,
 				   type     = Map}
 		   ]),
-    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_ql_ddl:is_query_valid(DDL, Query),
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
 
 %%
@@ -739,8 +745,8 @@ simple_filter_query_test() ->
 				   position = 2,
 				   type     = integer}
 		   ]),
-    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_ql_ddl:is_query_valid(DDL, Query),
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
 
 full_filter_query_test() ->
@@ -775,8 +781,8 @@ full_filter_query_test() ->
 				   position = 4,
 				   type     = integer}
 		   ]),
-    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_ql_ddl:is_query_valid(DDL, Query),
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
 
 
@@ -836,8 +842,8 @@ timeseries_filter_test() ->
 		  partition_key = PK,
 		  local_key     = LK
 		 },
-    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_ql_ddl:is_query_valid(DDL, Query),
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     Expected = true,
     ?assertEqual(Expected, Res).
 
@@ -862,8 +868,8 @@ simple_filter_query_fail_test() ->
 				   position = 2,
 				   type     = integer}
 		   ]),
-    {module, _ModName} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Res = riak_ql_ddl:is_query_valid(DDL, Query),
+    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(
         {false, [{invalid_field, [<<"gingerbread">>]}]},
         Res
@@ -881,9 +887,9 @@ is_query_valid_test_helper(Table_name, Table_def, Query) ->
     catch code:purge(Mod_name),
     catch code:purge(Mod_name),
     DDL = test_parse(Table_def),
-    % ?debugFmt("QUERY is ~p", [test_parse(Query)]),
-    {module,_} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    is_query_valid(DDL, test_parse(Query)).
+    ?debugFmt("QUERY is ~p", [test_parse(Query)]),
+    {module,Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    is_query_valid(Mod, DDL, test_parse(Query)).
 
 -define(TEST_TABLE_DEF,
     "CREATE TABLE mytab"
