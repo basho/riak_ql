@@ -1008,7 +1008,7 @@ is_query_valid_select_and_where_1_test() ->
 is_query_valid_compatible_op_1_test() ->
     ?assertEqual(
         {false, [
-        	{incompatible_operator, <<"myfamily">>, '>'}]},
+        	{incompatible_operator, <<"myfamily">>, binary, '>'}]},
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
@@ -1018,7 +1018,7 @@ is_query_valid_compatible_op_1_test() ->
 is_query_valid_compatible_op_2_test() ->
     ?assertEqual(
         {false, [
-            {incompatible_operator, <<"myfamily">>, '>='}]},
+            {incompatible_operator, <<"myfamily">>, binary, '>='}]},
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
