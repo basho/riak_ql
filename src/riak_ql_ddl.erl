@@ -35,12 +35,21 @@
 %% record definitions because of the build cycle
 %% so this function can be called out to to pick
 %% apart the DDL records
--export([
-	 get_partition_key/2,
-	 get_local_key/2,
-	 make_key/3,
-	 is_query_valid/3
-	]).
+
+-export([get_local_key/2]).
+-export([get_partition_key/2]).
+-export([is_query_valid/3]).
+-export([make_key/3]).
+-export([syntax_error_to_msg/1]).
+
+-type query_syntax_error() ::
+	{bucket_type_mismatch, DDL_bucket::binary(), Query_bucket::binary()} |
+	{incompatible_type, Field::binary(), simple_field_type(), atom()} |
+	{incompatible_operator, Field::binary(), simple_field_type(), relational_op()}  |
+	{unexpected_where_field, Field::binary()} |
+	{unexpected_select_field, Field::binary()}.
+
+-export_type([query_syntax_error/0]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -51,10 +60,8 @@
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
 
--type bucket()                :: binary().
--type modulename()            :: atom().
-
--spec make_module_name(bucket()) -> modulename().
+-spec make_module_name(Bucket::binary()) ->
+	    module().
 make_module_name(Bucket) when is_binary(Bucket) ->
     Nonce = binary_to_list(base64:encode(crypto:hash(md4, Bucket))),
     Nonce2 = remove_hooky_chars(Nonce),
@@ -130,16 +137,40 @@ convert([#param_v1{name = Nm} | T], Obj, Mod, Acc) ->
 convert([Constant | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Constant | Acc]).
 
+%% Convert an error emmitted from the :is_query_valid/3 function
+%% and convert it into a user-friendly, text message binary.
+-spec syntax_error_to_msg(query_syntax_error()) ->
+	    Msg::binary().
+syntax_error_to_msg(E) ->
+	{Fmt, Args} = syntax_error_to_msg2(E),
+	iolist_to_binary(io_lib:format(Fmt, Args)).
+
+%%
+syntax_error_to_msg2({bucket_type_mismatch, B1, B2}) ->
+    {"bucket_type_mismatch: DDL bucket type was ~s "
+     "but query selected from bucket type ~s.", [B1, B2]};
+syntax_error_to_msg2({incompatible_type, Field, Expected, Actual}) ->
+    {"incompatible_type: field ~s with type ~p cannot be compared "
+     "to type ~p in where clause.", [Field, Expected, Actual]};
+syntax_error_to_msg2({incompatible_operator, Field, ColType, Op}) ->
+    {"incompatible_operator: field ~s with type ~p cannot use "
+     "operator ~p in where clause.", [Field, ColType, Op]};
+syntax_error_to_msg2({unexpected_where_field, Field}) ->
+    {"unexpected_where_field: unexpected field ~s in where clause.",
+     [Field]};
+syntax_error_to_msg2({unexpected_select_field, Field}) ->
+    {"unexpected_select_field: unexpected field ~s in select clause.",
+     [Field]}.
+
 -spec is_query_valid(module(), #ddl_v1{}, #riak_sql_v1{}) ->
-        true | {false, [Error::any()]}.
-is_query_valid(_,   #ddl_v1{ bucket = B1 },
+        true | {false, [query_syntax_error()]}.
+is_query_valid(_,
+	           #ddl_v1{ bucket = B1 },
                #riak_sql_v1{ 'FROM' = B2 }) when B1 =/= B2 ->
-    Msg = io_lib:format("DDL bucket type was ~s "
-                        "but query selected from bucket type ~s", [B1, B2]),
-    {false, [{bucket_type_mismatch, iolist_to_binary(Msg)}]};
+    {false, [{bucket_type_mismatch, {B1, B2}}]};
 is_query_valid(Mod, _,
-	       #riak_sql_v1{'SELECT' = Selection,
-			    'WHERE'  = Where}) ->
+               #riak_sql_v1{'SELECT' = Selection,
+               'WHERE'  = Where}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
@@ -171,7 +202,7 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type,_}}, Acc1) ->
             end,
             case is_compatible_operator(Op, ExpectedType, RHS_type) of
                 true  -> Acc2;
-                false -> [{incompatible_operator, Field, Op} | Acc2]
+                false -> [{incompatible_operator, Field, ExpectedType, Op} | Acc2]
             end;
         false ->
             [{unexpected_where_field, Field} | Acc1]
@@ -213,7 +244,7 @@ are_selections_valid(Mod, Selections, _) ->
 	{Msgs, false} -> {false, lists:reverse(Msgs)}
     end.
 
-%% Fold over a the syntax tree for a where clause.
+%% Fold over the syntax tree for a where clause.
 fold_where_tree([], Acc, _) ->
     Acc;
 fold_where_tree([Where], Acc1, Fn) ->
