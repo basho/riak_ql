@@ -256,12 +256,12 @@ convert(#outputs{type = create} = O) ->
     O.
 
 process({chars, A}) ->
-    {word, A}.
+    {binary, A}.
 
-concatenate({word, A}, {chars, B}) ->
-    {word, <<A/binary, B/binary>>}.
+concatenate({binary, A}, {chars, B}) ->
+    {binary, <<A/binary, B/binary>>}.
 
-make_atom({word, SomeWord}) ->
+make_atom({binary, SomeWord}) ->
     {atom, binary_to_atom(SomeWord, utf8)}.
 
 make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, []}).
@@ -269,7 +269,7 @@ make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, []}).
 make_clause({select, _}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
     Type2 = case Type of
                 list   -> list;
-                word   -> string;
+                binary -> string;
                 quoted -> string;
                 regex  -> regex
             end,
@@ -311,7 +311,7 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
          end,
     {conditional, {B1, A, C2}}.
 
-make_word({quoted, Q}) -> {word, Q}.
+make_word({quoted, Q}) -> {binary, Q}.
 
 make_where({where, A}, {conditional, B}) ->
     NewB = remove_conditionals(B),
@@ -419,7 +419,7 @@ add_unit({Type, A}, {chars, U}) when U =:= <<"h">> -> {Type, A*60*60};
 add_unit({Type, A}, {chars, U}) when U =:= <<"d">> -> {Type, A*60*60*24}.
 
 make_list({maybetimes, A}) -> {list, [A]};
-make_list({word,       A}) -> {list, [A]};
+make_list({binary,       A}) -> {list, [A]};
 make_list(A)               -> {list, [A]}.
 
 make_list({list, A}, {_, B}) -> {list, A ++ [B]};
@@ -428,13 +428,13 @@ make_list({_,    A}, {_, B}) -> {list, [A, B]}.
 make_expr(A) ->
     {conditional, A}.
 
-make_column({word, FieldName}, {DataType, _}) ->
+make_column({binary, FieldName}, {DataType, _}) ->
     #riak_field_v1{
        name = FieldName,
        type = canonicalize_field_type(DataType),
        optional = true}.
 
-make_column({word, FieldName}, {DataType, _}, {not_null, _}) ->
+make_column({binary, FieldName}, {DataType, _}, {not_null, _}) ->
     #riak_field_v1{
        name = FieldName,
        type = canonicalize_field_type(DataType),
@@ -472,7 +472,7 @@ extract_key_field_list({list, [Field | Rest]}, Extracted) ->
     [#param_v1{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
-make_table_definition({word, BucketName}, Contents) ->
+make_table_definition({binary, BucketName}, Contents) ->
     PartitionKey = find_partition_key(Contents),
     LocalKey = find_local_key(Contents),
     Fields = find_fields(Contents),

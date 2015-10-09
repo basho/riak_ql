@@ -215,7 +215,6 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type,_}}, Acc1) ->
 is_compatible_type(timestamp, int) -> true;
 is_compatible_type(int, timestamp) -> true;
 is_compatible_type(integer, int)   -> true;
-is_compatible_type(binary, word)   -> true;
 is_compatible_type(T, T)           -> true;
 is_compatible_type(_, _)           -> false.
 
@@ -224,9 +223,9 @@ is_compatible_type(_, _)           -> false.
 -spec is_compatible_operator(OP::relational_op(), 
 	                         ExpectedType::simple_field_type(),
 	                         RHS_type::atom()) -> boolean().
-is_compatible_operator('=',  binary, word) -> true;
-is_compatible_operator('!=', binary, word) -> true;
-is_compatible_operator(_,    binary, word) -> false;
+is_compatible_operator('=',  binary, binary) -> true;
+is_compatible_operator('!=', binary, binary) -> true;
+is_compatible_operator(_,    binary, binary) -> false;
 is_compatible_operator(_,_,_)              -> true.
 
 are_selections_valid(_, [], ?CANTBEBLANK) ->
@@ -801,7 +800,7 @@ timeseries_filter_test() ->
 	       {'>', <<"time">>, {int, 3000}},
 	       {'<', <<"time">>, {int, 5000}}
 	      },
-	      {'=', <<"user">>, {word, <<"user_1">>}
+	      {'=', <<"user">>, {binary, <<"user_1">>}
 	      }
 	     }
 	    ],

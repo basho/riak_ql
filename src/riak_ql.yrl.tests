@@ -154,7 +154,7 @@ select_where_8_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
-						     {'=', <<"state">>, {word, <<"NY">>}}
+						     {'=', <<"state">>, {binary, <<"NY">>}}
 						    ]
 					}).
 
@@ -174,7 +174,7 @@ select_where_10_sql_test() ->
 					 'WHERE'  = [
 						     {and_,
 						      {'=', <<"customer_id">>, {int,  23}},
-						      {'=', <<"type">>,        {word, <<"click10">>}}
+						      {'=', <<"type">>,        {binary, <<"click10">>}}
 						     }
 						    ]
 					}).
@@ -229,7 +229,7 @@ select_where_14_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
-						     {'=', <<"signed_in">>, {word, <<"false">>}}
+						     {'=', <<"signed_in">>, {binary, <<"false">>}}
 						    ]
 					}).
 
@@ -240,7 +240,7 @@ select_where_15_sql_test() ->
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
 						     {and_,
-						      {'=', <<"state">>, {word, <<"ny">>}},
+						      {'=', <<"state">>, {binary, <<"ny">>}},
 						      {or_,
 						       {'=~', <<"email">>, {regex, <<"/.*gmail.*/">>}},
 						       {'=~', <<"email">>, {regex, <<"/.*yahoo.*/">>}}
@@ -254,7 +254,7 @@ select_where_letters_nos_in_strings_1a_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
-						     {'=', <<"user">>, {word, <<"user 1">>}}
+						     {'=', <<"user">>, {binary, <<"user 1">>}}
 						    ]
 					}).
 
@@ -272,7 +272,7 @@ select_where_letters_nos_in_strings_1a_test() ->
 %% 					 {'>', "time", {int, 2000}},
 %% 					 {'<', "time", {int, 8000}}
 %% 					},
-%% 					{'=', "user", {word, "user_1"}}
+%% 					{'=', "user", {binary, "user_1"}}
 %% 					}
 %% 				      ]
 %% 			  }).
@@ -282,7 +282,7 @@ select_where_letters_nos_in_strings_1b_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
-						     {'=', <<"user">>, {word, <<"user 1">>}}
+						     {'=', <<"user">>, {binary, <<"user 1">>}}
 						    ]
 					}).
 
@@ -292,7 +292,7 @@ select_where_letters_nos_in_strings_2b_test() ->
 					 'FROM'   = <<"GeoCheckin">>,
 					 'WHERE'  = [
 						     {and_,
-						      {'=', <<"user">>, {word, <<"user_1">>}},
+						      {'=', <<"user">>, {binary, <<"user_1">>}},
 						      {and_,
 						       {'<', <<"time">>, {int, 8000}},
 						       {'>', <<"time">>, {int, 2000}}
@@ -307,7 +307,7 @@ select_where_brackets_1_test() ->
 					 'FROM'   = <<"GeoCheckin">>,
 					 'WHERE'  = [
 						     {and_,
-						      {'=', <<"user">>, {word, <<"user_1">>}},
+						      {'=', <<"user">>, {binary, <<"user_1">>}},
 						      {and_,
 						       {'<', <<"time">>, {int, 8000}},
 						       {'>', <<"time">>, {int, 2000}}
@@ -322,7 +322,7 @@ select_where_brackets_2_test() ->
 					 'FROM'   = <<"GeoCheckin">>,
 					 'WHERE'  = [
 						     {and_,
-						      {'=', <<"user">>, {word, <<"user_1">>}},
+						      {'=', <<"user">>, {binary, <<"user_1">>}},
 						      {and_,
 						       {'<', <<"time">>, {int, 8000}},
 						       {'>', <<"time">>, {int, 2000}}
@@ -337,7 +337,7 @@ select_where_brackets_2a_test() ->
 					 'FROM'   = <<"GeoCheckin">>,
 					 'WHERE'  = [
 						     {and_,
-						      {'=', <<"user">>, {word, <<"user_1">>}},
+						      {'=', <<"user">>, {binary, <<"user_1">>}},
 						      {and_,
 						       {'<', <<"time">>, {int, 8000}},
 						       {'>', <<"time">>, {int, 2000}}
