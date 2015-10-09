@@ -212,11 +212,10 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type,_}}, Acc1) ->
 %% are comparable.
 -spec is_compatible_type(ColType::atom(), WhereType::atom()) ->
         boolean().
-is_compatible_type(timestamp, int) -> true;
-is_compatible_type(int, timestamp) -> true;
-is_compatible_type(integer, int)   -> true;
-is_compatible_type(T, T)           -> true;
-is_compatible_type(_, _)           -> false.
+is_compatible_type(timestamp, integer) -> true;
+is_compatible_type(integer, timestamp) -> true;
+is_compatible_type(T, T) -> true;
+is_compatible_type(_, _) -> false.
 
 %% Check that the operation being performed in a where clause, for example
 %% we cannot check if one binary is greated than another one in SQL.
@@ -734,8 +733,8 @@ simple_filter_query_test() ->
     Selections = [[<<"temperature">>], [<<"geohash">>]],
     Where = [
 	     {and_,
-	      {'>', <<"temperature">>, {int, 1}},
-	      {'<', <<"temperature">>, {int, 15}}
+	      {'>', <<"temperature">>, {integer, 1}},
+	      {'<', <<"temperature">>, {integer, 15}}
 	     }
 	    ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
@@ -759,14 +758,14 @@ full_filter_query_test() ->
     Selections = [[<<"temperature">>]],
     Where = [
 	     {and_,
-	      {'>', <<"temperature">>, {int, 1}},
+	      {'>', <<"temperature">>, {integer, 1}},
 	      {and_,
-	       {'<', <<"temperature">>, {int, 15}},
+	       {'<', <<"temperature">>, {integer, 15}},
 	       {or_,
-		{'!=', <<"ne field">>,   {int, 15}},
+		{'!=', <<"ne field">>,   {integer, 15}},
 		{and_,
-		 {'<=', <<"lte field">>,  {int, 15}},
-		 {'>=', <<"gte field">>,  {int, 15}}}}}}
+		 {'<=', <<"lte field">>,  {integer, 15}},
+		 {'>=', <<"gte field">>,  {integer, 15}}}}}}
 	    ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
 			 'SELECT' = Selections,
@@ -797,8 +796,8 @@ timeseries_filter_test() ->
     Where = [
 	     {and_,
 	      {and_,
-	       {'>', <<"time">>, {int, 3000}},
-	       {'<', <<"time">>, {int, 5000}}
+	       {'>', <<"time">>, {integer, 3000}},
+	       {'<', <<"time">>, {integer, 5000}}
 	      },
 	      {'=', <<"user">>, {binary, <<"user_1">>}
 	      }
@@ -915,7 +914,7 @@ is_query_valid_where_1_test() ->
 is_query_valid_where_2_test() ->
     ?assertEqual(
         {false, [
-            {incompatible_type, <<"myseries">>, binary, int}]},
+            {incompatible_type, <<"myseries">>, binary, integer}]},
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
@@ -926,8 +925,8 @@ is_query_valid_where_2_test() ->
 is_query_valid_where_3_test() ->
     ?assertEqual(
         {false, [
-            {incompatible_type, <<"myfamily">>, binary, int},
-            {incompatible_type, <<"myseries">>, binary, int}]},
+            {incompatible_type, <<"myfamily">>, binary, integer},
+            {incompatible_type, <<"myseries">>, binary, integer}]},
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "

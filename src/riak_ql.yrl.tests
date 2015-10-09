@@ -97,7 +97,7 @@ select_where_2_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"value">>]],
 					 'FROM'   = <<"response_times">>,
 					 'WHERE'  = [
-						     {'>', <<"time">>, {'-', {<<"now">>, []}, {int, 3600}}}
+						     {'>', <<"time">>, {'-', {<<"now">>, []}, {integer, 3600}}}
 						    ],
 					 'LIMIT'  = 1000
 					}).
@@ -107,7 +107,7 @@ select_where_3_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"value">>]],
 					 'FROM'   = <<"response_times">>,
 					 'WHERE'  = [
-						     {'>', <<"time">>, {int, 1388534400}}
+						     {'>', <<"time">>, {integer, 1388534400}}
 						    ]
 					}).
 
@@ -116,7 +116,7 @@ select_where_4_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"value">>]],
 					 'FROM'   = <<"response_times">>,
 					 'WHERE'  = [
-						     {'>', <<"time">>, {int, 1388534400}}
+						     {'>', <<"time">>, {integer, 1388534400}}
 						    ]
 					}).
 
@@ -127,8 +127,8 @@ select_where_5_sql_test() ->
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
 						     {and_,
-						      {'=', <<"sequence_number">>, {int, 2321}},
-						      {'=', <<"time">>,            {int, 1400497861762723}}
+						      {'=', <<"sequence_number">>, {integer, 2321}},
+						      {'=', <<"time">>,            {integer, 1400497861762723}}
 						     }
 						    ]
 					}).
@@ -138,7 +138,7 @@ select_where_6_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = {regex, <<"/^stats\./i">>},
 					 'WHERE'  = [
-						     {'>', <<"time">>, {'-', {<<"now">>, []}, {int, 3600}}}
+						     {'>', <<"time">>, {'-', {<<"now">>, []}, {integer, 3600}}}
 						    ]
 					}).
 
@@ -173,7 +173,7 @@ select_where_10_sql_test() ->
 					 'FROM'   = <<"events">>,
 					 'WHERE'  = [
 						     {and_,
-						      {'=', <<"customer_id">>, {int,  23}},
+						      {'=', <<"customer_id">>, {integer,  23}},
 						      {'=', <<"type">>,        {binary, <<"click10">>}}
 						     }
 						    ]
@@ -184,7 +184,7 @@ select_where_11_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"response_times">>,
 					 'WHERE'  = [
-						     {'>', <<"value">>, {int, 500}}
+						     {'>', <<"value">>, {integer, 500}}
 						    ]
 					}).
 
@@ -193,7 +193,7 @@ select_where_11a_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"response_times">>,
 					 'WHERE'  = [
-						     {'>=', <<"value">>, {int, 500}}
+						     {'>=', <<"value">>, {integer, 500}}
 						    ]
 					}).
 
@@ -202,7 +202,7 @@ select_where_11b_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"response_times">>,
 					 'WHERE'  = [
-						     {'<=', <<"value">>, {int, 500}}
+						     {'<=', <<"value">>, {integer, 500}}
 						    ]
 					}).
 
@@ -220,7 +220,7 @@ select_where_13_sql_test() ->
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"nagios_checks">>,
 					 'WHERE'  = [
-						     {'<>', <<"status">>, {int, 0}}
+						     {'<>', <<"status">>, {integer, 0}}
 						    ]
 					}).
 
@@ -269,8 +269,8 @@ select_where_letters_nos_in_strings_1a_test() ->
 %% 			   'WHERE'  = [
 %% 				       {and_,
 %% 					{and_,
-%% 					 {'>', "time", {int, 2000}},
-%% 					 {'<', "time", {int, 8000}}
+%% 					 {'>', "time", {integer, 2000}},
+%% 					 {'<', "time", {integer, 8000}}
 %% 					},
 %% 					{'=', "user", {binary, "user_1"}}
 %% 					}
@@ -294,8 +294,8 @@ select_where_letters_nos_in_strings_2b_test() ->
 						     {and_,
 						      {'=', <<"user">>, {binary, <<"user_1">>}},
 						      {and_,
-						       {'<', <<"time">>, {int, 8000}},
-						       {'>', <<"time">>, {int, 2000}}
+						       {'<', <<"time">>, {integer, 8000}},
+						       {'>', <<"time">>, {integer, 2000}}
 						      }
 						     }
 						    ]
@@ -309,8 +309,8 @@ select_where_brackets_1_test() ->
 						     {and_,
 						      {'=', <<"user">>, {binary, <<"user_1">>}},
 						      {and_,
-						       {'<', <<"time">>, {int, 8000}},
-						       {'>', <<"time">>, {int, 2000}}
+						       {'<', <<"time">>, {integer, 8000}},
+						       {'>', <<"time">>, {integer, 2000}}
 						      }
 						     }
 						    ]
@@ -324,8 +324,8 @@ select_where_brackets_2_test() ->
 						     {and_,
 						      {'=', <<"user">>, {binary, <<"user_1">>}},
 						      {and_,
-						       {'<', <<"time">>, {int, 8000}},
-						       {'>', <<"time">>, {int, 2000}}
+						       {'<', <<"time">>, {integer, 8000}},
+						       {'>', <<"time">>, {integer, 2000}}
 						      }
 						     }
 						    ]
@@ -339,8 +339,8 @@ select_where_brackets_2a_test() ->
 						     {and_,
 						      {'=', <<"user">>, {binary, <<"user_1">>}},
 						      {and_,
-						       {'<', <<"time">>, {int, 8000}},
-						       {'>', <<"time">>, {int, 2000}}
+						       {'<', <<"time">>, {integer, 8000}},
+						       {'>', <<"time">>, {integer, 2000}}
 						      }
 						     }
 						    ]
@@ -352,68 +352,68 @@ select_where_brackets_2a_test() ->
 
 canonicalise_where_1_test() ->
     ?where_test({or_,
-		 {'<', "alpha", {int, 2}},
-		 {'>', "beta",  {int, 3}}
+		 {'<', "alpha", {integer, 2}},
+		 {'>', "beta",  {integer, 3}}
 		},
 		{or_,
-		 {'<', "alpha", {int, 2}},
-		 {'>', "beta",  {int, 3}}
+		 {'<', "alpha", {integer, 2}},
+		 {'>', "beta",  {integer, 3}}
 		}).
 
 canonicalise_where_2_test() ->
     ?where_test({or_,
-		 {'>', "beta",  {int, 3}},
-		 {'<', "alpha", {int, 2}}
+		 {'>', "beta",  {integer, 3}},
+		 {'<', "alpha", {integer, 2}}
 		},
 		{or_,
-		 {'<', "alpha", {int, 2}},
-		 {'>', "beta",  {int, 3}}
+		 {'<', "alpha", {integer, 2}},
+		 {'>', "beta",  {integer, 3}}
 		}).
 
 canonicalise_where_2a_test() ->
     ?where_test({or_,
-		 {'>=', "beta",  {int, 3}},
-		 {'<', "alpha", {int, 2}}
+		 {'>=', "beta",  {integer, 3}},
+		 {'<', "alpha", {integer, 2}}
 		},
 		{or_,
-		 {'<', "alpha", {int, 2}},
-		 {'>=', "beta",  {int, 3}}
+		 {'<', "alpha", {integer, 2}},
+		 {'>=', "beta",  {integer, 3}}
 		}).
 
 canonicalise_where_2b_test() ->
     ?where_test({or_,
-		 {'>', "beta",  {int, 3}},
-		 {'<=', "alpha", {int, 2}}
+		 {'>', "beta",  {integer, 3}},
+		 {'<=', "alpha", {integer, 2}}
 		},
 		{or_,
-		 {'<=', "alpha", {int, 2}},
-		 {'>', "beta",  {int, 3}}
+		 {'<=', "alpha", {integer, 2}},
+		 {'>', "beta",  {integer, 3}}
 		}).
 
 
 canonicalise_where_3_test() ->
     ?where_test({and_,
-		 {'>', "beta",  {int, 3}},
-		 {'<', "alpha", {int, 2}}
+		 {'>', "beta",  {integer, 3}},
+		 {'<', "alpha", {integer, 2}}
 		},
 		{and_,
-		 {'<', "alpha", {int, 2}},
-		 {'>', "beta",  {int, 3}}
+		 {'<', "alpha", {integer, 2}},
+		 {'>', "beta",  {integer, 3}}
 		}).
 
 canonicalise_where_4_test() ->
     ?where_test({or_,
 		 {and_,
-		  {'>', "beta",  {int, 3}},
-		  {'<', "alpha", {int, 2}}
+		  {'>', "beta",  {integer, 3}},
+		  {'<', "alpha", {integer, 2}}
 		 },
-		 {'=', "time", {int, 1234}}
+		 {'=', "time", {integer, 1234}}
 		},
 		{or_,
-		 {'=', "time", {int, 1234}},
+		 {'=', "time", {integer, 1234}},
 		 {and_,
-		  {'<', "alpha", {int, 2}},
-		  {'>', "beta",  {int, 3}}
+		  {'<', "alpha", {integer, 2}},
+		  {'>', "beta",  {integer, 3}}
 		 }
 		}).
 
@@ -425,21 +425,21 @@ canonicalise_where_4_test() ->
 canonicalise_where_5_test() ->
     ?where_test({and_,
 		 {or_,
-		  {'>', "beta",  {int, 3}},
-		  {'<', "alpha", {int, 2}}
+		  {'>', "beta",  {integer, 3}},
+		  {'<', "alpha", {integer, 2}}
 		 },
 		 {and_,
-		  {'>', "gamma", {int, 3}},
-		  {'<', "delta", {int, 2}}
+		  {'>', "gamma", {integer, 3}},
+		  {'<', "delta", {integer, 2}}
 		 }
 		},
 		{and_,
-		 {'<', "delta", {int, 2}},
+		 {'<', "delta", {integer, 2}},
 		 {and_,
-		  {'>', "gamma", {int, 3}},
+		  {'>', "gamma", {integer, 3}},
 		  {or_,
-		   {'<', "alpha", {int, 2}},
-		   {'>', "beta",  {int, 3}}
+		   {'<', "alpha", {integer, 2}},
+		   {'>', "beta",  {integer, 3}}
 		  }
 		 }
 		}).
@@ -447,21 +447,21 @@ canonicalise_where_5_test() ->
 canonicalise_where_6_test() ->
     ?where_test({and_,
 		 {and_,
-		  {'>', "beta6",  {int, 3}},
-		  {'<', "alpha6", {int, 2}}
+		  {'>', "beta6",  {integer, 3}},
+		  {'<', "alpha6", {integer, 2}}
 		 },
 		 {and_,
-		  {'>', "gamma6", {int, 3}},
-		  {'<', "delta6", {int, 2}}
+		  {'>', "gamma6", {integer, 3}},
+		  {'<', "delta6", {integer, 2}}
 		 }
 		},
 		{and_,
-		 {'<', "alpha6", {int, 2}},
+		 {'<', "alpha6", {integer, 2}},
 		 {and_,
-		  {'<', "delta6", {int, 2}},
+		  {'<', "delta6", {integer, 2}},
 		  {and_,
-		   {'>', "beta6",  {int, 3}},
-		   {'>', "gamma6", {int, 3}}
+		   {'>', "beta6",  {integer, 3}},
+		   {'>', "gamma6", {integer, 3}}
 		  }
 		 }
 		}).
@@ -470,30 +470,30 @@ canonicalise_where_7_test() ->
     ?where_test({and_,
 		 {and_,
 		  {or_,
-		   {'>', "beta7",  {int, 3}},
-		   {'<', "alpha7", {int, 2}}
+		   {'>', "beta7",  {integer, 3}},
+		   {'<', "alpha7", {integer, 2}}
 		  },
 		  {and_,
-		   {'>', "gamma7", {int, 3}},
-		   {'<', "delta7", {int, 2}}
+		   {'>', "gamma7", {integer, 3}},
+		   {'<', "delta7", {integer, 2}}
 		  }
 		 },
 		 {and_,
-		  {'>', "epsilon7", {int, 3}},
-		  {'<', "zeta7",    {int, 2}}
+		  {'>', "epsilon7", {integer, 3}},
+		  {'<', "zeta7",    {integer, 2}}
 		 }
 		},
 		{and_,
-		 {'<', "delta7", {int, 2}},
+		 {'<', "delta7", {integer, 2}},
 		 {and_,
-		  {'<', "zeta7", {int, 2}},
+		  {'<', "zeta7", {integer, 2}},
 		  {and_,
-		   {'>', "epsilon7", {int, 3}},
+		   {'>', "epsilon7", {integer, 3}},
 		   {and_,
-		    {'>', "gamma7", {int, 3}},
+		    {'>', "gamma7", {integer, 3}},
 		    {or_,
-		     {'<', "alpha7", {int, 2}},
-		     {'>', "beta7",  {int, 3}}
+		     {'<', "alpha7", {integer, 2}},
+		     {'>', "beta7",  {integer, 3}}
 		    }
 		   }
 		  }

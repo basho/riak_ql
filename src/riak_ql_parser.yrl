@@ -54,7 +54,7 @@ and_
 datetime
 regex
 quoted
-int
+integer
 int_type
 float
 float_type
@@ -90,7 +90,7 @@ Endsymbol '$end'.
 Statement -> Query : convert('$1').
 Statement -> TableDefinition : fix_up_keys('$1').
 
-Query -> Select limit int : add_limit('$1', '$2', '$3').
+Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select           : '$1'.
 
 Select -> select Fields from Buckets Where : make_clause('$1', '$2', '$3', '$4', '$5').
@@ -132,8 +132,8 @@ Vals -> Val                 : '$1'.
 Vals -> Funcall             : '$1'.
 Vals -> Word                : '$1'.
 
-Val -> int chars : add_unit('$1', '$2').
-Val -> int       : '$1'.
+Val -> integer chars : add_unit('$1', '$2').
+Val -> integer       : '$1'.
 Val -> float     : '$1'.
 Val -> datetime  : '$1'.
 Val -> varchar   : '$1'.
@@ -196,9 +196,9 @@ KeyFieldArgList ->
 KeyFieldArgList ->
     KeyFieldArg : make_list({list, []}, '$1').
 
-KeyFieldArg -> int    : '$1'.
-KeyFieldArg -> float  : '$1'.
-KeyFieldArg -> Word   : '$1'.
+KeyFieldArg -> integer : '$1'.
+KeyFieldArg -> float   : '$1'.
+KeyFieldArg -> Word    : '$1'.
 KeyFieldArg -> atom openb Word closeb : make_atom('$3').
 
 Erlang code.
@@ -284,7 +284,7 @@ make_clause({select, _}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
                   where   = E
                  }.
 
-add_limit(A, _B, {int, C}) ->
+add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
 
 make_expr({_, A}, {B, _}, {Type, C}) ->
