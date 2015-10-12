@@ -259,7 +259,7 @@ process({chars, A}) ->
     {word, A}.
 
 concatenate({word, A}, {chars, B}) ->
-    {word, A ++ B}.
+    {word, <<A/binary, B/binary>>}.
 
 make_atom({word, SomeWord}) ->
     {atom, binary_to_atom(SomeWord, utf8)}.
