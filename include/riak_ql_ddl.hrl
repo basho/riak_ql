@@ -35,7 +35,7 @@
 -type complex_field_type() :: {map, [#riak_field_v1{}]} | any().
 
 %% Relational operators allowed in a where clause.
--type relational_op() :: '=' | '!=' | '>' | '>' | '<' | '<=' | '>='.
+-type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
 
 -record(param_v1, {
           name :: [binary()]
