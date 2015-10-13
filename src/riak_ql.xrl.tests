@@ -120,15 +120,15 @@ words_containing_digits_test_() ->
     Expected = [
                 {chars, <<"sha512">>},
                 {chars, <<"sha">>},
-                {int, 512}
+                {integer, 512}
                ],
     ?_assertEqual(Expected, Got).
 
 nums_test_() ->
     Got = riak_ql_lexer:get_tokens("1 -2 2.0 -2.0 3.3e+3 -3.3e-3"),
     Expected = [
-                {int, 1},
-                {int, -2},
+                {integer, 1},
+                {integer, -2},
                 {float, 2.0},
                 {float, -2.0},
                 {float, 3300.0},
@@ -304,7 +304,7 @@ timeseries_test_() ->
 		{openb, <<"(">>},
 		{chars,<<"time">>},
 		{comma, <<",">>},
-		{int,15},
+		{integer,15},
 		{comma, <<",">>},
 		{chars,<<"m">>},
 		{closeb, <<")">>},
