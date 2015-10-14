@@ -60,25 +60,25 @@
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
 
--spec make_module_name(Bucket::binary()) ->
+-spec make_module_name(Table::binary()) ->
 	    module().
-make_module_name(Bucket) when is_binary(Bucket) ->
-    Nonce = binary_to_list(base64:encode(crypto:hash(md4, Bucket))),
+make_module_name(Table) when is_binary(Table) ->
+    Nonce = binary_to_list(base64:encode(crypto:hash(md4, Table))),
     Nonce2 = remove_hooky_chars(Nonce),
     ModName = "riak_ql_ddl_helper_mod_" ++ Nonce2,
     list_to_atom(ModName).
 
 -spec get_partition_key(#ddl_v1{}, tuple()) -> term().
-get_partition_key(#ddl_v1{bucket = B, partition_key = PK}, Obj)
+get_partition_key(#ddl_v1{table = T, partition_key = PK}, Obj)
   when is_tuple(Obj) ->
-    Mod = make_module_name(B),
+    Mod = make_module_name(T),
     #key_v1{ast = Params} = PK,
     _Key = build(Params, Obj, Mod, []).
 
 -spec get_local_key(#ddl_v1{}, tuple()) -> term().
-get_local_key(#ddl_v1{bucket = B, local_key = LK}, Obj)
+get_local_key(#ddl_v1{table = T, local_key = LK}, Obj)
   when is_tuple(Obj) ->
-    Mod = make_module_name(B),
+    Mod = make_module_name(T),
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
 
@@ -165,9 +165,9 @@ syntax_error_to_msg2({unexpected_select_field, Field}) ->
 -spec is_query_valid(module(), #ddl_v1{}, #riak_sql_v1{}) ->
         true | {false, [query_syntax_error()]}.
 is_query_valid(_,
-	           #ddl_v1{ bucket = B1 },
-               #riak_sql_v1{ 'FROM' = B2 }) when B1 =/= B2 ->
-    {false, [{bucket_type_mismatch, {B1, B2}}]};
+	           #ddl_v1{ table = T1 },
+               #riak_sql_v1{ 'FROM' = T2 }) when T1 =/= T2 ->
+    {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _,
                #riak_sql_v1{'SELECT' = Selection,
                'WHERE'  = Where}) ->
@@ -270,15 +270,15 @@ remove_hooky_chars(Nonce) ->
 
 mock_partition_fn(_A, _B, _C) -> mock_result.
 
-make_ddl(Bucket, Fields) when is_binary(Bucket) ->
-    make_ddl(Bucket, Fields, #key_v1{}, #key_v1{}).
+make_ddl(Table, Fields) when is_binary(Table) ->
+    make_ddl(Table, Fields, #key_v1{}, #key_v1{}).
 
-make_ddl(Bucket, Fields, PK) when is_binary(Bucket) ->
-    make_ddl(Bucket, Fields, PK, #key_v1{}).
+make_ddl(Table, Fields, PK) when is_binary(Table) ->
+    make_ddl(Table, Fields, PK, #key_v1{}).
 
-make_ddl(Bucket, Fields, #key_v1{} = PK, #key_v1{} = LK)
-  when is_binary(Bucket) ->
-    #ddl_v1{bucket        = Bucket,
+make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
+  when is_binary(Table) ->
+    #ddl_v1{table         = Table,
 	    fields        = Fields,
 	    partition_key = PK,
 	    local_key     = LK}.
@@ -841,7 +841,7 @@ timeseries_filter_test() ->
 			#param_v1{name = [<<"time">>]},
 			#param_v1{name = [<<"user">>]}]
 		},
-    DDL = #ddl_v1{bucket        = <<"timeseries_filter_test">>,
+    DDL = #ddl_v1{table         = <<"timeseries_filter_test">>,
 		  fields        = Fields,
 		  partition_key = PK,
 		  local_key     = LK

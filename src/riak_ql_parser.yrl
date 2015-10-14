@@ -472,12 +472,12 @@ extract_key_field_list({list, [Field | Rest]}, Extracted) ->
     [#param_v1{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
-make_table_definition({binary, BucketName}, Contents) ->
+make_table_definition({binary, Table}, Contents) ->
     PartitionKey = find_partition_key(Contents),
     LocalKey = find_local_key(Contents),
     Fields = find_fields(Contents),
     #ddl_v1{
-       bucket = BucketName,
+       table = Table,
        partition_key = PartitionKey,
        local_key = LocalKey,
        fields = Fields}.

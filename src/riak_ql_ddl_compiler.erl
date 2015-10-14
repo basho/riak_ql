@@ -217,9 +217,9 @@ compile(DDL) ->
 -spec compile(#ddl_v1{}, binary(), boolean()) ->
                      {module, ast()} | {'error', tuple()}.
 compile(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
-    #ddl_v1{bucket        = Bucket,
+    #ddl_v1{table         = Table,
             fields        = Fields} = DDL,
-    {ModName, Attrs, LineNo} = make_attrs(Bucket, ?LINENOSTART),
+    {ModName, Attrs, LineNo} = make_attrs(Table, ?LINENOSTART),
     {VFns,  LineNo2} = build_validn_fns([Fields],   LineNo,  ?POSNOSTART, [], []),
     {ACFns, LineNo3} = build_add_cols_fns(Fields, LineNo2),
     {ExtractFn, LineNo4} = build_extract_fn([Fields],  LineNo3, []),
@@ -259,12 +259,12 @@ write_src(AST, DDL, SrcFileName) ->
     Syntax = erl_syntax:form_list(AST2),
     Header = io_lib:format("%%% Generated Module, DO NOT EDIT~n~n" ++
                                "Validates the DDL~n~n" ++
-                               "Bucket        : ~s~n" ++
+                               "Table         : ~s~n" ++
                                "Fields        : ~p~n" ++
                                "Partition_Key : ~p~n" ++
 			       "Local_Key     : ~p~n~n",
                            [
-                            binary_to_list(DDL#ddl_v1.bucket),
+                            binary_to_list(DDL#ddl_v1.table),
                             DDL#ddl_v1.fields,
                             DDL#ddl_v1.partition_key,
 			    DDL#ddl_v1.local_key
@@ -327,11 +327,11 @@ make_extract_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
 %% this is gnarly because the field order is compile-time dependent
 -spec build_get_ddl_fn(#ddl_v1{}, pos_integer(), ast()) ->
 			      {expr(), pos_integer()}.
-build_get_ddl_fn(#ddl_v1{bucket        = B,
+build_get_ddl_fn(#ddl_v1{table         = T,
 			 fields        = F,
 			 partition_key = PK,
 			 local_key     = LK}, LineNo, []) ->
-    PosB  = #ddl_v1.bucket,
+    PosT  = #ddl_v1.table,
     PosF  = #ddl_v1.fields,
     PosPK = #ddl_v1.partition_key,
     PosLK = #ddl_v1.local_key,
@@ -340,7 +340,7 @@ build_get_ddl_fn(#ddl_v1{bucket        = B,
     %% The record name is deliberatly put last in the list to check it is
     %% actually working ;-)
     {_Poses, List} = lists:unzip(lists:sort([
-					     {PosB,  make_binary(B, LineNo)},
+					     {PosT,  make_binary(T, LineNo)},
 					     {PosF,  expand_fields(F, LineNo)},
 					     {PosPK, expand_key(PK, LineNo)},
 					     {PosLK, expand_key(LK, LineNo)},
@@ -769,22 +769,22 @@ make_export_attr(LineNo) ->
 %% Helper fns
 %%
 
-make_ddl(#ddl_v1{bucket = Bucket,
+make_ddl(#ddl_v1{table = Table,
                  fields = Fields,
                  partition_key = PK,
                  local_key = LK
                 }) ->
-    make_ddl(Bucket, Fields, PK, LK).
+    make_ddl(Table, Fields, PK, LK).
 
-make_ddl(Bucket, Fields) when is_binary(Bucket) ->
-    make_ddl(Bucket, Fields, #key_v1{}, #key_v1{}).
+make_ddl(Table, Fields) when is_binary(Table) ->
+    make_ddl(Table, Fields, #key_v1{}, #key_v1{}).
 
-make_ddl(Bucket, Fields, PK) when is_binary(Bucket) ->
-    make_ddl(Bucket, Fields, PK, #key_v1{}).
+make_ddl(Table, Fields, PK) when is_binary(Table) ->
+    make_ddl(Table, Fields, PK, #key_v1{}).
 
-make_ddl(Bucket, Fields, #key_v1{} = PK, #key_v1{} = LK)
-  when is_binary(Bucket) ->
-    #ddl_v1{bucket        = Bucket,
+make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
+  when is_binary(Table) ->
+    #ddl_v1{table         = Table,
             fields        = Fields,
             partition_key = PK,
             local_key     = LK}.
@@ -1726,7 +1726,7 @@ complex_ddl_test() ->
 
 make_complex_ddl_ddl() ->
     #ddl_v1{
-       bucket = <<"temperatures">>,
+       table = <<"temperatures">>,
        fields = [
 		 #riak_field_v1{
 		    name     = <<"time">>,
@@ -1901,7 +1901,7 @@ make_timeseries_ddl() ->
 			#param_v1{name = [<<"time">>]},
 			#param_v1{name = [<<"user">>]}]
 		},
-    _DDL = #ddl_v1{bucket        = <<"timeseries_filter_test">>,
+    _DDL = #ddl_v1{table         = <<"timeseries_filter_test">>,
 		   fields        = Fields,
 		   partition_key = PK,
 		   local_key     = LK
