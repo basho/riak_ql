@@ -45,12 +45,7 @@
 %% * a list of all the quantum boundaries
 %%   - the length of the list is the number of slices - 1
 -spec quanta(time_ms(), time_ms(), non_neg_integer(), time_unit()) -> {integer(), [integer()]} | {error, any()}.
-quanta(StartTime, EndTime, QuantaSize, Unit) when Unit == y;
-						  Unit == mo;
-						  Unit == d;
-						  Unit == h;
-						  Unit == m;
-						  Unit == s ->
+quanta(StartTime, EndTime, QuantaSize, Unit) ->
     Start = quantum(StartTime, QuantaSize, Unit),
     case Start of
 	{error, _} = E -> E;
