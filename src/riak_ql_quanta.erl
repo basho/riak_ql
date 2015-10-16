@@ -45,7 +45,7 @@
 %% * a list of all the quantum boundaries
 %%   - the length of the list is the number of slices - 1
 -spec quanta(time_ms(), time_ms(), non_neg_integer(), time_unit()) -> {integer(), [integer()]} | {error, any()}.
-quanta(StartTime, EndTime, QuantaSize, Unit) when Unit == d; Unit == h; Unit == m; Unit == s ->
+quanta(StartTime, EndTime, QuantaSize, Unit) ->
     Start = quantum(StartTime, QuantaSize, Unit),
     case Start of
 	{error, _} = E -> E;
@@ -67,7 +67,10 @@ gen_quanta(N, Start, Slice, Acc) when is_integer(N) andalso N > 1 ->
 %% generate the starting timestamp of the range (quantum) in milliseconds since the epoch where the
 %% time belongs. Note that Time - Quanta is less than or equal to QuantaSize * Unit (in milliseconds).
 -spec quantum(time_ms(), non_neg_integer(), time_unit()) -> time_ms() | err().
-quantum(Time, QuantaSize, Unit) when Unit == d; Unit == h; Unit == m; Unit == s ->
+quantum(Time, QuantaSize, Unit) when Unit == d;
+				     Unit == h;
+				     Unit == m;
+				     Unit == s ->
     Ms = unit_to_ms(Unit),
     Diff = Time rem (QuantaSize*Ms),
     Time - Diff;
@@ -252,7 +255,7 @@ prop_quantum_year_boundary_test() ->
 %% than one quantum ahead of the quantum start.
 prop_quantum_bounded() ->
     ?FORALL(
-        {Date, Time, {Quanta, Unit}}, 
+        {Date, Time, {Quanta, Unit}},
         {date_gen(), time_gen(), quantum_gen()},
         begin
             DateTime = {Date, Time},
