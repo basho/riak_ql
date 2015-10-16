@@ -110,7 +110,6 @@ Bucket -> Word   : '$1'.
 Bucket -> regex  : '$1'.
 Bucket -> quoted : '$1'.
 
-Word -> Word chars : concatenate('$1', '$2').
 Word -> chars      : process('$1').
 
 Funcall -> Word openb     closeb : make_funcall('$1').
@@ -257,9 +256,6 @@ convert(#outputs{type = create} = O) ->
 
 process({chars, A}) ->
     {binary, A}.
-
-concatenate({binary, A}, {chars, B}) ->
-    {binary, <<A/binary, B/binary>>}.
 
 make_atom({binary, SomeWord}) ->
     {atom, binary_to_atom(SomeWord, utf8)}.

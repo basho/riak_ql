@@ -716,6 +716,17 @@ failure_sql_test() ->
 	  end,
     ?assertEqual(Expected, Got).
 
+% RTS-388
+concatenated_unquoted_strings_test() ->
+    String = "select * from response_times where cats = be a st",
+    Expected = error,
+    Got = case parse(riak_ql_lexer:get_tokens(String)) of
+              {error, _Err} ->
+                  error;
+              {ok, Other} -> {should_not_compile, Other}
+          end,
+    ?assertEqual(Expected, Got).
+
 %% select count(type) from events group by time(10m);
 
 %% select count(type) from events group by time(10m), type;
