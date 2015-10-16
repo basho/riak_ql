@@ -14,3 +14,4 @@ src/riak_ql_parser.erl
 _build
 rebar.lock
 .local_dialyzer_plt
+riak_ql
