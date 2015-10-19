@@ -5,7 +5,6 @@
 	Exp2 = fix(Expected),
 	Toks = riak_ql_lexer:get_tokens(String),
 	Got = parse(Toks),
-	gg:format("String: ~p~n- Got:~n- ~p~nExpected: ~p~n", [String, Got, Expected]),
 	?assertEqual({ok, Exp2}, Got)).
 
 -define(where_test(Uncanonical, Expected),
