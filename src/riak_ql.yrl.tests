@@ -5,6 +5,7 @@
 	Exp2 = fix(Expected),
 	Toks = riak_ql_lexer:get_tokens(String),
 	Got = parse(Toks),
+	gg:format("String: ~p~n- Got:~n- ~p~nExpected: ~p~n", [String, Got, Expected]),
 	?assertEqual({ok, Exp2}, Got)).
 
 -define(where_test(Uncanonical, Expected),
@@ -39,7 +40,7 @@ fix(Other) ->
 rts_433_regression_test() ->
     ?sql_compilation_assert("select * from HardDrivesV14 where date >= 123 " ++
 				"and date <= 567 " ++
-				"and family = 'Hitachi HDS5Cq4040ALE630' " ++
+				"and family = 'Hitachi HDS5C4040ALE630' " ++
 				"and series = 'true'",
 			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
 					 'FROM'   = <<"HardDrivesV14">>,
