@@ -510,7 +510,7 @@ create_simple_sql_test() ->
 				"temperature_k float, " ++
 				"primary key (time))",
 			    #ddl_v1{
-			       bucket = <<"temperatures">>,
+			       table = <<"temperatures">>,
 			       fields = [
 					 #riak_field_v1{
 					    name = <<"time">>,
@@ -541,7 +541,7 @@ create_simple_sql_int_test() ->
 				"temperature_k int, " ++
 				"primary key (time))",
 			    #ddl_v1{
-			       bucket = <<"temperatures">>,
+			       table = <<"temperatures">>,
 			       fields = [
 					 #riak_field_v1{
 					    name = <<"time">>,
@@ -573,7 +573,7 @@ create_composite_key_sql_test() ->
 				"mytype varchar not null, " ++
 				"primary key ((time, user_id), mytype))",
 			    #ddl_v1{
-			       bucket = <<"temperatures">>,
+			       table = <<"temperatures">>,
 			       fields = [
 					 #riak_field_v1{
 					    name = <<"time">>,
@@ -613,7 +613,7 @@ create_no_key_sql_test() ->
 				"(time timestamp not null, " ++
 				"temperature_k float)",
 			    #ddl_v1{
-			       bucket = <<"temperatures">>,
+			       table = <<"temperatures">>,
 			       fields = [
 					 #riak_field_v1{
 					    name = <<"time">>,
@@ -644,7 +644,7 @@ create_timeseries_sql_test() ->
 	      _WC     -> wont_compile
 	  end,
     Expected = #ddl_v1{
-		  bucket = <<"GeoCheckin">>,
+		  table = <<"GeoCheckin">>,
 		  fields = [
 			    #riak_field_v1{
 			       name = <<"geohash">>,

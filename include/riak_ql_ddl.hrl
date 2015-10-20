@@ -53,7 +53,7 @@
 	 }).
 
 -record(ddl_v1, {
-          bucket             :: binary(),
+          table              :: binary(),
           fields        = [] :: [#riak_field_v1{}],
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
