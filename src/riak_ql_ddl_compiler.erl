@@ -52,6 +52,7 @@
 
 -export([
          compile/1,
+         compile/3,
          make_helper_mod/1,
          make_helper_mod/2
         ]).
