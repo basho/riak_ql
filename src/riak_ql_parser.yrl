@@ -55,6 +55,8 @@ datetime
 regex
 quoted
 integer
+any
+boolean
 int_type
 float
 float_type
@@ -178,6 +180,8 @@ DataType -> float_type : canonicalize_data_type('$1').
 DataType -> int_type : canonicalize_data_type('$1').
 DataType -> timestamp : '$1'.
 DataType -> varchar : '$1'.
+DataType -> boolean : '$1'.
+DataType -> any : '$1'.
 
 KeyDefinition ->
     primary_key       openb KeyFieldList closeb                           : make_local_key('$3').
@@ -381,7 +385,7 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
 					 Op1 =:= '<>' orelse
 					 Op1 =:= '=~' orelse
 					 Op1 =:= '!~' orelse
-					 Op1 =:= '!=') 
+					 Op1 =:= '!=')
 					andalso
 					(Op2 =:= and_ orelse
 					 Op2 =:= or_  orelse
@@ -395,7 +399,7 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
 					 Op2 =:= '!~' orelse
 					 Op2 =:= '!=') ->
     (A < B).
-				     
+
 remove_conditionals({conditional, A}) ->
     A;
 remove_conditionals({A, B, C}) ->
@@ -445,14 +449,14 @@ make_local_key(FieldList) ->
      {local_key,     Key}
     ].
 
-make_partition_and_local_keys(PFieldList, LFieldList) ->    
+make_partition_and_local_keys(PFieldList, LFieldList) ->
     PFields = lists:reverse(extract_key_field_list(PFieldList, [])),
     LFields = lists:reverse(extract_key_field_list(LFieldList, [])),
     [
      {partition_key, #key_v1{ast = PFields}},
      {local_key,     #key_v1{ast = LFields}}
     ].
-    
+
 make_table_element_list(A, {table_element_list, B}) ->
     {table_element_list, [A] ++ lists:flatten(B)};
 make_table_element_list(A, B) ->

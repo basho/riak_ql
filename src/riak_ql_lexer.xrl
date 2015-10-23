@@ -8,6 +8,8 @@ Definitions.
 AND = (A|a)(N|n)(D|d)
 AS = (A|a)(S|s)
 ATOM = (A|a)(T|t)(O|o)(M|m)
+ANY  = (A|a)(N|n)(Y|y)
+BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
 CREATE_TABLE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)\s(T|t)(A|a)(B|b)(L|l)(E|e)
 DELETE = (D|d)(E|e)(L|l)(E|e)(T|t)(E|e)
 DROP = (D|d)(R|r)(O|o)(P|p)
@@ -16,7 +18,7 @@ FROM = (F|f)(R|r)(O|o)(M|m)
 GLOBAL = (G|g)(L|l)(O|o)(B|b)(A|a)(L|l)
 GROUPBY = (G|g)(R|r)(O|o)(U|u)(P|p)(B|b)(Y|y)
 INNER = (I|i)(N|n)(N|n)(E|e)(R|r)
-INT = (I|i)(N|n)(T|t)
+INTEGER = (I|i)(N|n)(T|t)(E|e)(G|g)(E|e)(R|r)
 JOIN = (J|j)(O|o)(I|i)(N|n)
 LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
 LOCAL = (L|l)(O|o)(C|c)(A|a)(L|l)
@@ -61,7 +63,7 @@ NE          = (<>)
 NOMATCH     = (!=)
 NOTAPPROX   = (!\~)
 OPEN        = \(
-		CLOSE       =\)
+CLOSE       =\)
 
 PLUS  = (\+)
 MINUS = (\-)
@@ -74,7 +76,9 @@ Rules.
 
 {AND} : {token, {and_, list_to_binary(TokenChars)}}.
 {AS} : {token, {as, list_to_binary(TokenChars)}}.
+{ANY} : {token, {any, list_to_binary(TokenChars)}}.
 {ATOM} : {token, {atom, list_to_binary(TokenChars)}}.
+{BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
 {CREATE_TABLE} : {token, {create_table, list_to_binary(TokenChars)}}.
 {DELETE} : {token, {delete, list_to_binary(TokenChars)}}.
 {DROP} : {token, {drop, list_to_binary(TokenChars)}}.
@@ -83,7 +87,7 @@ Rules.
 {GLOBAL} : {token, {global, list_to_binary(TokenChars)}}.
 {GROUPBY} : {token, {groupby, list_to_binary(TokenChars)}}.
 {INNER} : {token, {inner, list_to_binary(TokenChars)}}.
-{INT} : {token, {int_type, list_to_binary(TokenChars)}}.
+{INTEGER} : {token, {int_type, list_to_binary(TokenChars)}}.
 {JOIN} : {token, {join, list_to_binary(TokenChars)}}.
 {LIMIT} : {token, {limit, list_to_binary(TokenChars)}}.
 {LOCAL} : {token, {local, list_to_binary(TokenChars)}}.

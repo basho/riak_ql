@@ -538,7 +538,7 @@ create_simple_sql_test() ->
 create_simple_sql_int_test() ->
     ?sql_compilation_assert("create table temperatures " ++
 				"(time timestamp not null, " ++
-				"temperature_k int, " ++
+				"temperature_k integer, " ++
 				"primary key (time))",
 			    #ddl_v1{
 			       table = <<"temperatures">>,
@@ -689,6 +689,80 @@ create_timeseries_sql_test() ->
 				       ]}
 		 },
     ?assertEqual(Expected, Got).
+
+
+create_all_types_sql_test() ->
+    String = "CREATE TABLE GeoCheckin "
+	++ "(geohash varchar not null, "
+	++ "user varchar not null, "
+	++ "time timestamp not null, "
+	++ "isweather boolean not null, "
+	++ "temperature float, "
+	++ "options any, "
+	++ "myinteger integer, "
+	++ "PRIMARY KEY ((geohash, quantum(time, 15, 'm')), time, user))",
+    Toks = riak_ql_lexer:get_tokens(String),
+    Got = case parse(Toks) of
+	      {ok, G} -> G;
+	      _WC     -> wont_compile
+	  end,
+    Expected = #ddl_v1{
+		  table = <<"GeoCheckin">>,
+		  fields = [
+			    #riak_field_v1{
+			       name = <<"geohash">>,
+			       position = 1,
+			       type = binary,
+			       optional = false},
+			    #riak_field_v1{
+			       name = <<"user">>,
+			       position = 2,
+			       type = binary,
+			       optional = false},
+			    #riak_field_v1{
+			       name = <<"time">>,
+			       position = 3,
+			       type = timestamp,
+			       optional = false},
+			    #riak_field_v1{
+			       name = <<"isweather">>,
+			       position = 4,
+			       type = boolean,
+			       optional = false},
+			    #riak_field_v1{
+			       name = <<"temperature">>,
+			       position = 5,
+			       type = float,
+			       optional = true},
+			    #riak_field_v1{
+			       name = <<"options">>,
+			       position = 6,
+			       type = any,
+			       optional = true},
+			    #riak_field_v1{
+			       name = <<"myinteger">>,
+			       position = 7,
+			       type = integer,
+			       optional = true}
+			   ],
+		  partition_key = #key_v1{
+				     ast = [
+					    #param_v1{name = [<<"geohash">>]},
+					    #hash_fn_v1{mod  = riak_ql_quanta,
+							fn   = quantum,
+							args = [
+								#param_v1{name = [<<"time">>]}, 15, m
+							       ],
+							type = timestamp}
+					   ]},
+		  local_key = #key_v1{
+				 ast = [
+					#param_v1{name = [<<"time">>]},
+					#param_v1{name = [<<"user">>]}
+				       ]}
+		 },
+    ?assertEqual(Expected, Got).
+
 
 select_sql_case_insensitive_1_test() ->
     ?sql_compilation_assert_match("SELECT * from argle",

@@ -107,7 +107,7 @@
 
 ?passing_short_test(integer_type_test,
                     "create table temperatures "
-                    "(counter int not null, "
+                    "(counter integer not null, "
                     "primary key (counter))",
               {12345}).
 
@@ -144,7 +144,7 @@
 
 ?ddl_roundtrip_assert(integer_type_ddl_test,
                     "create table temperatures "
-                    "(counter int not null, "
+                    "(counter integer not null, "
                     "primary key (counter))").
 
 ?ddl_roundtrip_assert(float_ddl_test,
