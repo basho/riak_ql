@@ -171,6 +171,17 @@ brackets_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+keywords_in_words_test_() ->
+    Got = riak_ql_lexer:get_tokens("myfloat myinteger myboolean mycreate myany"),
+    Expected = [
+                {chars, <<"myfloat">>},
+                {chars, <<"myinteger">>},
+                {chars, <<"myboolean">>},
+                {chars, <<"mycreate">>},
+                {chars, <<"myany">>}
+               ],
+    ?_assertEqual(Expected, Got).
+
 datetime_1a_test_() ->
     Got = riak_ql_lexer:get_tokens("'23 April 1963 8:00 AM'"),
     Expected = [

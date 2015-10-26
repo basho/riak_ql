@@ -182,7 +182,7 @@ is_query_valid_result({false,L},  true)        -> {false, L};
 is_query_valid_result({false,L1}, {false, L2}) -> {false, L1++L2}.
 
 check_filters_valid(Mod, Where) ->
-    Errors = fold_where_tree(Where, [], 
+    Errors = fold_where_tree(Where, [],
         fun(Clause, Acc) ->
             is_filters_field_valid(Mod, Clause, Acc)
         end),
@@ -192,11 +192,11 @@ check_filters_valid(Mod, Where) ->
     end.
 
 %%
-is_filters_field_valid(Mod, {Op, Field, {RHS_type,_}}, Acc1) ->
+is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
     case Mod:is_field_valid([Field]) of
         true  ->
             ExpectedType = Mod:get_field_type([Field]),
-            case is_compatible_type(ExpectedType, RHS_type) of
+            case is_compatible_type(ExpectedType, RHS_type, normalise(RHS_Val)) of
                 true  -> Acc2 = Acc1;
                 false -> Acc2 = [{incompatible_type, Field, ExpectedType, RHS_type} | Acc1]
             end,
@@ -208,18 +208,24 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type,_}}, Acc1) ->
             [{unexpected_where_field, Field} | Acc1]
     end.
 
+normalise(Bin) when is_binary(Bin) ->
+    string:to_lower(binary_to_list(Bin));
+normalise(X) -> X.
+
 %% Check if the column type and the value being being compared
 %% are comparable.
--spec is_compatible_type(ColType::atom(), WhereType::atom()) ->
+-spec is_compatible_type(ColType::atom(), WhereType::atom(), any()) ->
         boolean().
-is_compatible_type(timestamp, integer) -> true;
-is_compatible_type(integer, timestamp) -> true;
-is_compatible_type(T, T) -> true;
-is_compatible_type(_, _) -> false.
+is_compatible_type(timestamp, integer, _) -> true;
+is_compatible_type(integer, timestamp, _) -> true;
+is_compatible_type(boolean, binary, "true")  -> true;
+is_compatible_type(boolean, binary, "false") -> true;
+is_compatible_type(T, T, _) -> true;
+is_compatible_type(_, _, _) -> false.
 
 %% Check that the operation being performed in a where clause, for example
 %% we cannot check if one binary is greated than another one in SQL.
--spec is_compatible_operator(OP::relational_op(), 
+-spec is_compatible_operator(OP::relational_op(),
 	                         ExpectedType::simple_field_type(),
 	                         RHS_type::atom()) -> boolean().
 is_compatible_operator('=',  binary, binary) -> true;
@@ -906,7 +912,7 @@ is_query_valid_where_1_test() ->
     ?assertEqual(
         {false, [
             {unexpected_where_field, <<"locname">>}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 10 AND time < 11 AND locname = 1")
     ).
@@ -915,7 +921,7 @@ is_query_valid_where_2_test() ->
     ?assertEqual(
         {false, [
             {incompatible_type, <<"myseries">>, binary, integer}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
             "AND myfamily = 'family1' "
@@ -927,7 +933,7 @@ is_query_valid_where_3_test() ->
         {false, [
             {incompatible_type, <<"myfamily">>, binary, integer},
             {incompatible_type, <<"myseries">>, binary, integer}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
             "AND myfamily = 12 "
@@ -937,7 +943,7 @@ is_query_valid_where_3_test() ->
 is_query_valid_where_4_test() ->
     ?assertEqual(
         true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
             "AND myfamily = 'bob' "
@@ -947,7 +953,7 @@ is_query_valid_where_4_test() ->
 is_query_valid_where_5_test() ->
     ?assertEqual(
         true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
             "AND myfamily = 'bob' "
@@ -957,18 +963,18 @@ is_query_valid_where_5_test() ->
 is_query_valid_where_6_test() ->
     ?assertEqual(
         true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
             "AND myfamily = 'bob' "
-            "AND myfamily = 'bert' ") 
+            "AND myfamily = 'bert' ")
             %% FIXME contradictory where clause, this will never match
     ).
 
 is_query_valid_selections_1_test() ->
     ?assertEqual(
         true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT myseries FROM mytab "
             "WHERE time > 1 AND time < 10 ")
     ).
@@ -976,7 +982,7 @@ is_query_valid_selections_1_test() ->
 is_query_valid_selections_2_test() ->
     ?assertEqual(
         {false, [{unexpected_select_field,<<"doge">>}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT doge FROM mytab "
             "WHERE time > 1 AND time < 10 ")
     ).
@@ -986,7 +992,7 @@ is_query_valid_selections_3_test() ->
         {false, [
             {unexpected_select_field,<<"doge">>},
             {unexpected_select_field,<<"nyan">>}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT doge, nyan FROM mytab "
             "WHERE time > 1 AND time < 10 ")
     ).
@@ -997,7 +1003,7 @@ is_query_valid_select_and_where_1_test() ->
             {unexpected_select_field,<<"doge">>},
             {unexpected_select_field,<<"nyan">>},
             {unexpected_where_field,<<"monfamily">>}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT doge, nyan FROM mytab "
             "WHERE time > 1 AND time < 10 "
             "AND monfamily = 12 ")
@@ -1007,7 +1013,7 @@ is_query_valid_compatible_op_1_test() ->
     ?assertEqual(
         {false, [
         	{incompatible_operator, <<"myfamily">>, binary, '>'}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
             "AND myfamily > 'bob' ")
@@ -1017,7 +1023,7 @@ is_query_valid_compatible_op_2_test() ->
     ?assertEqual(
         {false, [
             {incompatible_operator, <<"myfamily">>, binary, '>='}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF, 
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
             "AND myfamily >= 'bob' ")
@@ -1031,7 +1037,7 @@ fold_where_tree_test() ->
         "AND myseries = 10 "),
     ?assertEqual(
         [<<"myseries">>, <<"myfamily">>, <<"time">>, <<"time">>],
-        lists:reverse(fold_where_tree(Where, [], 
+        lists:reverse(fold_where_tree(Where, [],
                 fun({_, Field, _}, Acc) -> [Field | Acc] end))
     ).
 
