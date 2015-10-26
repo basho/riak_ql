@@ -190,7 +190,6 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word1 =:= or_ orelse
 						 Word1 =:= primary_key orelse
 						 Word1 =:= preserve orelse
-						 Word1 =:= quanta orelse
 						 Word1 =:= rows orelse
 						 Word1 =:= select orelse
 						 Word1 =:= system_versioning orelse
@@ -223,7 +222,6 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word2 =:= or_ orelse
 						 Word2 =:= primary_key orelse
 						 Word2 =:= preserve orelse
-						 Word2 =:= quanta orelse
 						 Word2 =:= rows orelse
 						 Word2 =:= select orelse
 						 Word2 =:= system_versioning orelse
