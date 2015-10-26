@@ -694,12 +694,18 @@ create_timeseries_sql_test() ->
 create_all_types_sql_test() ->
     String = "CREATE TABLE GeoCheckin "
 	++ "(geohash varchar not null, "
-	++ "user varchar not null, "
+        ++ "user varchar not null, "
 	++ "time timestamp not null, "
 	++ "isweather boolean not null, "
-	++ "temperature float, "
-	++ "options any, "
-	++ "myinteger integer, "
+	++ "temperature float not null, "
+	++ "options any not null, "
+	++ "myinteger integer not null, "
+        ++ "user2 varchar, "
+	++ "time2 timestamp, "
+	++ "isweather2 boolean, "
+	++ "temperature2 float, "
+	++ "options2 any, "
+	++ "myinteger2 integer, "
 	++ "PRIMARY KEY ((geohash, quantum(time, 15, 'm')), time, user))",
     Toks = riak_ql_lexer:get_tokens(String),
     Got = case parse(Toks) of
@@ -733,15 +739,45 @@ create_all_types_sql_test() ->
 			       name = <<"temperature">>,
 			       position = 5,
 			       type = float,
-			       optional = true},
+			       optional = false},
 			    #riak_field_v1{
 			       name = <<"options">>,
 			       position = 6,
 			       type = any,
-			       optional = true},
+			       optional = false},
 			    #riak_field_v1{
 			       name = <<"myinteger">>,
 			       position = 7,
+			       type = integer,
+			       optional = false},
+			    #riak_field_v1{
+			       name = <<"user2">>,
+			       position = 8,
+			       type = binary,
+			       optional = true},
+			    #riak_field_v1{
+			       name = <<"time2">>,
+			       position = 9,
+			       type = timestamp,
+			       optional = true},
+			    #riak_field_v1{
+			       name = <<"isweather2">>,
+			       position = 10,
+			       type = boolean,
+			       optional = true},
+			    #riak_field_v1{
+			       name = <<"temperature2">>,
+			       position = 11,
+			       type = float,
+			       optional = true},
+			    #riak_field_v1{
+			       name = <<"options2">>,
+			       position = 12,
+			       type = any,
+			       optional = true},
+			    #riak_field_v1{
+			       name = <<"myinteger2">>,
+			       position = 13,
 			       type = integer,
 			       optional = true}
 			   ],
