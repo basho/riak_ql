@@ -148,17 +148,33 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
                     ?STANDARDTABLE,
                     ?SQL ++ "myboolean < 3.4").
 
+?invalid_query_test(boolean_3a_test,
+                    ?STANDARDTABLE,
+                    ?SQL ++ "myboolean < true").
+
 ?invalid_query_test(boolean_4_test,
                     ?STANDARDTABLE,
                     ?SQL ++ "myboolean <= 3.4").
+
+?invalid_query_test(boolean_4a_test,
+                    ?STANDARDTABLE,
+                    ?SQL ++ "myboolean <= false").
 
 ?invalid_query_test(boolean_5_test,
                     ?STANDARDTABLE,
                     ?SQL ++ "myboolean > 3.4").
 
+?invalid_query_test(boolean_5a_test,
+                    ?STANDARDTABLE,
+                    ?SQL ++ "myboolean > true").
+
 ?invalid_query_test(boolean_6_test,
                     ?STANDARDTABLE,
                     ?SQL ++ "myboolean >= 3.4").
+
+?invalid_query_test(boolean_6a_test,
+                    ?STANDARDTABLE,
+                    ?SQL ++ "myboolean >= fALse").
 
 %% Floats
 

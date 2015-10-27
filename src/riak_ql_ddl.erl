@@ -228,10 +228,13 @@ is_compatible_type(_, _, _) -> false.
 -spec is_compatible_operator(OP::relational_op(),
 	                         ExpectedType::simple_field_type(),
 	                         RHS_type::atom()) -> boolean().
-is_compatible_operator('=',  binary, binary) -> true;
-is_compatible_operator('!=', binary, binary) -> true;
-is_compatible_operator(_,    binary, binary) -> false;
-is_compatible_operator(_,_,_)              -> true.
+is_compatible_operator('=',  binary,  binary) -> true;
+is_compatible_operator('!=', binary,  binary) -> true;
+is_compatible_operator(_,    binary,  binary) -> false;
+is_compatible_operator('=',  boolean, binary) -> true;
+is_compatible_operator('!=', boolean, binary) -> true;
+is_compatible_operator(_,    boolean, binary) -> false;
+is_compatible_operator(_,_,_)                 -> true.
 
 are_selections_valid(_, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};

@@ -108,10 +108,10 @@
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               ?debugFmt("in ~p~n- DDL is:~n -~p~n", [Name, DDL]),
+               %% ?debugFmt("in ~p~n- DDL is:~n -~p~n", [Name, DDL]),
                {module, Module} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
                Got = Module:get_ddl(),
-               ?debugFmt("in ~p~n- Got is:~n -~p~n", [Name, Got]),
+               %% ?debugFmt("in ~p~n- Got is:~n -~p~n", [Name, Got]),
                ?assertEqual(DDL, Got)).
 
 %%
