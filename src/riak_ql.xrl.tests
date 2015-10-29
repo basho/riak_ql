@@ -139,14 +139,20 @@ words_containing_digits_test_() ->
     ?_assertEqual(Expected, Got).
 
 nums_test_() ->
-    Got = riak_ql_lexer:get_tokens("1 -2 2.0 -2.0 3.3e+3 -3.3e-3"),
+    Got = riak_ql_lexer:get_tokens("1 -2 2.0 -2.0 3.3e+3 -3.3e-3 44e4 44e-4 44e+4 44e-0 44e+0 44e0"),
     Expected = [
                 {integer, 1},
                 {integer, -2},
                 {float, 2.0},
                 {float, -2.0},
-                {float, 3300.0},
-                {float, -0.0033}
+                {float, 3.3e3},
+                {float, -0.0033},
+                {float, 4.4e5},
+                {float, 0.0044},
+                {float, 4.4e5},
+                {float, 44.0},
+                {float, 44.0},
+                {float, 44.0}
                ],
     ?_assertEqual(Expected, Got).
 
