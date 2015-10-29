@@ -67,13 +67,27 @@ keywords_3b_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+keyword_general_test_() ->
+    ?_assertEqual(
+       [
+        {boolean, <<"boolean">>},
+        {boolean, <<"BOOLEAN">>},
+        {boolean, <<"booLEan">>},
+        {any, <<"any">>},
+        {any, <<"ANY">>},
+        {any, <<"Any">>}
+       ],
+       riak_ql_lexer:get_tokens("boolean BOOLEAN booLEan any ANY Any")
+      ).
+
+
 keyword_int_type_test_() ->
     ?_assertEqual(
-        [{int_type, <<"int">>},
-         {int_type, <<"INT">>},
-         {int_type, <<"iNt">>},
-         {int_type, <<"InT">>}],
-        riak_ql_lexer:get_tokens("int INT iNt InT")
+        [{int_type, <<"integer">>},
+         {int_type, <<"INTEGER">>},
+         {int_type, <<"iNteger">>},
+         {int_type, <<"InTeger">>}],
+        riak_ql_lexer:get_tokens("integer INTEGER iNteger InTeger")
     ).
 
 keyword_float_type_test_() ->
@@ -154,6 +168,17 @@ brackets_test_() ->
     Expected = [
                 {openb,  <<"(">>},
                 {closeb, <<")">>}
+               ],
+    ?_assertEqual(Expected, Got).
+
+keywords_in_words_test_() ->
+    Got = riak_ql_lexer:get_tokens("myfloat myinteger myboolean mycreate myany"),
+    Expected = [
+                {chars, <<"myfloat">>},
+                {chars, <<"myinteger">>},
+                {chars, <<"myboolean">>},
+                {chars, <<"mycreate">>},
+                {chars, <<"myany">>}
                ],
     ?_assertEqual(Expected, Got).
 

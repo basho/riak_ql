@@ -1,3 +1,25 @@
+%% -------------------------------------------------------------------
+%%
+%% a basic test suite for the compiler
+%%
+%%
+%% Copyright (c) 2007-2015 Basho Technologies, Inc.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(compiler_basic_1).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -86,10 +108,10 @@
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               ?debugFmt("in ~p~n- DDL is:~n -~p~n", [Name, DDL]),
+               %% ?debugFmt("in ~p~n- DDL is:~n -~p~n", [Name, DDL]),
                {module, Module} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
                Got = Module:get_ddl(),
-               ?debugFmt("in ~p~n- Got is:~n -~p~n", [Name, Got]),
+               %% ?debugFmt("in ~p~n- Got is:~n -~p~n", [Name, Got]),
                ?assertEqual(DDL, Got)).
 
 %%
@@ -107,7 +129,7 @@
 
 ?passing_short_test(integer_type_test,
                     "create table temperatures "
-                    "(counter int not null, "
+                    "(counter integer not null, "
                     "primary key (counter))",
               {12345}).
 
@@ -144,7 +166,7 @@
 
 ?ddl_roundtrip_assert(integer_type_ddl_test,
                     "create table temperatures "
-                    "(counter int not null, "
+                    "(counter integer not null, "
                     "primary key (counter))").
 
 ?ddl_roundtrip_assert(float_ddl_test,

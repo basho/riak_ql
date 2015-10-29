@@ -1,6 +1,7 @@
 and
 as
 atom
+boolean
 create table
 delete
 drop
@@ -9,7 +10,7 @@ from
 global
 groupby
 inner
-int
+integer
 join
 limit
 local
