@@ -44,7 +44,7 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
     Lexed = riak_ql_lexer:get_tokens(CreateTable),
     ?debugFmt("CreateTable is ~p~n- Lexed is ~p~n", [CreateTable, Lexed]),
     {ok, DDL} = riak_ql_parser:parse(Lexed),
-    case riak_ql_ddl_compiler:mk_helper_m2(DDL, "/tmp") of
+    case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
         {module, Module} ->
             Lexed2 = riak_ql_lexer:get_tokens(SQLQuery),
             Qry = riak_ql_parser:parse(Lexed2),
