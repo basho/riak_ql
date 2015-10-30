@@ -81,26 +81,23 @@ keyword_general_test_() ->
       ).
 
 
-keyword_int_type_test_() ->
+keyword_int_test_() ->
     ?_assertEqual(
-        [{int_type, <<"integer">>},
-         {int_type, <<"INTEGER">>},
-         {int_type, <<"iNteger">>},
-         {int_type, <<"InTeger">>}],
-        riak_ql_lexer:get_tokens("integer INTEGER iNteger InTeger")
-    ).
+       [{sint64, <<"sint64">>},
+        {sint64, <<"SINT64">>},
+        {sint64, <<"siNT64">>},
+        {sint64, <<"Sint64">>}],
+       riak_ql_lexer:get_tokens("sint64 SINT64 siNT64 Sint64")
+      ).
 
-keyword_float_type_test_() ->
+keyword_double_test_() ->
     ?_assertEqual(
-        [{float_type, <<"float">>},
-         {float_type, <<"Float">>},
-         {float_type, <<"fLoat">>},
-         {float_type, <<"flOat">>},
-         {float_type, <<"floAt">>},
-         {float_type, <<"floaT">>},
-         {float_type, <<"FLOAT">>}],
-        riak_ql_lexer:get_tokens("float Float fLoat flOat floAt floaT FLOAT")
-    ).
+       [{double, <<"double">>},
+        {double, <<"Double">>},
+        {double, <<"dOuble">>},
+        {double, <<"DOUBLE">>}],
+       riak_ql_lexer:get_tokens("double Double dOuble DOUBLE")
+      ).
 
 keywords_create_test_() ->
     Got = riak_ql_lexer:get_tokens("create table not null primary key"),
@@ -112,7 +109,7 @@ keywords_create_test_() ->
 
 words_containing_keywords_test_() ->
     Got = riak_ql_lexer:get_tokens("error or horror and handy andy or "
-                                   "zfloatcintxcreateyb or jimmy3boy or jimmy4"),
+                                   "zdoublecintxcreateyb or jimmy3boy or jimmy4"),
     Expected = [
                 {chars, <<"error">>},
                 {or_,   <<"or">>},
@@ -121,7 +118,7 @@ words_containing_keywords_test_() ->
                 {chars, <<"handy">>},
                 {chars, <<"andy">>},
                 {or_,   <<"or">>},
-                {chars, <<"zfloatcintxcreateyb">>},
+                {chars, <<"zdoublecintxcreateyb">>},
                 {or_,   <<"or">>},
                 {chars, <<"jimmy3boy">>},
                 {or_,   <<"or">>},
@@ -172,10 +169,10 @@ brackets_test_() ->
     ?_assertEqual(Expected, Got).
 
 keywords_in_words_test_() ->
-    Got = riak_ql_lexer:get_tokens("myfloat myinteger myboolean mycreate myany"),
+    Got = riak_ql_lexer:get_tokens("mydouble mysint64 myboolean mycreate myany"),
     Expected = [
-                {chars, <<"myfloat">>},
-                {chars, <<"myinteger">>},
+                {chars, <<"mydouble">>},
+                {chars, <<"mysint64">>},
                 {chars, <<"myboolean">>},
                 {chars, <<"mycreate">>},
                 {chars, <<"myany">>}
@@ -311,7 +308,7 @@ timeseries_test_() ->
                                    ++ "user varchar not_null, "
                                    ++ "time timestamp not_null, "
                                    ++ "weather varchar not_null, "
-                                   ++ "temperature float not_null, "
+                                   ++ "temperature double not_null, "
                                    ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
     Expected = [
                 {create_table, <<"CREATE TABLE">>},
@@ -334,7 +331,7 @@ timeseries_test_() ->
                 {chars,<<"not_null">>},
                 {comma, <<",">>},
                 {chars,<<"temperature">>},
-                {float_type, <<"float">>},
+                {double, <<"double">>},
                 {chars,<<"not_null">>},
                 {comma, <<",">>},
                 {primary_key, <<"PRIMARY KEY">>},
