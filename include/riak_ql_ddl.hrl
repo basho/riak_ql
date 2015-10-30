@@ -31,7 +31,7 @@
          }).
 
 -type field_type()         :: simple_field_type() | complex_field_type().
--type simple_field_type()  :: binary | integer | float | timestamp | boolean | set.
+-type simple_field_type()  :: varchar | sint64 | double | timestamp | boolean | set.
 -type complex_field_type() :: {map, [#riak_field_v1{}]} | any().
 
 %% Relational operators allowed in a where clause.
