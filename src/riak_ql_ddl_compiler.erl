@@ -810,7 +810,7 @@ make_simplest_valid_ddl() ->
 
 simple_valid_varchar_test() ->
     DDL = make_simple_valid_varchar_ddl(),
-    {module, Module} = mk_helper_m2(DDL, "/tmp"),
+    {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, <<"werewr">>}),
     ?assertEqual(?VALID, Result).
 
