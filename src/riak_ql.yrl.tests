@@ -51,7 +51,7 @@ select_quoted_keyword_sql_test() ->
                                          'FROM'   = <<"select">>}).
 
 select_nested_quotes_sql_test() ->
-    ?sql_compilation_assert("select * from \"some \"quotes\" in me\"",
+    ?sql_compilation_assert("select * from \"some \"\"quotes\"\" in me\"",
                             #riak_sql_v1{'SELECT' = [[<<"*">>]],
                                          'FROM'   = <<"some \"quotes\" in me">>}).
 
@@ -344,6 +344,21 @@ select_where_brackets_2a_test() ->
                                                       }
                                                      }
                                                     ]
+                                        }).
+
+select_quoted_spaces_sql_test() ->
+    ?sql_compilation_assert("select * from \"table with spaces\"",
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"table with spaces">>}).
+
+
+select_quoted_where_sql_test() ->
+    ?sql_compilation_assert("select * from \"table with spaces\" where \"color spaces\" = 'someone had painted it blue'",
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"table with spaces">>,
+                                         'WHERE' = [
+                                                    {'=', <<"color spaces">>, {binary, <<"someone had painted it blue">>}}
+                                                   ]
                                         }).
 
 %%

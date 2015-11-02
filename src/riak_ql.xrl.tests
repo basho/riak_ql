@@ -221,7 +221,15 @@ not_a_date_test_() ->
 double_quote_1_test_() ->
     Got = riak_ql_lexer:get_tokens("\" yardle hoop !@#$%^&*() _ -\""),
     Expected = [
-                {quoted, <<"yardle hoop !@#$%^&*() _ -">>}
+                {quoted, <<" yardle hoop !@#$%^&*() _ -">>}
+               ],
+    ?_assertEqual(Expected, Got).
+
+double_quote_2_test_() ->
+    Got = riak_ql_lexer:get_tokens("\"first quote\" \"second quote\""),
+    Expected = [
+                {quoted, <<"first quote">>},
+                {quoted, <<"second quote">>}
                ],
     ?_assertEqual(Expected, Got).
 
