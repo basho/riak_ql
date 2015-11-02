@@ -45,7 +45,7 @@ DATETIME = ('[0-9a-zA-Z\s:\-\.]*')
 
 REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
-QUOTED = ("(.*(\")*)")
+QUOTED = ("([^\"]|(\"\"))*")
 
 WHITESPACE = ([\000-\s]*)
 
@@ -259,6 +259,6 @@ fix_up_date(Date) ->
     end.
 
 
-strip_quoted(Date) ->
-    Date2 = string:strip(Date, both, $"), %"
-    list_to_binary(string:strip(Date2)).
+strip_quoted(QuotedString) ->
+    StrippedOutsideQuotes = string:strip(QuotedString, both, $"),
+    re:replace(StrippedOutsideQuotes, "\"\"", "\"", [global, {return, binary}]).
