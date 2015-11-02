@@ -2,34 +2,34 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(sql_compilation_assert(String, Expected),
-	Exp2 = fix(Expected),
-	Toks = riak_ql_lexer:get_tokens(String),
-	Got = parse(Toks),
-	?assertEqual({ok, Exp2}, Got)).
+        Exp2 = fix(Expected),
+        Toks = riak_ql_lexer:get_tokens(String),
+        Got = parse(Toks),
+        ?assertEqual({ok, Exp2}, Got)).
 
 -define(where_test(Uncanonical, Expected),
-	Got = canonicalise(Uncanonical),
-	?assertEqual(Expected, Got)).
+        Got = canonicalise(Uncanonical),
+        ?assertEqual(Expected, Got)).
 
 % assert match is useful for only matching part of the output, that
 % is being tested and not the whole state to prevent tests failing
 % on irrelevant changes.
 -define(sql_compilation_assert_match(String, Expected),
-	Toks = riak_ql_lexer:get_tokens(String),
-	Got = parse(Toks),
-	?assertMatch({ok, Expected}, Got)).
+        Toks = riak_ql_lexer:get_tokens(String),
+        Got = parse(Toks),
+        ?assertMatch({ok, Expected}, Got)).
 
 -define(sql_compilation_fail(QL_string),
-	Toks = riak_ql_lexer:get_tokens(QL_string),
-	Got = parse(Toks),
-	?assertMatch({error, _}, Got)).
+        Toks = riak_ql_lexer:get_tokens(QL_string),
+        Got = parse(Toks),
+        ?assertMatch({error, _}, Got)).
 
 fix(#riak_sql_v1{'FROM' = F} = Expected) ->
     case F of
-	{regex, _} -> Expected;
-	{list,  _} -> Expected;
-	_          -> Mod = riak_ql_ddl:make_module_name(F),
-		      Expected#riak_sql_v1{helper_mod = Mod}
+        {regex, _} -> Expected;
+        {list,  _} -> Expected;
+        _          -> Mod = riak_ql_ddl:make_module_name(F),
+                      Expected#riak_sql_v1{helper_mod = Mod}
     end;
 fix(Other) ->
     Other.
@@ -37,226 +37,226 @@ fix(Other) ->
 %% Tests
 select_sql_test() ->
     ?sql_compilation_assert("select * from argle",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"argle">>}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"argle">>}).
 
 select_quoted_sql_test() ->
     ?sql_compilation_assert("select * from \"argle\"",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"argle">>}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"argle">>}).
 
 select_quoted_keyword_sql_test() ->
     ?sql_compilation_assert("select * from \"select\"",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"select">>}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"select">>}).
 
 select_nested_quotes_sql_test() ->
     ?sql_compilation_assert("select * from \"some \"quotes\" in me\"",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"some \"quotes\" in me">>}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"some \"quotes\" in me">>}).
 
 select_regex_sql_test() ->
     ?sql_compilation_assert("select * from /.*/",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = {regex, <<"/.*/">>}}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = {regex, <<"/.*/">>}}).
 
 select_with_limit_sql_test() ->
     ?sql_compilation_assert("select * from /.*/ limit 1",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = {regex, <<"/.*/">>},
-					 'LIMIT'  = 1}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = {regex, <<"/.*/">>},
+                                         'LIMIT'  = 1}).
 
 select_from_lists_sql_test() ->
     ?sql_compilation_assert("select * from events, errors",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = {list, [<<"events">>, <<"errors">>]}
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = {list, [<<"events">>, <<"errors">>]}
+                                        }).
 
 select_fields_from_lists_sql_test() ->
     ?sql_compilation_assert("select hip, hop, dont, stop from events",
-			    #riak_sql_v1{'SELECT' = [[<<"hip">>], [<<"hop">>], [<<"dont">>], [<<"stop">>]],
-					 'FROM'   = <<"events">>
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"hip">>], [<<"hop">>], [<<"dont">>], [<<"stop">>]],
+                                         'FROM'   = <<"events">>
+                                        }).
 
 
 select_where_1_sql_test() ->
     ?sql_compilation_assert("select value from response_times " ++
-				"where time > '2013-08-12 23:32:01' and time < '2013-08-13 12:34:56'",
-			    #riak_sql_v1{'SELECT' = [[<<"value">>]],
-					 'FROM'   = <<"response_times">>,
-					 'WHERE'  = [
-						     {and_,
-						      {'<', <<"time">>, {datetime, {{2013, 8, 13}, {12, 34, 56}}}},
-						      {'>', <<"time">>, {datetime, {{2013, 8, 12}, {23, 32, 1}}}}
-						     }
-						    ]
-					}).
+                                "where time > '2013-08-12 23:32:01' and time < '2013-08-13 12:34:56'",
+                            #riak_sql_v1{'SELECT' = [[<<"value">>]],
+                                         'FROM'   = <<"response_times">>,
+                                         'WHERE'  = [
+                                                     {and_,
+                                                      {'<', <<"time">>, {datetime, {{2013, 8, 13}, {12, 34, 56}}}},
+                                                      {'>', <<"time">>, {datetime, {{2013, 8, 12}, {23, 32, 1}}}}
+                                                     }
+                                                    ]
+                                        }).
 
 select_where_2_sql_test() ->
     ?sql_compilation_assert("select value from response_times where time > now() - 1h limit 1000",
-			    #riak_sql_v1{'SELECT' = [[<<"value">>]],
-					 'FROM'   = <<"response_times">>,
-					 'WHERE'  = [
-						     {'>', <<"time">>, {'-', {<<"now">>, []}, {integer, 3600}}}
-						    ],
-					 'LIMIT'  = 1000
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"value">>]],
+                                         'FROM'   = <<"response_times">>,
+                                         'WHERE'  = [
+                                                     {'>', <<"time">>, {'-', {<<"now">>, []}, {integer, 3600}}}
+                                                    ],
+                                         'LIMIT'  = 1000
+                                        }).
 
 select_where_3_sql_test() ->
     ?sql_compilation_assert("select value from response_times where time > 1388534400",
-			    #riak_sql_v1{'SELECT' = [[<<"value">>]],
-					 'FROM'   = <<"response_times">>,
-					 'WHERE'  = [
-						     {'>', <<"time">>, {integer, 1388534400}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"value">>]],
+                                         'FROM'   = <<"response_times">>,
+                                         'WHERE'  = [
+                                                     {'>', <<"time">>, {integer, 1388534400}}
+                                                    ]
+                                        }).
 
 select_where_4_sql_test() ->
     ?sql_compilation_assert("select value from response_times where time > 1388534400s",
-			    #riak_sql_v1{'SELECT' = [[<<"value">>]],
-					 'FROM'   = <<"response_times">>,
-					 'WHERE'  = [
-						     {'>', <<"time">>, {integer, 1388534400}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"value">>]],
+                                         'FROM'   = <<"response_times">>,
+                                         'WHERE'  = [
+                                                     {'>', <<"time">>, {integer, 1388534400}}
+                                                    ]
+                                        }).
 
 select_where_5_sql_test() ->
     ?sql_compilation_assert("select * from events where time = 1400497861762723 "++
-				"and sequence_number = 2321",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"events">>,
-					 'WHERE'  = [
-						     {and_,
-						      {'=', <<"sequence_number">>, {integer, 2321}},
-						      {'=', <<"time">>,            {integer, 1400497861762723}}
-						     }
-						    ]
-					}).
+                                "and sequence_number = 2321",
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"events">>,
+                                         'WHERE'  = [
+                                                     {and_,
+                                                      {'=', <<"sequence_number">>, {integer, 2321}},
+                                                      {'=', <<"time">>,            {integer, 1400497861762723}}
+                                                     }
+                                                    ]
+                                        }).
 
 select_where_6_sql_test() ->
     ?sql_compilation_assert("select * from /^stats\./i where time > now() - 1h",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = {regex, <<"/^stats\./i">>},
-					 'WHERE'  = [
-						     {'>', <<"time">>, {'-', {<<"now">>, []}, {integer, 3600}}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = {regex, <<"/^stats\./i">>},
+                                         'WHERE'  = [
+                                                     {'>', <<"time">>, {'-', {<<"now">>, []}, {integer, 3600}}}
+                                                    ]
+                                        }).
 
 select_where_7_sql_test() ->
     ?sql_compilation_assert("select * from /.*/ limit 1",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = {regex, <<"/.*/">>},
-					 'LIMIT'  = 1
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = {regex, <<"/.*/">>},
+                                         'LIMIT'  = 1
+                                        }).
 
 select_where_8_sql_test() ->
     ?sql_compilation_assert("select * from events where state = 'NY'",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"events">>,
-					 'WHERE'  = [
-						     {'=', <<"state">>, {binary, <<"NY">>}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"events">>,
+                                         'WHERE'  = [
+                                                     {'=', <<"state">>, {binary, <<"NY">>}}
+                                                    ]
+                                        }).
 
 select_where_9_sql_test() ->
     ?sql_compilation_assert("select * from log_lines where line =~ /error/i",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"log_lines">>,
-					 'WHERE'  = [
-						     {'=~', <<"line">>, {regex, <<"/error/i">>}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"log_lines">>,
+                                         'WHERE'  = [
+                                                     {'=~', <<"line">>, {regex, <<"/error/i">>}}
+                                                    ]
+                                        }).
 
 select_where_10_sql_test() ->
     ?sql_compilation_assert("select * from events where customer_id = 23 and type = 'click10'",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"events">>,
-					 'WHERE'  = [
-						     {and_,
-						      {'=', <<"customer_id">>, {integer,  23}},
-						      {'=', <<"type">>,        {binary, <<"click10">>}}
-						     }
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"events">>,
+                                         'WHERE'  = [
+                                                     {and_,
+                                                      {'=', <<"customer_id">>, {integer,  23}},
+                                                      {'=', <<"type">>,        {binary, <<"click10">>}}
+                                                     }
+                                                    ]
+                                        }).
 
 select_where_11_sql_test() ->
     ?sql_compilation_assert("select * from response_times where value > 500",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"response_times">>,
-					 'WHERE'  = [
-						     {'>', <<"value">>, {integer, 500}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"response_times">>,
+                                         'WHERE'  = [
+                                                     {'>', <<"value">>, {integer, 500}}
+                                                    ]
+                                        }).
 
 select_where_11a_sql_test() ->
     ?sql_compilation_assert("select * from response_times where value >= 500",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"response_times">>,
-					 'WHERE'  = [
-						     {'>=', <<"value">>, {integer, 500}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"response_times">>,
+                                         'WHERE'  = [
+                                                     {'>=', <<"value">>, {integer, 500}}
+                                                    ]
+                                        }).
 
 select_where_11b_sql_test() ->
     ?sql_compilation_assert("select * from response_times where value <= 500",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"response_times">>,
-					 'WHERE'  = [
-						     {'<=', <<"value">>, {integer, 500}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"response_times">>,
+                                         'WHERE'  = [
+                                                     {'<=', <<"value">>, {integer, 500}}
+                                                    ]
+                                        }).
 
 select_where_12_sql_test() ->
     ?sql_compilation_assert("select * from events where email !~ /.*gmail.*/",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"events">>,
-					 'WHERE'  = [
-						     {'!~', <<"email">>, {regex, <<"/.*gmail.*/">>}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"events">>,
+                                         'WHERE'  = [
+                                                     {'!~', <<"email">>, {regex, <<"/.*gmail.*/">>}}
+                                                    ]
+                                        }).
 
 select_where_13_sql_test() ->
     ?sql_compilation_assert("select * from nagios_checks where status <> 0",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"nagios_checks">>,
-					 'WHERE'  = [
-						     {'<>', <<"status">>, {integer, 0}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"nagios_checks">>,
+                                         'WHERE'  = [
+                                                     {'<>', <<"status">>, {integer, 0}}
+                                                    ]
+                                        }).
 
 select_where_14_sql_test() ->
     ?sql_compilation_assert("select * from events where signed_in = false",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"events">>,
-					 'WHERE'  = [
-						     {'=', <<"signed_in">>, {binary, <<"false">>}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"events">>,
+                                         'WHERE'  = [
+                                                     {'=', <<"signed_in">>, {binary, <<"false">>}}
+                                                    ]
+                                        }).
 
 select_where_15_sql_test() ->
     ?sql_compilation_assert("select * from events where (email =~ /.*gmail.*/ or " ++
-				"email =~ /.*yahoo.*/) and state = 'ny'",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"events">>,
-					 'WHERE'  = [
-						     {and_,
-						      {'=', <<"state">>, {binary, <<"ny">>}},
-						      {or_,
-						       {'=~', <<"email">>, {regex, <<"/.*gmail.*/">>}},
-						       {'=~', <<"email">>, {regex, <<"/.*yahoo.*/">>}}
-						      }
-						     }
-						    ]
-					}).
+                                "email =~ /.*yahoo.*/) and state = 'ny'",
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"events">>,
+                                         'WHERE'  = [
+                                                     {and_,
+                                                      {'=', <<"state">>, {binary, <<"ny">>}},
+                                                      {or_,
+                                                       {'=~', <<"email">>, {regex, <<"/.*gmail.*/">>}},
+                                                       {'=~', <<"email">>, {regex, <<"/.*yahoo.*/">>}}
+                                                      }
+                                                     }
+                                                    ]
+                                        }).
 
 select_where_letters_nos_in_strings_1a_test() ->
     ?sql_compilation_assert("select * from events where user = 'user 1'",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"events">>,
-					 'WHERE'  = [
-						     {'=', <<"user">>, {binary, <<"user 1">>}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"events">>,
+                                         'WHERE'  = [
+                                                     {'=', <<"user">>, {binary, <<"user 1">>}}
+                                                    ]
+                                        }).
 
 %% TODO
 %%
@@ -264,87 +264,87 @@ select_where_letters_nos_in_strings_1a_test() ->
 %%
 %% select_where_letters_nos_in_strings_2a_test() ->
 %%    ?sql_compilation_assert("select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
-%% 	      #riak_sql_v1{'SELECT' = [["weather"]],
-%% 			   'FROM'   = <<"GeoCheckin">>,
-%% 			   'WHERE'  = [
-%% 				       {and_,
-%% 					{and_,
-%% 					 {'>', "time", {integer, 2000}},
-%% 					 {'<', "time", {integer, 8000}}
-%% 					},
-%% 					{'=', "user", {binary, "user_1"}}
-%% 					}
-%% 				      ]
-%% 			  }).
+%%            #riak_sql_v1{'SELECT' = [["weather"]],
+%%                         'FROM'   = <<"GeoCheckin">>,
+%%                         'WHERE'  = [
+%%                                     {and_,
+%%                                      {and_,
+%%                                       {'>', "time", {integer, 2000}},
+%%                                       {'<', "time", {integer, 8000}}
+%%                                      },
+%%                                      {'=', "user", {binary, "user_1"}}
+%%                                      }
+%%                                    ]
+%%                        }).
 
 select_where_letters_nos_in_strings_1b_test() ->
     ?sql_compilation_assert("select * from events where user = \"user 1\"",
-			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
-					 'FROM'   = <<"events">>,
-					 'WHERE'  = [
-						     {'=', <<"user">>, {binary, <<"user 1">>}}
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"events">>,
+                                         'WHERE'  = [
+                                                     {'=', <<"user">>, {binary, <<"user 1">>}}
+                                                    ]
+                                        }).
 
 select_where_letters_nos_in_strings_2b_test() ->
     ?sql_compilation_assert("select weather from GeoCheckin where time > 2000 and time < 8000 and user = \"user_1\"",
-			    #riak_sql_v1{'SELECT' = [[<<"weather">>]],
-					 'FROM'   = <<"GeoCheckin">>,
-					 'WHERE'  = [
-						     {and_,
-						      {'=', <<"user">>, {binary, <<"user_1">>}},
-						      {and_,
-						       {'<', <<"time">>, {integer, 8000}},
-						       {'>', <<"time">>, {integer, 2000}}
-						      }
-						     }
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"weather">>]],
+                                         'FROM'   = <<"GeoCheckin">>,
+                                         'WHERE'  = [
+                                                     {and_,
+                                                      {'=', <<"user">>, {binary, <<"user_1">>}},
+                                                      {and_,
+                                                       {'<', <<"time">>, {integer, 8000}},
+                                                       {'>', <<"time">>, {integer, 2000}}
+                                                      }
+                                                     }
+                                                    ]
+                                        }).
 
 select_where_brackets_1_test() ->
     ?sql_compilation_assert("select weather from GeoCheckin where (time > 2000 and time < 8000) and user = \"user_1\"",
-			    #riak_sql_v1{'SELECT' = [[<<"weather">>]],
-					 'FROM'   = <<"GeoCheckin">>,
-					 'WHERE'  = [
-						     {and_,
-						      {'=', <<"user">>, {binary, <<"user_1">>}},
-						      {and_,
-						       {'<', <<"time">>, {integer, 8000}},
-						       {'>', <<"time">>, {integer, 2000}}
-						      }
-						     }
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"weather">>]],
+                                         'FROM'   = <<"GeoCheckin">>,
+                                         'WHERE'  = [
+                                                     {and_,
+                                                      {'=', <<"user">>, {binary, <<"user_1">>}},
+                                                      {and_,
+                                                       {'<', <<"time">>, {integer, 8000}},
+                                                       {'>', <<"time">>, {integer, 2000}}
+                                                      }
+                                                     }
+                                                    ]
+                                        }).
 
 select_where_brackets_2_test() ->
     ?sql_compilation_assert("select weather from GeoCheckin where user = \"user_1\" and (time > 2000 and time < 8000)",
-			    #riak_sql_v1{'SELECT' = [[<<"weather">>]],
-					 'FROM'   = <<"GeoCheckin">>,
-					 'WHERE'  = [
-						     {and_,
-						      {'=', <<"user">>, {binary, <<"user_1">>}},
-						      {and_,
-						       {'<', <<"time">>, {integer, 8000}},
-						       {'>', <<"time">>, {integer, 2000}}
-						      }
-						     }
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"weather">>]],
+                                         'FROM'   = <<"GeoCheckin">>,
+                                         'WHERE'  = [
+                                                     {and_,
+                                                      {'=', <<"user">>, {binary, <<"user_1">>}},
+                                                      {and_,
+                                                       {'<', <<"time">>, {integer, 8000}},
+                                                       {'>', <<"time">>, {integer, 2000}}
+                                                      }
+                                                     }
+                                                    ]
+                                        }).
 
 select_where_brackets_2a_test() ->
     ?sql_compilation_assert("select weather from GeoCheckin where user = \"user_1\" and (time > 2000 and (time < 8000))",
-			    #riak_sql_v1{'SELECT' = [[<<"weather">>]],
-					 'FROM'   = <<"GeoCheckin">>,
-					 'WHERE'  = [
-						     {and_,
-						      {'=', <<"user">>, {binary, <<"user_1">>}},
-						      {and_,
-						       {'<', <<"time">>, {integer, 8000}},
-						       {'>', <<"time">>, {integer, 2000}}
-						      }
-						     }
-						    ]
-					}).
+                            #riak_sql_v1{'SELECT' = [[<<"weather">>]],
+                                         'FROM'   = <<"GeoCheckin">>,
+                                         'WHERE'  = [
+                                                     {and_,
+                                                      {'=', <<"user">>, {binary, <<"user_1">>}},
+                                                      {and_,
+                                                       {'<', <<"time">>, {integer, 8000}},
+                                                       {'>', <<"time">>, {integer, 2000}}
+                                                      }
+                                                     }
+                                                    ]
+                                        }).
 
 %%
 %% canonicalise WHERE clauses tests
@@ -352,70 +352,70 @@ select_where_brackets_2a_test() ->
 
 canonicalise_where_1_test() ->
     ?where_test({or_,
-		 {'<', "alpha", {integer, 2}},
-		 {'>', "beta",  {integer, 3}}
-		},
-		{or_,
-		 {'<', "alpha", {integer, 2}},
-		 {'>', "beta",  {integer, 3}}
-		}).
+                 {'<', "alpha", {integer, 2}},
+                 {'>', "beta",  {integer, 3}}
+                },
+                {or_,
+                 {'<', "alpha", {integer, 2}},
+                 {'>', "beta",  {integer, 3}}
+                }).
 
 canonicalise_where_2_test() ->
     ?where_test({or_,
-		 {'>', "beta",  {integer, 3}},
-		 {'<', "alpha", {integer, 2}}
-		},
-		{or_,
-		 {'<', "alpha", {integer, 2}},
-		 {'>', "beta",  {integer, 3}}
-		}).
+                 {'>', "beta",  {integer, 3}},
+                 {'<', "alpha", {integer, 2}}
+                },
+                {or_,
+                 {'<', "alpha", {integer, 2}},
+                 {'>', "beta",  {integer, 3}}
+                }).
 
 canonicalise_where_2a_test() ->
     ?where_test({or_,
-		 {'>=', "beta",  {integer, 3}},
-		 {'<', "alpha", {integer, 2}}
-		},
-		{or_,
-		 {'<', "alpha", {integer, 2}},
-		 {'>=', "beta",  {integer, 3}}
-		}).
+                 {'>=', "beta",  {integer, 3}},
+                 {'<', "alpha", {integer, 2}}
+                },
+                {or_,
+                 {'<', "alpha", {integer, 2}},
+                 {'>=', "beta",  {integer, 3}}
+                }).
 
 canonicalise_where_2b_test() ->
     ?where_test({or_,
-		 {'>', "beta",  {integer, 3}},
-		 {'<=', "alpha", {integer, 2}}
-		},
-		{or_,
-		 {'<=', "alpha", {integer, 2}},
-		 {'>', "beta",  {integer, 3}}
-		}).
+                 {'>', "beta",  {integer, 3}},
+                 {'<=', "alpha", {integer, 2}}
+                },
+                {or_,
+                 {'<=', "alpha", {integer, 2}},
+                 {'>', "beta",  {integer, 3}}
+                }).
 
 
 canonicalise_where_3_test() ->
     ?where_test({and_,
-		 {'>', "beta",  {integer, 3}},
-		 {'<', "alpha", {integer, 2}}
-		},
-		{and_,
-		 {'<', "alpha", {integer, 2}},
-		 {'>', "beta",  {integer, 3}}
-		}).
+                 {'>', "beta",  {integer, 3}},
+                 {'<', "alpha", {integer, 2}}
+                },
+                {and_,
+                 {'<', "alpha", {integer, 2}},
+                 {'>', "beta",  {integer, 3}}
+                }).
 
 canonicalise_where_4_test() ->
     ?where_test({or_,
-		 {and_,
-		  {'>', "beta",  {integer, 3}},
-		  {'<', "alpha", {integer, 2}}
-		 },
-		 {'=', "time", {integer, 1234}}
-		},
-		{or_,
-		 {'=', "time", {integer, 1234}},
-		 {and_,
-		  {'<', "alpha", {integer, 2}},
-		  {'>', "beta",  {integer, 3}}
-		 }
-		}).
+                 {and_,
+                  {'>', "beta",  {integer, 3}},
+                  {'<', "alpha", {integer, 2}}
+                 },
+                 {'=', "time", {integer, 1234}}
+                },
+                {or_,
+                 {'=', "time", {integer, 1234}},
+                 {and_,
+                  {'<', "alpha", {integer, 2}},
+                  {'>', "beta",  {integer, 3}}
+                 }
+                }).
 
 %%
 %% these are the ones that matters
@@ -424,81 +424,81 @@ canonicalise_where_4_test() ->
 %%
 canonicalise_where_5_test() ->
     ?where_test({and_,
-		 {or_,
-		  {'>', "beta",  {integer, 3}},
-		  {'<', "alpha", {integer, 2}}
-		 },
-		 {and_,
-		  {'>', "gamma", {integer, 3}},
-		  {'<', "delta", {integer, 2}}
-		 }
-		},
-		{and_,
-		 {'<', "delta", {integer, 2}},
-		 {and_,
-		  {'>', "gamma", {integer, 3}},
-		  {or_,
-		   {'<', "alpha", {integer, 2}},
-		   {'>', "beta",  {integer, 3}}
-		  }
-		 }
-		}).
+                 {or_,
+                  {'>', "beta",  {integer, 3}},
+                  {'<', "alpha", {integer, 2}}
+                 },
+                 {and_,
+                  {'>', "gamma", {integer, 3}},
+                  {'<', "delta", {integer, 2}}
+                 }
+                },
+                {and_,
+                 {'<', "delta", {integer, 2}},
+                 {and_,
+                  {'>', "gamma", {integer, 3}},
+                  {or_,
+                   {'<', "alpha", {integer, 2}},
+                   {'>', "beta",  {integer, 3}}
+                  }
+                 }
+                }).
 
 canonicalise_where_6_test() ->
     ?where_test({and_,
-		 {and_,
-		  {'>', "beta6",  {integer, 3}},
-		  {'<', "alpha6", {integer, 2}}
-		 },
-		 {and_,
-		  {'>', "gamma6", {integer, 3}},
-		  {'<', "delta6", {integer, 2}}
-		 }
-		},
-		{and_,
-		 {'<', "alpha6", {integer, 2}},
-		 {and_,
-		  {'<', "delta6", {integer, 2}},
-		  {and_,
-		   {'>', "beta6",  {integer, 3}},
-		   {'>', "gamma6", {integer, 3}}
-		  }
-		 }
-		}).
+                 {and_,
+                  {'>', "beta6",  {integer, 3}},
+                  {'<', "alpha6", {integer, 2}}
+                 },
+                 {and_,
+                  {'>', "gamma6", {integer, 3}},
+                  {'<', "delta6", {integer, 2}}
+                 }
+                },
+                {and_,
+                 {'<', "alpha6", {integer, 2}},
+                 {and_,
+                  {'<', "delta6", {integer, 2}},
+                  {and_,
+                   {'>', "beta6",  {integer, 3}},
+                   {'>', "gamma6", {integer, 3}}
+                  }
+                 }
+                }).
 
 canonicalise_where_7_test() ->
     ?where_test({and_,
-		 {and_,
-		  {or_,
-		   {'>', "beta7",  {integer, 3}},
-		   {'<', "alpha7", {integer, 2}}
-		  },
-		  {and_,
-		   {'>', "gamma7", {integer, 3}},
-		   {'<', "delta7", {integer, 2}}
-		  }
-		 },
-		 {and_,
-		  {'>', "epsilon7", {integer, 3}},
-		  {'<', "zeta7",    {integer, 2}}
-		 }
-		},
-		{and_,
-		 {'<', "delta7", {integer, 2}},
-		 {and_,
-		  {'<', "zeta7", {integer, 2}},
-		  {and_,
-		   {'>', "epsilon7", {integer, 3}},
-		   {and_,
-		    {'>', "gamma7", {integer, 3}},
-		    {or_,
-		     {'<', "alpha7", {integer, 2}},
-		     {'>', "beta7",  {integer, 3}}
-		    }
-		   }
-		  }
-		 }
-		}).
+                 {and_,
+                  {or_,
+                   {'>', "beta7",  {integer, 3}},
+                   {'<', "alpha7", {integer, 2}}
+                  },
+                  {and_,
+                   {'>', "gamma7", {integer, 3}},
+                   {'<', "delta7", {integer, 2}}
+                  }
+                 },
+                 {and_,
+                  {'>', "epsilon7", {integer, 3}},
+                  {'<', "zeta7",    {integer, 2}}
+                 }
+                },
+                {and_,
+                 {'<', "delta7", {integer, 2}},
+                 {and_,
+                  {'<', "zeta7", {integer, 2}},
+                  {and_,
+                   {'>', "epsilon7", {integer, 3}},
+                   {and_,
+                    {'>', "gamma7", {integer, 3}},
+                    {or_,
+                     {'<', "alpha7", {integer, 2}},
+                     {'>', "beta7",  {integer, 3}}
+                    }
+                   }
+                  }
+                 }
+                }).
 
 %%
 %% create table tests
@@ -506,312 +506,312 @@ canonicalise_where_7_test() ->
 
 create_simple_sql_test() ->
     ?sql_compilation_assert("create table temperatures " ++
-				"(time timestamp not null, " ++
-				"temperature_k float, " ++
-				"primary key (time))",
-			    #ddl_v1{
-			       table = <<"temperatures">>,
-			       fields = [
-					 #riak_field_v1{
-					    name = <<"time">>,
-					    position = 1,
-					    type = timestamp,
-					    optional = false},
-					 #riak_field_v1{
-					    name = <<"temperature_k">>,
-					    position = 2,
-					    type = float,
-					    optional = true}
-					],
-			       partition_key = #key_v1{
-						  ast = [#param_v1{
-							    name = [<<"time">>]
-							   }]
-						 },
-			       local_key = #key_v1{
-					      ast = [#param_v1{
-							name = [<<"time">>]
-						       }]
-					     }
-			      }).
+                                "(time timestamp not null, " ++
+                                "temperature_k float, " ++
+                                "primary key (time))",
+                            #ddl_v1{
+                               table = <<"temperatures">>,
+                               fields = [
+                                         #riak_field_v1{
+                                            name = <<"time">>,
+                                            position = 1,
+                                            type = timestamp,
+                                            optional = false},
+                                         #riak_field_v1{
+                                            name = <<"temperature_k">>,
+                                            position = 2,
+                                            type = float,
+                                            optional = true}
+                                        ],
+                               partition_key = #key_v1{
+                                                  ast = [#param_v1{
+                                                            name = [<<"time">>]
+                                                           }]
+                                                 },
+                               local_key = #key_v1{
+                                              ast = [#param_v1{
+                                                        name = [<<"time">>]
+                                                       }]
+                                             }
+                              }).
 
 create_simple_sql_int_test() ->
     ?sql_compilation_assert("create table temperatures " ++
-				"(time timestamp not null, " ++
-				"temperature_k integer, " ++
-				"primary key (time))",
-			    #ddl_v1{
-			       table = <<"temperatures">>,
-			       fields = [
-					 #riak_field_v1{
-					    name = <<"time">>,
-					    position = 1,
-					    type = timestamp,
-					    optional = false},
-					 #riak_field_v1{
-					    name = <<"temperature_k">>,
-					    position = 2,
-					    type = integer,
-					    optional = true}
-					],
-			       partition_key = #key_v1{
-					      ast = [#param_v1{
-							name = [<<"time">>]
-						       }]
-						 },
-			       local_key = #key_v1{
-					      ast = [#param_v1{
-							name = [<<"time">>]
-						       }]
-					     }
-			      }).
+                                "(time timestamp not null, " ++
+                                "temperature_k integer, " ++
+                                "primary key (time))",
+                            #ddl_v1{
+                               table = <<"temperatures">>,
+                               fields = [
+                                         #riak_field_v1{
+                                            name = <<"time">>,
+                                            position = 1,
+                                            type = timestamp,
+                                            optional = false},
+                                         #riak_field_v1{
+                                            name = <<"temperature_k">>,
+                                            position = 2,
+                                            type = integer,
+                                            optional = true}
+                                        ],
+                               partition_key = #key_v1{
+                                              ast = [#param_v1{
+                                                        name = [<<"time">>]
+                                                       }]
+                                                 },
+                               local_key = #key_v1{
+                                              ast = [#param_v1{
+                                                        name = [<<"time">>]
+                                                       }]
+                                             }
+                              }).
 
 create_composite_key_sql_test() ->
     ?sql_compilation_assert("create table temperatures " ++
-				"(time timestamp not null, " ++
-				"user_id varchar not null, " ++
-				"mytype varchar not null, " ++
-				"primary key ((time, user_id), mytype))",
-			    #ddl_v1{
-			       table = <<"temperatures">>,
-			       fields = [
-					 #riak_field_v1{
-					    name = <<"time">>,
-					    position = 1,
-					    type = timestamp,
-					    optional = false},
-					 #riak_field_v1{
-					    name = <<"user_id">>,
-					    position = 2,
-					    type = binary,
-					    optional = false},
-					 #riak_field_v1{
-					    name = <<"mytype">>,
-					    position = 3,
-					    type = binary,
-					    optional = false}
-					],
-			       partition_key = #key_v1{
-						  ast = [
-							 #param_v1{
-							    name = [<<"time">>]
-							   },
-							 #param_v1{
-							    name = [<<"user_id">>]
-							   }
-							]},
-			       local_key = #key_v1{
-					      ast = [
-						     #param_v1{
-							name = [<<"mytype">>]
-						       }
-						    ]}
-			      }).
+                                "(time timestamp not null, " ++
+                                "user_id varchar not null, " ++
+                                "mytype varchar not null, " ++
+                                "primary key ((time, user_id), mytype))",
+                            #ddl_v1{
+                               table = <<"temperatures">>,
+                               fields = [
+                                         #riak_field_v1{
+                                            name = <<"time">>,
+                                            position = 1,
+                                            type = timestamp,
+                                            optional = false},
+                                         #riak_field_v1{
+                                            name = <<"user_id">>,
+                                            position = 2,
+                                            type = binary,
+                                            optional = false},
+                                         #riak_field_v1{
+                                            name = <<"mytype">>,
+                                            position = 3,
+                                            type = binary,
+                                            optional = false}
+                                        ],
+                               partition_key = #key_v1{
+                                                  ast = [
+                                                         #param_v1{
+                                                            name = [<<"time">>]
+                                                           },
+                                                         #param_v1{
+                                                            name = [<<"user_id">>]
+                                                           }
+                                                        ]},
+                               local_key = #key_v1{
+                                              ast = [
+                                                     #param_v1{
+                                                        name = [<<"mytype">>]
+                                                       }
+                                                    ]}
+                              }).
 
 create_no_key_sql_test() ->
     ?sql_compilation_assert("create table temperatures " ++
-				"(time timestamp not null, " ++
-				"temperature_k float)",
-			    #ddl_v1{
-			       table = <<"temperatures">>,
-			       fields = [
-					 #riak_field_v1{
-					    name = <<"time">>,
-					    position = 1,
-					    type = timestamp,
-					    optional = false},
-					 #riak_field_v1{
-					    name = <<"temperature_k">>,
-					    position = 2,
-					    type = float,
-					    optional = true}],
-			       partition_key = none,
-			       local_key = none
-			      }).
+                                "(time timestamp not null, " ++
+                                "temperature_k float)",
+                            #ddl_v1{
+                               table = <<"temperatures">>,
+                               fields = [
+                                         #riak_field_v1{
+                                            name = <<"time">>,
+                                            position = 1,
+                                            type = timestamp,
+                                            optional = false},
+                                         #riak_field_v1{
+                                            name = <<"temperature_k">>,
+                                            position = 2,
+                                            type = float,
+                                            optional = true}],
+                               partition_key = none,
+                               local_key = none
+                              }).
 
 %% need to refactor
 create_timeseries_sql_test() ->
     String = "CREATE TABLE GeoCheckin "
-	++ "(geohash varchar not null, "
-	++ "user varchar not null, "
-	++ "time timestamp not null, "
-	++ "weather varchar not null, "
-	++ "temperature varchar, "
-	++ "PRIMARY KEY ((geohash, quantum(time, 15, 'm')), time, user))",
+        ++ "(geohash varchar not null, "
+        ++ "user varchar not null, "
+        ++ "time timestamp not null, "
+        ++ "weather varchar not null, "
+        ++ "temperature varchar, "
+        ++ "PRIMARY KEY ((geohash, quantum(time, 15, 'm')), time, user))",
     Toks = riak_ql_lexer:get_tokens(String),
     Got = case parse(Toks) of
-	      {ok, G} -> G;
-	      _WC     -> wont_compile
-	  end,
+              {ok, G} -> G;
+              _WC     -> wont_compile
+          end,
     Expected = #ddl_v1{
-		  table = <<"GeoCheckin">>,
-		  fields = [
-			    #riak_field_v1{
-			       name = <<"geohash">>,
-			       position = 1,
-			       type = binary,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"user">>,
-			       position = 2,
-			       type = binary,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"time">>,
-			       position = 3,
-			       type = timestamp,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"weather">>,
-			       position = 4,
-			       type = binary,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"temperature">>,
-			       position = 5,
-			       type = binary,
-			       optional = true}
-			   ],
-		  partition_key = #key_v1{
-				     ast = [
-					    #param_v1{name = [<<"geohash">>]},
-					    #hash_fn_v1{mod  = riak_ql_quanta,
-							fn   = quantum,
-							args = [
-								#param_v1{name = [<<"time">>]}, 15, m
-							       ],
-							type = timestamp}
-					   ]},
-		  local_key = #key_v1{
-				 ast = [
-					#param_v1{name = [<<"time">>]},
-					#param_v1{name = [<<"user">>]}
-				       ]}
-		 },
+                  table = <<"GeoCheckin">>,
+                  fields = [
+                            #riak_field_v1{
+                               name = <<"geohash">>,
+                               position = 1,
+                               type = binary,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"user">>,
+                               position = 2,
+                               type = binary,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"time">>,
+                               position = 3,
+                               type = timestamp,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"weather">>,
+                               position = 4,
+                               type = binary,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"temperature">>,
+                               position = 5,
+                               type = binary,
+                               optional = true}
+                           ],
+                  partition_key = #key_v1{
+                                     ast = [
+                                            #param_v1{name = [<<"geohash">>]},
+                                            #hash_fn_v1{mod  = riak_ql_quanta,
+                                                        fn   = quantum,
+                                                        args = [
+                                                                #param_v1{name = [<<"time">>]}, 15, m
+                                                               ],
+                                                        type = timestamp}
+                                           ]},
+                  local_key = #key_v1{
+                                 ast = [
+                                        #param_v1{name = [<<"time">>]},
+                                        #param_v1{name = [<<"user">>]}
+                                       ]}
+                 },
     ?assertEqual(Expected, Got).
 
 
 create_all_types_sql_test() ->
     String = "CREATE TABLE GeoCheckin "
-	++ "(geohash varchar not null, "
+        ++ "(geohash varchar not null, "
         ++ "user varchar not null, "
-	++ "time timestamp not null, "
-	++ "isweather boolean not null, "
-	++ "temperature float not null, "
-	++ "options any not null, "
-	++ "myinteger integer not null, "
+        ++ "time timestamp not null, "
+        ++ "isweather boolean not null, "
+        ++ "temperature float not null, "
+        ++ "options any not null, "
+        ++ "myinteger integer not null, "
         ++ "user2 varchar, "
-	++ "time2 timestamp, "
-	++ "isweather2 boolean, "
-	++ "temperature2 float, "
-	++ "options2 any, "
-	++ "myinteger2 integer, "
-	++ "PRIMARY KEY ((geohash, quantum(time, 15, 'm')), time, user))",
+        ++ "time2 timestamp, "
+        ++ "isweather2 boolean, "
+        ++ "temperature2 float, "
+        ++ "options2 any, "
+        ++ "myinteger2 integer, "
+        ++ "PRIMARY KEY ((geohash, quantum(time, 15, 'm')), time, user))",
     Toks = riak_ql_lexer:get_tokens(String),
     Got = case parse(Toks) of
-	      {ok, G} -> G;
-	      _WC     -> wont_compile
-	  end,
+              {ok, G} -> G;
+              _WC     -> wont_compile
+          end,
     Expected = #ddl_v1{
-		  table = <<"GeoCheckin">>,
-		  fields = [
-			    #riak_field_v1{
-			       name = <<"geohash">>,
-			       position = 1,
-			       type = binary,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"user">>,
-			       position = 2,
-			       type = binary,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"time">>,
-			       position = 3,
-			       type = timestamp,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"isweather">>,
-			       position = 4,
-			       type = boolean,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"temperature">>,
-			       position = 5,
-			       type = float,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"options">>,
-			       position = 6,
-			       type = any,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"myinteger">>,
-			       position = 7,
-			       type = integer,
-			       optional = false},
-			    #riak_field_v1{
-			       name = <<"user2">>,
-			       position = 8,
-			       type = binary,
-			       optional = true},
-			    #riak_field_v1{
-			       name = <<"time2">>,
-			       position = 9,
-			       type = timestamp,
-			       optional = true},
-			    #riak_field_v1{
-			       name = <<"isweather2">>,
-			       position = 10,
-			       type = boolean,
-			       optional = true},
-			    #riak_field_v1{
-			       name = <<"temperature2">>,
-			       position = 11,
-			       type = float,
-			       optional = true},
-			    #riak_field_v1{
-			       name = <<"options2">>,
-			       position = 12,
-			       type = any,
-			       optional = true},
-			    #riak_field_v1{
-			       name = <<"myinteger2">>,
-			       position = 13,
-			       type = integer,
-			       optional = true}
-			   ],
-		  partition_key = #key_v1{
-				     ast = [
-					    #param_v1{name = [<<"geohash">>]},
-					    #hash_fn_v1{mod  = riak_ql_quanta,
-							fn   = quantum,
-							args = [
-								#param_v1{name = [<<"time">>]}, 15, m
-							       ],
-							type = timestamp}
-					   ]},
-		  local_key = #key_v1{
-				 ast = [
-					#param_v1{name = [<<"time">>]},
-					#param_v1{name = [<<"user">>]}
-				       ]}
-		 },
+                  table = <<"GeoCheckin">>,
+                  fields = [
+                            #riak_field_v1{
+                               name = <<"geohash">>,
+                               position = 1,
+                               type = binary,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"user">>,
+                               position = 2,
+                               type = binary,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"time">>,
+                               position = 3,
+                               type = timestamp,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"isweather">>,
+                               position = 4,
+                               type = boolean,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"temperature">>,
+                               position = 5,
+                               type = float,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"options">>,
+                               position = 6,
+                               type = any,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"myinteger">>,
+                               position = 7,
+                               type = integer,
+                               optional = false},
+                            #riak_field_v1{
+                               name = <<"user2">>,
+                               position = 8,
+                               type = binary,
+                               optional = true},
+                            #riak_field_v1{
+                               name = <<"time2">>,
+                               position = 9,
+                               type = timestamp,
+                               optional = true},
+                            #riak_field_v1{
+                               name = <<"isweather2">>,
+                               position = 10,
+                               type = boolean,
+                               optional = true},
+                            #riak_field_v1{
+                               name = <<"temperature2">>,
+                               position = 11,
+                               type = float,
+                               optional = true},
+                            #riak_field_v1{
+                               name = <<"options2">>,
+                               position = 12,
+                               type = any,
+                               optional = true},
+                            #riak_field_v1{
+                               name = <<"myinteger2">>,
+                               position = 13,
+                               type = integer,
+                               optional = true}
+                           ],
+                  partition_key = #key_v1{
+                                     ast = [
+                                            #param_v1{name = [<<"geohash">>]},
+                                            #hash_fn_v1{mod  = riak_ql_quanta,
+                                                        fn   = quantum,
+                                                        args = [
+                                                                #param_v1{name = [<<"time">>]}, 15, m
+                                                               ],
+                                                        type = timestamp}
+                                           ]},
+                  local_key = #key_v1{
+                                 ast = [
+                                        #param_v1{name = [<<"time">>]},
+                                        #param_v1{name = [<<"user">>]}
+                                       ]}
+                 },
     ?assertEqual(Expected, Got).
 
 
 select_sql_case_insensitive_1_test() ->
     ?sql_compilation_assert_match("SELECT * from argle",
-				  #riak_sql_v1{'SELECT' = [[<<"*">>]]}).
+                                  #riak_sql_v1{'SELECT' = [[<<"*">>]]}).
 
 select_sql_case_insensitive_2_test() ->
     ?sql_compilation_assert_match("seLEct * from argle",
-				  #riak_sql_v1{'SELECT' = [[<<"*">>]]}).
+                                  #riak_sql_v1{'SELECT' = [[<<"*">>]]}).
 
 
 sql_first_char_is_newline_test() ->
     ?sql_compilation_assert_match("\nselect * from argle",
-				  #riak_sql_v1{'SELECT' = [[<<"*">>]]}).
+                                  #riak_sql_v1{'SELECT' = [[<<"*">>]]}).
 
 %%%
 %%% Failure tests
@@ -821,9 +821,9 @@ failure_sql_test() ->
     String = "klsdafj kljfd (*((*& 89& 8KHH kJHkj hKJH K K",
     Expected = error,
     Got = case parse(riak_ql_lexer:get_tokens(String)) of
-	      {error, _Err} -> error;
-	      Other         -> {should_not_compile, Other}
-	  end,
+              {error, _Err} -> error;
+              Other         -> {should_not_compile, Other}
+          end,
     ?assertEqual(Expected, Got).
 
 % RTS-388
