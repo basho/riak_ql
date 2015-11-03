@@ -258,24 +258,35 @@ select_where_letters_nos_in_strings_1a_test() ->
                                                     ]
                                         }).
 
-%% TODO
-%%
-%% Single quotes don't really work
-%%
-%% select_where_letters_nos_in_strings_2a_test() ->
-%%    ?sql_compilation_assert("select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
-%%            #riak_sql_v1{'SELECT' = [["weather"]],
-%%                         'FROM'   = <<"GeoCheckin">>,
-%%                         'WHERE'  = [
-%%                                     {and_,
-%%                                      {and_,
-%%                                       {'>', "time", {integer, 2000}},
-%%                                       {'<', "time", {integer, 8000}}
-%%                                      },
-%%                                      {'=', "user", {binary, "user_1"}}
-%%                                      }
-%%                                    ]
-%%                        }).
+select_where_letters_nos_in_strings_2a_test() ->
+   ?sql_compilation_assert(
+      "select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
+      #riak_sql_v1{'SELECT' = [["weather"]],
+                   'FROM'   = <<"GeoCheckin">>,
+                   'WHERE'  = [
+                               {and_,
+                                {and_,
+                                 {'>', "time", {integer, 2000}},
+                                 {'<', "time", {integer, 8000}}
+                                },
+                                {'=', "user", {binary, "user_1"}}
+                               }
+                              ]
+                  }).
+
+select_where_single_quotes_test() ->
+    ?sql_compilation_assert(
+       "select weather from GeoCheckin where user = 'user_1' and location = 'San Francisco'",
+       #riak_sql_v1{'SELECT' = [[<<"weather">>]],
+                    'FROM'   = <<"GeoCheckin">>,
+                    'WHERE'  = [
+                                {and_,
+                                 {'=', <<"location">>, {binary, <<"San Francisco">>}},
+                                 {'=', <<"user">>, {binary, <<"user_1">>}}
+                                }
+                               ]
+                   }.
+
 
 select_where_letters_nos_in_strings_1b_test() ->
     ?sql_compilation_assert("select * from events where user = \"user 1\"",
