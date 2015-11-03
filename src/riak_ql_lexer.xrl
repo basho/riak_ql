@@ -41,7 +41,7 @@ VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
 WITH = (W|w)(I|i)(T|t)(H|h)
 
-DATETIME = ('[0-9a-zA-Z\s:\-\.]*')
+DATETIME = ('([^\']|(\'\'))*')
 
 REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
@@ -251,11 +251,14 @@ lex(String) ->
     Toks.
 
 fix_up_date(Date) ->
-    Date2 = string:strip(Date, both, $'), %'
-    Date3 = string:strip(Date2),
-    case dh_date:parse(Date3) of
-        {error, bad_date} -> {chars, Date2};
-        Date4             -> {datetime, Date4}
+    RemovedOutsideQuotes = string:strip(Date, both, $'), %'
+    DeDoubledInternalQuotes = re:replace(RemovedOutsideQuotes,
+                                         "''", "'",
+                                         [global, {return, list}]),
+    RemovedOutsideSpacing = string:strip(DeDoubledInternalQuotes),
+    case dh_date:parse(RemovedOutsideSpacing) of
+        {error, bad_date} -> {chars, DeDoubledInternalQuotes};
+        ParsedDate        -> {datetime, ParsedDate}
     end.
 
 

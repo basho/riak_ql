@@ -218,6 +218,15 @@ not_a_date_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+multiple_single_quotes_test_() ->
+    Got = riak_ql_lexer:get_tokens("'user_1' 'San Fierro' 'klingon''name'"),
+    Expected = [
+                {chars, <<"user_1">>},
+                {chars, <<"San Fierro">>},
+                {chars, <<"klingon'name">>}
+               ],
+    ?_assertEqual(Expected, Got).
+
 double_quote_1_test_() ->
     Got = riak_ql_lexer:get_tokens("\" yardle hoop !@#$%^&*() _ -\""),
     Expected = [
