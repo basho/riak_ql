@@ -4,13 +4,13 @@ atom
 boolean
 create table
 delete
+double
 drop
-float
 from
 global
 groupby
 inner
-integer
+sint64
 join
 limit
 local

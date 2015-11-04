@@ -216,11 +216,12 @@ normalise(X) -> X.
 %% are comparable.
 -spec is_compatible_type(ColType::atom(), WhereType::atom(), any()) ->
         boolean().
-is_compatible_type(timestamp, integer, _) -> true;
-is_compatible_type(integer, timestamp, _) -> true;
-is_compatible_type(boolean, binary, "true")  -> true;
-is_compatible_type(boolean, binary, "false") -> true;
-is_compatible_type(T, T, _) -> true;
+is_compatible_type(timestamp, integer, _)       -> true;
+is_compatible_type(boolean,   binary,  "true")  -> true;
+is_compatible_type(boolean,   binary,  "false") -> true;
+is_compatible_type(sint64,    integer, _)       -> true;
+is_compatible_type(double,    float,   _)       -> true;
+is_compatible_type(varchar,   binary,  _)       -> true;
 is_compatible_type(_, _, _) -> false.
 
 %% Check that the operation being performed in a where clause, for example
@@ -228,9 +229,9 @@ is_compatible_type(_, _, _) -> false.
 -spec is_compatible_operator(OP::relational_op(),
 	                         ExpectedType::simple_field_type(),
 	                         RHS_type::atom()) -> boolean().
-is_compatible_operator('=',  binary,  binary) -> true;
-is_compatible_operator('!=', binary,  binary) -> true;
-is_compatible_operator(_,    binary,  binary) -> false;
+is_compatible_operator('=',  varchar, binary) -> true;
+is_compatible_operator('!=', varchar, binary) -> true;
+is_compatible_operator(_,    varchar, binary) -> false;
 is_compatible_operator('=',  boolean, binary) -> true;
 is_compatible_operator('!=', boolean, binary) -> true;
 is_compatible_operator(_,    boolean, binary) -> false;
@@ -305,13 +306,13 @@ simplest_partition_key_test() ->
 		   [
 		    #riak_field_v1{name     = Name,
 				   position = 1,
-				   type     = binary}
+				   type     = varchar}
 		   ],
 		   PK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {Name},
     Result = (catch get_partition_key(DDL, Obj)),
-    ?assertEqual([{binary, Name}], Result).
+    ?assertEqual([{varchar, Name}], Result).
 
 simple_partition_key_test() ->
     Name1 = <<"yando">>,
@@ -324,19 +325,19 @@ simple_partition_key_test() ->
 		   [
 		    #riak_field_v1{name     = Name2,
 				   position = 1,
-				   type     = binary},
+				   type     = varchar},
 		    #riak_field_v1{name     = <<"sherk">>,
 				   position = 2,
-				   type     = binary},
+				   type     = varchar},
 		    #riak_field_v1{name     = Name1,
 				   position = 3,
-				   type     = binary}
+				   type     = varchar}
 		   ],
 		   PK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {<<"one">>, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
-    ?assertEqual([{binary, <<"three">>}, {binary, <<"one">>}], Result).
+    ?assertEqual([{varchar, <<"three">>}, {varchar, <<"one">>}], Result).
 
 function_partition_key_test() ->
     Name1 = <<"yando">>,
@@ -360,10 +361,10 @@ function_partition_key_test() ->
 				   type     = timestamp},
 		    #riak_field_v1{name     = <<"sherk">>,
 				   position = 2,
-				   type     = binary},
+				   type     = varchar},
 		    #riak_field_v1{name     = Name1,
 				   position = 3,
-				   type     = binary}
+				   type     = varchar}
 		   ],
 		   PK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
@@ -371,7 +372,7 @@ function_partition_key_test() ->
     Result = (catch get_partition_key(DDL, Obj)),
     %% Yes the mock partition function is actually computed
     %% read the actual code, lol
-    Expected = [{binary, <<"three">>}, {timestamp, mock_result}],
+    Expected = [{varchar, <<"three">>}, {timestamp, mock_result}],
     ?assertEqual(Expected, Result).
 
 complex_partition_key_test() ->
@@ -414,17 +415,17 @@ complex_partition_key_test() ->
     Map3 = {map, [
 		  #riak_field_v1{name     = <<"in_Map_2">>,
 				 position = 1,
-				 type     = integer}
+				 type     = sint64}
 		 ]},
     Map2 = {map, [
 		  #riak_field_v1{name     = Name3,
 				 position = 1,
-				 type     = integer}
+				 type     = sint64}
 		 ]},
     Map1 = {map, [
 		  #riak_field_v1{name     = Name1,
 				 position = 1,
-				 type     = integer},
+				 type     = sint64},
 		  #riak_field_v1{name     = Name2,
 				 position = 2,
 				 type     = Map2},
@@ -442,7 +443,7 @@ complex_partition_key_test() ->
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {{2, {3}, {4}}},
     Result = (catch get_partition_key(DDL, Obj)),
-    Expected = [{integer, 2}, {poodle, mock_result}, {wombat, mock_result}],
+    Expected = [{sint64, 2}, {poodle, mock_result}, {wombat, mock_result}],
     ?assertEqual(Expected, Result).
 
 %%
@@ -461,13 +462,13 @@ local_key_test() ->
 		   [
 		    #riak_field_v1{name     = Name,
 				   position = 1,
-				   type     = binary}
+				   type     = varchar}
 		   ],
 		   PK, LK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {Name},
     Result = (catch get_local_key(DDL, Obj)),
-    ?assertEqual([{binary, Name}], Result).
+    ?assertEqual([{varchar, Name}], Result).
 
 %%
 %% Maps
@@ -477,41 +478,41 @@ simple_valid_map_get_type_1_test() ->
     Map = {map, [
 		 #riak_field_v1{name     = <<"yarple">>,
 				position = 1,
-				type     = integer}
+				type     = sint64}
 		]},
     DDL = make_ddl(<<"simple_valid_map_get_type_1_test">>,
 		   [
 		    #riak_field_v1{name     = <<"yando">>,
 				   position = 1,
-				   type     = binary},
+				   type     = varchar},
 		    #riak_field_v1{name     = <<"erko">>,
 				   position = 2,
 				   type     = Map},
 		    #riak_field_v1{name     = <<"erkle">>,
 				   position = 3,
-				   type     = float}
+				   type     = double}
 		   ]),
     {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Result = (catch Module:get_field_type([<<"erko">>, <<"yarple">>])),
-    ?assertEqual(integer, Result).
+    ?assertEqual(sint64, Result).
 
 simple_valid_map_get_type_2_test() ->
     Map = {map, [
 		 #riak_field_v1{name     = <<"yarple">>,
 				position = 1,
-				type     = integer}
+				type     = sint64}
 		]},
     DDL = make_ddl(<<"simple_valid_map_get_type_2_test">>,
 		   [
 		    #riak_field_v1{name     = <<"yando">>,
 				   position = 1,
-				   type     = binary},
+				   type     = varchar},
 		    #riak_field_v1{name     = <<"erko">>,
 				   position = 2,
 				   type     = Map},
 		    #riak_field_v1{name     = <<"erkle">>,
 				   position = 3,
-				   type     = float}
+				   type     = double}
 		   ]),
     {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Result = (catch Module:get_field_type([<<"erko">>])),
@@ -521,17 +522,17 @@ complex_valid_map_get_type_test() ->
     Map3 = {map, [
 		  #riak_field_v1{name     = <<"in_Map_2">>,
 				 position = 1,
-				 type     = integer}
+				 type     = sint64}
 		 ]},
     Map2 = {map, [
 		  #riak_field_v1{name     = <<"in_Map_1">>,
 				 position = 1,
-				 type     = integer}
+				 type     = sint64}
 		 ]},
     Map1 = {map, [
 		  #riak_field_v1{name     = <<"Level_1_1">>,
 				 position = 1,
-				 type     = integer},
+				 type     = sint64},
 		  #riak_field_v1{name     = <<"Level_1_map1">>,
 				 position = 2,
 				 type     = Map2},
@@ -548,7 +549,7 @@ complex_valid_map_get_type_test() ->
     {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Path = [<<"Top_Map">>, <<"Level_1_map1">>, <<"in_Map_1">>],
     Res = (catch Module:get_field_type(Path)),
-    ?assertEqual(integer, Res).
+    ?assertEqual(sint64, Res).
 
 %%
 %% make_key tests
@@ -563,7 +564,7 @@ make_plain_key_test() ->
 		   [
 		    #riak_field_v1{name     = <<"user">>,
 				   position = 1,
-				   type     = binary},
+				   type     = varchar},
 		    #riak_field_v1{name     = <<"time">>,
 				   position = 2,
 				   type     = timestamp}
@@ -577,7 +578,7 @@ make_plain_key_test() ->
 	   ],
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Got = make_key(Mod, Key, Vals),
-    Expected = [{binary, <<"user_1">>}, {timestamp, Time}],
+    Expected = [{varchar, <<"user_1">>}, {timestamp, Time}],
     ?assertEqual(Expected, Got).
 
 make_functional_key_test() ->
@@ -597,7 +598,7 @@ make_functional_key_test() ->
 		   [
 		    #riak_field_v1{name     = <<"user">>,
 				   position = 1,
-				   type     = binary},
+				   type     = varchar},
 		    #riak_field_v1{name     = <<"time">>,
 				   position = 2,
 				   type     = timestamp}
@@ -611,7 +612,7 @@ make_functional_key_test() ->
 	   ],
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Got = make_key(Mod, Key, Vals),
-    Expected = [{binary, <<"user_1">>}, {timestamp, mock_result}],
+    Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
     ?assertEqual(Expected, Got).
 
 
@@ -625,10 +626,10 @@ partial_wildcard_are_selections_valid_test() ->
 		   [
 		    #riak_field_v1{name     = <<"temperature">>,
 				   position = 1,
-				   type     = integer},
+				   type     = sint64},
 		    #riak_field_v1{name     = <<"geohash">>,
 				   position = 2,
-				   type     = integer}
+				   type     = sint64}
 		   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     ?assertEqual(
@@ -643,10 +644,10 @@ partial_are_selections_valid_fail_test() ->
 		   [
 		    #riak_field_v1{name     = <<"temperature">>,
 				   position = 1,
-				   type     = integer},
+				   type     = sint64},
 		    #riak_field_v1{name     = <<"geohash">>,
 				   position = 2,
-				   type     = integer}
+				   type     = sint64}
 		   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     ?assertEqual(
@@ -667,10 +668,10 @@ simple_is_query_valid_test() ->
 		   [
 		    #riak_field_v1{name     = <<"temperature">>,
 				   position = 1,
-				   type     = integer},
+				   type     = sint64},
 		    #riak_field_v1{name     = <<"geohash">>,
 				   position = 2,
-				   type     = integer}
+				   type     = sint64}
 		   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     ?assertEqual(
@@ -689,13 +690,13 @@ simple_is_query_valid_map_test() ->
     Map = {map, [
 		 #riak_field_v1{name     = Name2,
 				position = 1,
-				type     = integer}
+				type     = sint64}
 		]},
     DDL = make_ddl(Bucket,
 		   [
 		    #riak_field_v1{name     = Name0,
 				   position = 1,
-				   type     = integer},
+				   type     = sint64},
 		    #riak_field_v1{name     = Name1,
 				   position = 2,
 				   type     = Map}
@@ -717,13 +718,13 @@ simple_is_query_valid_map_wildcard_test() ->
     Map = {map, [
 		 #riak_field_v1{name     = Name2,
 				position = 1,
-				type     = integer}
+				type     = sint64}
 		]},
     DDL = make_ddl(Bucket,
 		   [
 		    #riak_field_v1{name     = Name0,
 				   position = 1,
-				   type     = integer},
+				   type     = sint64},
 		    #riak_field_v1{name     = Name1,
 				   position = 2,
 				   type     = Map}
@@ -753,10 +754,10 @@ simple_filter_query_test() ->
 		   [
 		    #riak_field_v1{name     = <<"temperature">>,
 				   position = 1,
-				   type     = integer},
+				   type     = sint64},
 		    #riak_field_v1{name     = <<"geohash">>,
 				   position = 2,
-				   type     = integer}
+				   type     = sint64}
 		   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
@@ -783,16 +784,16 @@ full_filter_query_test() ->
 		   [
 		    #riak_field_v1{name     = <<"temperature">>,
 				   position = 1,
-				   type     = integer},
+				   type     = sint64},
 		    #riak_field_v1{name     = <<"ne field">>,
 				   position = 2,
-				   type     = integer},
+				   type     = sint64},
 		    #riak_field_v1{name     = <<"lte field">>,
 				   position = 3,
-				   type     = integer},
+				   type     = sint64},
 		    #riak_field_v1{name     = <<"gte field">>,
 				   position = 4,
-				   type     = integer}
+				   type     = sint64}
 		   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
@@ -818,11 +819,11 @@ timeseries_filter_test() ->
     Fields = [
 	      #riak_field_v1{name     = <<"geohash">>,
 			     position = 1,
-			     type     = binary,
+			     type     = varchar,
 			     optional = false},
 	      #riak_field_v1{name     = <<"user">>,
 			     position = 2,
-			     type     = binary,
+			     type     = varchar,
 			     optional = false},
 	      #riak_field_v1{name     = <<"time">>,
 			     position = 3,
@@ -830,11 +831,11 @@ timeseries_filter_test() ->
 			     optional = false},
 	      #riak_field_v1{name     = <<"weather">>,
 			     position = 4,
-			     type     = binary,
+			     type     = varchar,
 			     optional = false},
 	      #riak_field_v1{name     = <<"temperature">>,
 			     position = 5,
-			     type     = binary,
+			     type     = varchar,
 			     optional = true}
 	     ],
     PK = #key_v1{ast = [
@@ -880,7 +881,7 @@ is_query_valid_test_helper(Table_name, Table_def, Query) ->
     "    myseries    VARCHAR   NOT NULL, "
     "    time        TIMESTAMP NOT NULL, "
     "    weather     VARCHAR   NOT NULL, "
-    "    temperature FLOAT, "
+    "    temperature DOUBLE, "
     "    PRIMARY KEY ((QUANTUM(time, 15, 'm'), myfamily, myseries), "
     "    time, myfamily, myseries))"
 ).
@@ -923,7 +924,7 @@ is_query_valid_where_1_test() ->
 is_query_valid_where_2_test() ->
     ?assertEqual(
         {false, [
-            {incompatible_type, <<"myseries">>, binary, integer}]},
+            {incompatible_type, <<"myseries">>, varchar, integer}]},
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
@@ -934,8 +935,8 @@ is_query_valid_where_2_test() ->
 is_query_valid_where_3_test() ->
     ?assertEqual(
         {false, [
-            {incompatible_type, <<"myfamily">>, binary, integer},
-            {incompatible_type, <<"myseries">>, binary, integer}]},
+            {incompatible_type, <<"myfamily">>, varchar, integer},
+            {incompatible_type, <<"myseries">>, varchar, integer}]},
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
@@ -1015,7 +1016,7 @@ is_query_valid_select_and_where_1_test() ->
 is_query_valid_compatible_op_1_test() ->
     ?assertEqual(
         {false, [
-        	{incompatible_operator, <<"myfamily">>, binary, '>'}]},
+            {incompatible_operator, <<"myfamily">>, varchar, '>'}]},
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
@@ -1025,7 +1026,7 @@ is_query_valid_compatible_op_1_test() ->
 is_query_valid_compatible_op_2_test() ->
     ?assertEqual(
         {false, [
-            {incompatible_operator, <<"myfamily">>, binary, '>='}]},
+            {incompatible_operator, <<"myfamily">>, varchar, '>='}]},
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
