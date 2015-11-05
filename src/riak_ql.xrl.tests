@@ -156,6 +156,29 @@ nums_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+floats_in_chars_test_() ->
+    ?_assertEqual(
+        [{chars, <<"hello44.4">>}],
+        riak_ql_lexer:get_tokens("hello44.4")
+    ).
+negative_floats_in_chars_test_() ->
+    ?_assertEqual(
+        [{chars, <<"hello-44.4">>}],
+        riak_ql_lexer:get_tokens("hello-44.4")
+    ).
+
+sci_floats_in_chars_test_() ->
+    ?_assertEqual(
+        [{chars, <<"hello4.40000000000000035527e+00">>}],
+        riak_ql_lexer:get_tokens("hello4.40000000000000035527e+00")
+    ).
+
+negative_sci_floats_in_chars_test_() ->
+    ?_assertEqual(
+        [{chars, <<"hello-4.40000000000000035527e+00">>}],
+        riak_ql_lexer:get_tokens("hello-4.40000000000000035527e+00")
+    ).
+
 ops_test_() ->
     Got = riak_ql_lexer:get_tokens("> < <> != !~ = =~"),
     Expected = [
