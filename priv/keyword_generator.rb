@@ -4,7 +4,7 @@ require 'csv'
 require 'pp'
 
 ERLANG_RESERVED = %w{and of or}
-DISAMBIGUATED = %W{float int}
+DISAMBIGUATED = %W{int}
 
 csv_filename =
   ARGV[0] ||
@@ -83,4 +83,4 @@ keywords.each do |kw_name, keyword|
 end
 
 # also need to add the int type to the second half the guard clause
-puts "Word2 =:= int -> % additional check added for Word2 only"
+puts "Word2 =:= integer -> % additional check added for Word2 only"

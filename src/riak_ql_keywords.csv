@@ -1,4 +1,5 @@
 and
+any
 as
 atom
 boolean
@@ -6,11 +7,13 @@ create table
 delete
 drop
 float
+float_sci
+float_type
 from
 global
 groupby
 inner
-integer
+int_type
 join
 limit
 local
@@ -21,7 +24,6 @@ on commit
 or
 primary key
 preserve
-quanta
 rows
 select
 system versioning
