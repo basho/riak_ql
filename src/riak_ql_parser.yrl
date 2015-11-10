@@ -55,11 +55,11 @@ datetime
 regex
 quoted
 integer
+float
 any
 boolean
-int_type
-float
-float_type
+sint64
+double
 eq
 gt
 lt
@@ -175,13 +175,13 @@ ColumnDefinition ->
     Field DataType : make_column('$1', '$2').
 ColumnConstraint -> not_null : '$1'.
 
-DataType -> datetime : '$1'.
-DataType -> float_type : canonicalize_data_type('$1').
-DataType -> int_type : canonicalize_data_type('$1').
+DataType -> datetime  : '$1'.
+DataType -> double    : '$1'.
+DataType -> sint64    : '$1'.
 DataType -> timestamp : '$1'.
-DataType -> varchar : '$1'.
-DataType -> boolean : '$1'.
-DataType -> any : '$1'.
+DataType -> varchar   : '$1'.
+DataType -> boolean   : '$1'.
+DataType -> any       : '$1'.
 
 KeyDefinition ->
     primary_key       openb KeyFieldList closeb                           : make_local_key('$3').
@@ -430,14 +430,14 @@ make_expr(A) ->
 
 make_column({binary, FieldName}, {DataType, _}) ->
     #riak_field_v1{
-       name = FieldName,
-       type = canonicalize_field_type(DataType),
+       name     = FieldName,
+       type     = DataType,
        optional = true}.
 
 make_column({binary, FieldName}, {DataType, _}, {not_null, _}) ->
     #riak_field_v1{
-       name = FieldName,
-       type = canonicalize_field_type(DataType),
+       name     = FieldName,
+       type     = DataType,
        optional = false}.
 
 %% if only the local key is defined
@@ -520,14 +520,3 @@ find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
 find_fields(Count, [_Head | Rest], Elements) ->
     find_fields(Count, Rest, Elements).
 
-canonicalize_field_type(varchar) ->
-    binary;
-canonicalize_field_type(Type) ->
-    Type.
-
-canonicalize_data_type({float_type, Tokens}) ->
-    {float, Tokens};
-canonicalize_data_type({int_type, Tokens}) ->
-    {integer, Tokens};
-canonicalize_data_type(Type) ->
-    Type.

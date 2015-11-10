@@ -124,18 +124,18 @@
                   "user_id varchar not null, " ++
                   "primary key (time, user_id))",
               {12345, <<"beeees">>},
-              [{timestamp, 12345}, {binary, <<"beeees">>}],
-              [{timestamp, 12345}, {binary, <<"beeees">>}]).
+              [{timestamp, 12345}, {varchar, <<"beeees">>}],
+              [{timestamp, 12345}, {varchar, <<"beeees">>}]).
 
-?passing_short_test(integer_type_test,
+?passing_short_test(sint64_type_test,
                     "create table temperatures "
-                    "(counter integer not null, "
+                    "(counter sint64 not null, "
                     "primary key (counter))",
               {12345}).
 
-?passing_short_test(float_test,
+?passing_short_test(double_test,
                     "create table temperatures "
-                    "(real_counter float not null, "
+                    "(real_counter double not null, "
                     "primary key (real_counter))",
               {12345.6}).
 
@@ -152,8 +152,8 @@
                   "user_id varchar not null, " ++
                   "primary key (time, user_id))",
               {12345, <<"beeees">>},
-              [{timestamp, 12345}, {binary, <<"beeees">>}],
-              [{timestamp, 12345}, {binary, <<"beeees">>}]).
+              [{timestamp, 12345}, {varchar, <<"beeees">>}],
+              [{timestamp, 12345}, {varchar, <<"beeees">>}]).
 
 %%
 %% roundtrip DDL tests
@@ -164,14 +164,14 @@
                   "user_id varchar not null, " ++
                   "primary key (time, user_id))").
 
-?ddl_roundtrip_assert(integer_type_ddl_test,
+?ddl_roundtrip_assert(sint64_type_ddl_test,
                     "create table temperatures "
-                    "(counter integer not null, "
+                    "(counter sint64 not null, "
                     "primary key (counter))").
 
-?ddl_roundtrip_assert(float_ddl_test,
+?ddl_roundtrip_assert(double_ddl_test,
                     "create table temperatures "
-                    "(real_counter float not null, "
+                    "(real_counter double not null, "
                     "primary key (real_counter))").
 
 ?ddl_roundtrip_assert(round_trip_ddl_2_test,

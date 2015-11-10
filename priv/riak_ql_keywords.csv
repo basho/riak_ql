@@ -5,6 +5,7 @@ atom
 boolean
 create table
 delete
+double
 drop
 float
 float_sci
@@ -13,7 +14,7 @@ from
 global
 groupby
 inner
-int_type
+sint64
 join
 limit
 local

@@ -12,13 +12,12 @@ ANY  = (A|a)(N|n)(Y|y)
 BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
 CREATE_TABLE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)\s(T|t)(A|a)(B|b)(L|l)(E|e)
 DELETE = (D|d)(E|e)(L|l)(E|e)(T|t)(E|e)
+DOUBLE = (D|d)(O|o)(U|u)(B|b)(L|l)(E|e)
 DROP = (D|d)(R|r)(O|o)(P|p)
-FLOAT = (F|f)(L|l)(O|o)(A|a)(T|t)
 FROM = (F|f)(R|r)(O|o)(M|m)
 GLOBAL = (G|g)(L|l)(O|o)(B|b)(A|a)(L|l)
 GROUPBY = (G|g)(R|r)(O|o)(U|u)(P|p)(B|b)(Y|y)
 INNER = (I|i)(N|n)(N|n)(E|e)(R|r)
-INTEGER = (I|i)(N|n)(T|t)(E|e)(G|g)(E|e)(R|r)
 JOIN = (J|j)(O|o)(I|i)(N|n)
 LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
 LOCAL = (L|l)(O|o)(C|c)(A|a)(L|l)
@@ -34,6 +33,7 @@ PRESERVE = (P|p)(R|r)(E|e)(S|s)(E|e)(R|r)(V|v)(E|e)
 QUANTUM = (Q|q)(U|u)(A|a)(N|n)(T|t)(U|u)(M|m)
 ROWS = (R|r)(O|o)(W|w)(S|s)
 SELECT = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
+SINT64 = ((S|s)(I|i)(N|n)(T|t)64)
 SYSTEM_VERSIONING = (S|s)(Y|y)(S|s)(T|t)(E|e)(M|m)\s(V|v)(E|e)(R|r)(S|s)(I|i)(O|o)(N|n)(I|i)(N|n)(G|g)
 TEMPORARY = (T|t)(E|e)(M|m)(P|p)(O|o)(R|r)(A|a)(R|r)(Y|y)
 TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
@@ -41,11 +41,11 @@ VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
 WITH = (W|w)(I|i)(T|t)(H|h)
 
-DATETIME = ('[0-9a-zA-Z\s:\-\.]*')
+DATETIME = ('([^\']|(\'\'))*')
 
 REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
-QUOTED = ("(.*(\")*)")
+QUOTED = ("([^\"]|(\"\"))*")
 
 WHITESPACE = ([\000-\s]*)
 
@@ -81,13 +81,12 @@ Rules.
 {BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
 {CREATE_TABLE} : {token, {create_table, list_to_binary(TokenChars)}}.
 {DELETE} : {token, {delete, list_to_binary(TokenChars)}}.
+{DOUBLE} : {token, {double, list_to_binary(TokenChars)}}.
 {DROP} : {token, {drop, list_to_binary(TokenChars)}}.
-{FLOAT} : {token, {float_type, list_to_binary(TokenChars)}}.
 {FROM} : {token, {from, list_to_binary(TokenChars)}}.
 {GLOBAL} : {token, {global, list_to_binary(TokenChars)}}.
 {GROUPBY} : {token, {groupby, list_to_binary(TokenChars)}}.
 {INNER} : {token, {inner, list_to_binary(TokenChars)}}.
-{INTEGER} : {token, {int_type, list_to_binary(TokenChars)}}.
 {JOIN} : {token, {join, list_to_binary(TokenChars)}}.
 {LIMIT} : {token, {limit, list_to_binary(TokenChars)}}.
 {LOCAL} : {token, {local, list_to_binary(TokenChars)}}.
@@ -103,6 +102,7 @@ Rules.
 {QUANTUM} : {token, {quantum, list_to_binary(TokenChars)}}.
 {ROWS} : {token, {rows, list_to_binary(TokenChars)}}.
 {SELECT} : {token, {select, list_to_binary(TokenChars)}}.
+{SINT64} : {token, {sint64, list_to_binary(TokenChars)}}.
 {SYSTEM_VERSIONING} : {token, {system_versioning, list_to_binary(TokenChars)}}.
 {TEMPORARY} : {token, {temporary, list_to_binary(TokenChars)}}.
 {TIMESTAMP} : {token, {timestamp, list_to_binary(TokenChars)}}.
@@ -182,11 +182,11 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word1 =:= float orelse
 						 Word1 =:= float_sci orelse
 						 Word1 =:= float_type orelse
+						 Word1 =:= double orelse
 						 Word1 =:= from orelse
 						 Word1 =:= global orelse
 						 Word1 =:= groupby orelse
 						 Word1 =:= inner orelse
-						 Word1 =:= int_type orelse
 						 Word1 =:= join orelse
 						 Word1 =:= limit orelse
 						 Word1 =:= local orelse
@@ -199,6 +199,7 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word1 =:= preserve orelse
 						 Word1 =:= rows orelse
 						 Word1 =:= select orelse
+						 Word1 =:= sint64 orelse
 						 Word1 =:= system_versioning orelse
 						 Word1 =:= temporary orelse
 						 Word1 =:= timestamp orelse
@@ -214,6 +215,7 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word2 =:= boolean orelse
 						 Word2 =:= create_table orelse
 						 Word2 =:= delete orelse
+						 Word2 =:= double orelse
 						 Word2 =:= drop orelse
 						 Word2 =:= float orelse
 						 Word2 =:= float_sci orelse
@@ -222,7 +224,6 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word2 =:= global orelse
 						 Word2 =:= groupby orelse
 						 Word2 =:= inner orelse
-						 Word2 =:= int_type orelse
 						 Word2 =:= join orelse
 						 Word2 =:= limit orelse
 						 Word2 =:= local orelse
@@ -235,6 +236,7 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word2 =:= preserve orelse
 						 Word2 =:= rows orelse
 						 Word2 =:= select orelse
+						 Word2 =:= sint64 orelse
 						 Word2 =:= system_versioning orelse
 						 Word2 =:= temporary orelse
 						 Word2 =:= timestamp orelse
@@ -263,16 +265,19 @@ lex(String) ->
     Toks.
 
 fix_up_date(Date) ->
-    Date2 = string:strip(Date, both, $'), %'
-    Date3 = string:strip(Date2),
-    case dh_date:parse(Date3) of
-        {error, bad_date} -> {chars, Date2};
-        Date4             -> {datetime, Date4}
+    RemovedOutsideQuotes = string:strip(Date, both, $'), %'
+    DeDoubledInternalQuotes = re:replace(RemovedOutsideQuotes,
+                                         "''", "'",
+                                         [global, {return, list}]),
+    RemovedOutsideSpacing = string:strip(DeDoubledInternalQuotes),
+    case dh_date:parse(RemovedOutsideSpacing) of
+        {error, bad_date} -> {chars, DeDoubledInternalQuotes};
+        ParsedDate        -> {datetime, ParsedDate}
     end.
 
-strip_quoted(Date) ->
-    Date2 = string:strip(Date, both, $"), %"
-    list_to_binary(string:strip(Date2)).
+strip_quoted(QuotedString) ->
+    StrippedOutsideQuotes = string:strip(QuotedString, both, $"),
+    re:replace(StrippedOutsideQuotes, "\"\"", "\"", [global, {return, binary}]).
 
 sci_to_float(Chars) ->
     [Mantissa, Exponent] = re:split(Chars, "E|e", [{return, list}]),

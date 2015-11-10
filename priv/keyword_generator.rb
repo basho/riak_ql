@@ -8,7 +8,7 @@ DISAMBIGUATED = %W{int}
 
 csv_filename =
   ARGV[0] ||
-  File.join(File.dirname(__FILE__), '..', 'src', 'riak_ql_keywords.csv')
+  File.join(File.dirname(__FILE__), '.', 'riak_ql_keywords.csv')
 
 keywords = Hash.new
 

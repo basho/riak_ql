@@ -43,7 +43,7 @@
 run_test(Name, CreateTable, SQLQuery, IsValid) ->
     Lexed = riak_ql_lexer:get_tokens(CreateTable),
     {ok, DDL} = riak_ql_parser:parse(Lexed),
-    case riak_ql_ddl_compiler:mk_helper_m2(DDL, "/tmp") of
+    case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
         {module, Module} ->
             Lexed2 = riak_ql_lexer:get_tokens(SQLQuery),
             Qry = riak_ql_parser:parse(Lexed2),
@@ -78,16 +78,16 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
 
 -define(STANDARDTABLE,
         "CREATE TABLE GeoCheckin "
-	++ "(geohash varchar not null, "
+        ++ "(geohash varchar not null, "
         ++ "user varchar not null, "
-	++ "time timestamp not null, "
-	++ "mytimestamp timestamp not null, "
-	++ "myboolean boolean not null, "
-	++ "myfloat float not null, "
-	++ "myany any not null, "
-	++ "myinteger integer not null, "
-	++ "myvarchar varchar not null, "
-	++ "PRIMARY KEY ((geohash, quantum(time, 15, 'm')), time, user))").
+        ++ "time timestamp not null, "
+        ++ "mytimestamp timestamp not null, "
+        ++ "myboolean boolean not null, "
+        ++ "mydouble double not null, "
+        ++ "myany any not null, "
+        ++ "mysint64 sint64 not null, "
+        ++ "myvarchar varchar not null, "
+        ++ "PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
 
 -define(SQL, "SELECT * FROM GeoCheckin WHERE " ++
             "geohash = erk and user = berk and time > 1 and time < 1000 and ").
@@ -137,8 +137,8 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
                   ?SQL ++ "myboolean = False").
 
 ?invalid_query_test(boolean_1d_test,
-                  ?STANDARDTABLE,
-                  ?SQL ++ "myboolean = yardle").
+                    ?STANDARDTABLE,
+                    ?SQL ++ "myboolean = yardle").
 
 ?valid_query_test(boolean_2_test,
                   ?STANDARDTABLE,
@@ -176,31 +176,31 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
                     ?STANDARDTABLE,
                     ?SQL ++ "myboolean >= fALse").
 
-%% Floats
+%% Doubles
 
-?valid_query_test(float_1_test,
+?valid_query_test(double_1_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myfloat = 3.4").
+                  ?SQL ++ "mydouble = 3.4").
 
-?valid_query_test(float_2_test,
+?valid_query_test(double_2_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myfloat != 3.4").
+                  ?SQL ++ "mydouble != 3.4").
 
-?valid_query_test(float_3_test,
+?valid_query_test(double_3_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myfloat < 3.4").
+                  ?SQL ++ "mydouble < 3.4").
 
-?valid_query_test(float_4_test,
+?valid_query_test(double_4_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myfloat <= 3.4").
+                  ?SQL ++ "mydouble <= 3.4").
 
-?valid_query_test(float_5_test,
+?valid_query_test(double_5_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myfloat > 3.4").
+                  ?SQL ++ "mydouble > 3.4").
 
-?valid_query_test(float_6_test,
+?valid_query_test(double_6_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myfloat >= 3.4").
+                  ?SQL ++ "mydouble >= 3.4").
 
 %% any's
 
@@ -228,31 +228,31 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
                     ?STANDARDTABLE,
                     ?SQL ++ "myany >= 3.4").
 
-%% integers
+%% sint64s
 
-?valid_query_test(integer_1_test,
+?valid_query_test(sint64_1_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myinteger = 3").
+                  ?SQL ++ "mysint64 = 3").
 
-?valid_query_test(integer_2_test,
+?valid_query_test(sint64_2_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myinteger != 3").
+                  ?SQL ++ "mysint64 != 3").
 
-?valid_query_test(integer_3_test,
+?valid_query_test(sint64_3_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myinteger < 3").
+                  ?SQL ++ "mysint64 < 3").
 
-?valid_query_test(integer_4_test,
+?valid_query_test(sint64_4_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myinteger <= 3").
+                  ?SQL ++ "mysint64 <= 3").
 
-?valid_query_test(integer_5_test,
+?valid_query_test(sint64_5_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myinteger > 3").
+                  ?SQL ++ "mysint64 > 3").
 
-?valid_query_test(integer_6_test,
+?valid_query_test(sint64_6_test,
                   ?STANDARDTABLE,
-                  ?SQL ++ "myinteger >= 3").
+                  ?SQL ++ "mysint64 >= 3").
 
 %% varchars
 

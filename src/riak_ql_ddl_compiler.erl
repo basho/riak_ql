@@ -171,9 +171,9 @@ validate_fields([#riak_field_v1{name     = N,
   when is_binary(N),
        (is_integer(P)
         andalso P > 0),
-       (Ty == binary
-        orelse Ty =:= integer
-        orelse Ty =:= float
+       (Ty == varchar
+        orelse Ty =:= sint64
+        orelse Ty =:= double
         orelse Ty =:= boolean
         orelse Ty =:= set
         orelse Ty =:= timestamp
@@ -628,9 +628,9 @@ make_v_gds2([#riak_field_v1{name     = Name,
                             position = NPos,
                             type     = Type,
                             optional = IsOp} | T], LineNo, Acc1, Acc2)
-  when Type =:= binary    orelse
-       Type =:= integer   orelse
-       Type =:= float     orelse
+  when Type =:= varchar   orelse
+       Type =:= sint64    orelse
+       Type =:= double    orelse
        Type =:= boolean   orelse
        Type =:= set       orelse
        Type =:= timestamp ->
@@ -651,11 +651,11 @@ make_v_gds2([#riak_field_v1{name     = Name,
 make_op(Op, LHS, RHS, LineNo) -> {op, LineNo, Op, LHS, RHS}.
 
 -spec make_validation_guard(expr(), simple_field_type(), pos_integer()) -> expr().
-make_validation_guard(Nm, binary, LNo) ->
+make_validation_guard(Nm, varchar, LNo) ->
     {call, LNo, make_atom(is_binary,  LNo), [Nm]};
-make_validation_guard(Nm, integer, LNo) ->
+make_validation_guard(Nm, sint64, LNo) ->
     {call, LNo, make_atom(is_integer, LNo), [Nm]};
-make_validation_guard(Nm, float, LNo) ->
+make_validation_guard(Nm, double, LNo) ->
     {call, LNo, make_atom(is_float, LNo), [Nm]};
 make_validation_guard(Nm, boolean, LNo) ->
     {call, LNo, make_atom(is_boolean, LNo), [Nm]};
@@ -805,64 +805,64 @@ make_simplest_valid_ddl() ->
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = binary}
+			     type     = varchar}
 	     ]).
 
-simple_valid_binary_test() ->
-    DDL = make_simple_valid_binary_ddl(),
+simple_valid_varchar_test() ->
+    DDL = make_simple_valid_varchar_ddl(),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, <<"werewr">>}),
     ?assertEqual(?VALID, Result).
 
-make_simple_valid_binary_ddl() ->
-    make_ddl(<<"simple_valid_binary_test">>,
+make_simple_valid_varchar_ddl() ->
+    make_ddl(<<"simple_valid_varchar_test">>,
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = binary},
+			     type     = varchar},
 	      #riak_field_v1{name     = <<"erko">>,
 			     position = 2,
-			     type     = binary}
+			     type     = varchar}
 	     ]).
 
-simple_valid_integer_test() ->
-    DDL = make_simple_valid_integer_ddl(),
+simple_valid_sint64_test() ->
+    DDL = make_simple_valid_sint64_ddl(),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({999, -9999, 0}),
     ?assertEqual(?VALID, Result).
 
-make_simple_valid_integer_ddl() ->
-    make_ddl(<<"simple_valid_integer_test">>,
+make_simple_valid_sint64_ddl() ->
+    make_ddl(<<"simple_valid_sint64_test">>,
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = integer},
+			     type     = sint64},
 	      #riak_field_v1{name     = <<"erko">>,
 			     position = 2,
-			     type     = integer},
+			     type     = sint64},
 	      #riak_field_v1{name     = <<"erkle">>,
 			     position = 3,
-			     type     = integer}
+			     type     = sint64}
 	     ]).
 
-simple_valid_float_test() ->
-    DDL = make_simple_valid_float_ddl(),
+simple_valid_double_test() ->
+    DDL = make_simple_valid_double_ddl(),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({432.22, -23423.22, -0.0}),
     ?assertEqual(?VALID, Result).
 
-make_simple_valid_float_ddl() ->
-    make_ddl(<<"simple_valid_float_test">>,
+make_simple_valid_double_ddl() ->
+    make_ddl(<<"simple_valid_double_test">>,
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = float},
+			     type     = double},
 	      #riak_field_v1{name     = <<"erko">>,
 			     position = 2,
-			     type     = float},
+			     type     = double},
 	      #riak_field_v1{name     = <<"erkle">>,
 			     position = 3,
-			     type     = float}
+			     type     = double}
 	     ]).
 
 simple_valid_boolean_test() ->
@@ -912,19 +912,19 @@ make_simple_valid_map_1_ddl() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yarple">>,
                                 position = 1,
-                                type     = binary}
+                                type     = varchar}
                 ]},
     _DDL = make_ddl(<<"simple_valid_map_1_test">>,
 		    [
 		     #riak_field_v1{name     = <<"yando">>,
 				    position = 1,
-				    type     = binary},
+				    type     = varchar},
 		     #riak_field_v1{name     = <<"erko">>,
 				    position = 2,
 				    type     = Map},
 		     #riak_field_v1{name     = <<"erkle">>,
 				    position = 3,
-				    type     = float}
+				    type     = double}
 		    ]).
 
 simple_valid_map_2_test() ->
@@ -937,22 +937,22 @@ make_simple_valid_map_2_ddl() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yarple">>,
                                 position = 1,
-                                type     = binary},
+                                type     = varchar},
                  #riak_field_v1{name     = <<"yoplait">>,
                                 position = 2,
-                                type     = integer}
+                                type     = sint64}
                 ]},
     _DDL = make_ddl(<<"simple_valid_map_2_test">>,
 		    [
 		     #riak_field_v1{name     = <<"yando">>,
 				    position = 1,
-				    type     = binary},
+				    type     = varchar},
 		     #riak_field_v1{name     = <<"erko">>,
 				    position = 2,
 				    type     = Map},
 		     #riak_field_v1{name     = <<"erkle">>,
 				    position = 3,
-				    type     = float}
+				    type     = double}
 		    ]).
 
 simple_valid_optional_1_test() ->
@@ -966,7 +966,7 @@ make_simple_valid_optional_1_ddl() ->
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = binary,
+			     type     = varchar,
 			     optional = true}
 	     ]).
 
@@ -981,15 +981,15 @@ make_simple_valid_optional_2_ddl() ->
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = binary,
+			     type     = varchar,
 			     optional = true},
 	      #riak_field_v1{name     = <<"erko">>,
 			     position = 2,
-			     type     = integer,
+			     type     = sint64,
 			     optional = true},
 	      #riak_field_v1{name     = <<"erkle">>,
 			     position = 3,
-			     type     = float,
+			     type     = double,
 			     optional = true},
 	      #riak_field_v1{name     = <<"eejit">>,
 			     position = 4,
@@ -1020,11 +1020,11 @@ make_simple_valid_optional_3_ddl() ->
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = binary,
+			     type     = varchar,
 			     optional = true},
 	      #riak_field_v1{name     = <<"yerk">>,
 			     position = 2,
-			     type     = binary,
+			     type     = varchar,
 			     optional = false}
 	     ]).
 
@@ -1038,18 +1038,18 @@ make_complex_valid_optional_1_ddl() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yando">>,
                                 position = 1,
-                                type     = integer,
+                                type     = sint64,
                                 optional = true},
                  #riak_field_v1{name     = <<"yando">>,
                                 position = 2,
-                                type     = binary,
+                                type     = varchar,
                                 optional = true}
                 ]},
     _DDL = make_ddl(<<"complex_valid_optional_1_test">>,
 		    [
 		     #riak_field_v1{name     = <<"yando">>,
 				    position = 1,
-				    type     = binary,
+				    type     = varchar,
 				    optional = true},
 		     #riak_field_v1{name     = <<"yando">>,
 				    position = 2,
@@ -1067,33 +1067,33 @@ make_complex_valid_map_1_ddl() ->
     Map2 = {map, [
                   #riak_field_v1{name     = <<"dingle">>,
                                  position = 1,
-                                 type     = integer},
+                                 type     = sint64},
                   #riak_field_v1{name     = <<"zoomer">>,
                                  position = 2,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     Map1 = {map, [
                   #riak_field_v1{name     = <<"yarple">>,
                                  position = 1,
-                                 type     = integer},
+                                 type     = sint64},
                   #riak_field_v1{name     = <<"yoplait">>,
                                  position = 2,
                                  type     = Map2},
                   #riak_field_v1{name     = <<"yowl">>,
                                  position = 3,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     _DDL = make_ddl(<<"complex_valid_map_1_test">>,
 		    [
 		     #riak_field_v1{name     = <<"yando">>,
 				    position = 1,
-				    type     = integer},
+				    type     = sint64},
 		     #riak_field_v1{name     = <<"erko">>,
 				    position = 2,
 				    type     = Map1},
 		     #riak_field_v1{name     = <<"erkle">>,
 				    position = 3,
-				    type     = integer}
+				    type     = sint64}
 		    ]).
 
 complex_valid_map_2_test() ->
@@ -1106,18 +1106,18 @@ make_complex_valid_map_2_ddl() ->
     Map3 = {map, [
                   #riak_field_v1{name     = <<"yik">>,
                                  position = 1,
-                                 type     = integer},
+                                 type     = sint64},
                   #riak_field_v1{name     = <<"banjo">>,
                                  position = 2,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     Map2 = {map, [
                   #riak_field_v1{name     = <<"dingle">>,
                                  position = 1,
-                                 type     = integer},
+                                 type     = sint64},
                   #riak_field_v1{name     = <<"zoomer">>,
                                  position = 2,
-                                 type     = integer},
+                                 type     = sint64},
                   #riak_field_v1{name     = <<"dougal">>,
                                  position = 3,
                                  type     = Map3}
@@ -1125,25 +1125,25 @@ make_complex_valid_map_2_ddl() ->
     Map1 = {map, [
                   #riak_field_v1{name     = <<"yarple">>,
                                  position = 1,
-                                 type     = integer},
+                                 type     = sint64},
                   #riak_field_v1{name     = <<"yoplait">>,
                                  position = 2,
                                  type     = Map2},
                   #riak_field_v1{name     = <<"yowl">>,
                                  position = 3,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     _DDL = make_ddl(<<"complex_valid_map_2_test">>,
 		    [
 		     #riak_field_v1{name     = <<"yando">>,
 				    position = 1,
-				    type     = integer},
+				    type     = sint64},
 		     #riak_field_v1{name     = <<"erko">>,
 				    position = 2,
 				    type     = Map1},
 		     #riak_field_v1{name     = <<"erkle">>,
 				    position = 3,
-				    type     = integer}
+				    type     = sint64}
 		    ]).
 
 complex_valid_map_3_test() ->
@@ -1156,17 +1156,17 @@ make_complex_valid_map_3_ddl() ->
     Map3 = {map, [
                   #riak_field_v1{name     = <<"in_Map_2">>,
                                  position = 1,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     Map2 = {map, [
                   #riak_field_v1{name     = <<"in_Map_1">>,
                                  position = 1,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     Map1 = {map, [
                   #riak_field_v1{name     = <<"Level_1_1">>,
                                  position = 1,
-                                 type     = integer},
+                                 type     = sint64},
                   #riak_field_v1{name     = <<"Level_1_map1">>,
                                  position = 2,
                                  type     = Map2},
@@ -1192,13 +1192,13 @@ make_simple_valid_any_ddl() ->
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = binary},
+			     type     = varchar},
 	      #riak_field_v1{name     = <<"erko">>,
 			     position = 2,
 			     type     = any},
 	      #riak_field_v1{name     = <<"erkle">>,
 			     position = 3,
-			     type     = float}
+			     type     = double}
 	     ]).
 
 simple_valid_set_test() ->
@@ -1212,13 +1212,13 @@ make_simple_valid_set_ddl() ->
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = binary},
+			     type     = varchar},
 	      #riak_field_v1{name     = <<"erko">>,
 			     position = 2,
 			     type     = set},
 	      #riak_field_v1{name     = <<"erkle">>,
 			     position = 3,
-			     type     = float}
+			     type     = double}
 	     ]).
 
 simple_valid_mixed_test() ->
@@ -1232,13 +1232,13 @@ make_simple_valid_mixed_ddl() ->
 	     [
 	      #riak_field_v1{name     = <<"yando">>,
 			     position = 1,
-			     type     = binary},
+			     type     = varchar},
 	      #riak_field_v1{name     = <<"erko">>,
 			     position = 2,
-			     type     = integer},
+			     type     = sint64},
 	      #riak_field_v1{name     = <<"erkle">>,
 			     position = 3,
-			     type     = float},
+			     type     = double},
 	      #riak_field_v1{name     = <<"banjo">>,
 			     position = 4,
 			     type     = timestamp}
@@ -1248,49 +1248,49 @@ make_simple_valid_mixed_ddl() ->
 %% invalid tests
 %%
 
-simple_invalid_binary_test() ->
-    DDL = make_ddl(<<"simple_invalid_binary_test">>,
+simple_invalid_varchar_test() ->
+    DDL = make_ddl(<<"simple_invalid_varchar_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary},
+                                   type     = varchar},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
-                                   type     = binary}
+                                   type     = varchar}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, 55}),
     ?assertEqual(?INVALID, Result).
 
-simple_invalid_integer_test() ->
-    DDL = make_ddl(<<"simple_invalid_integer_test">>,
+simple_invalid_sint64_test() ->
+    DDL = make_ddl(<<"simple_invalid_sint64_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = integer},
+                                   type     = sint64},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
-                                   type     = integer},
+                                   type     = sint64},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = integer}
+                                   type     = sint64}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({999, -9999, 0,0}),
     ?assertEqual(?INVALID, Result).
 
-simple_invalid_float_test() ->
-    DDL = make_ddl(<<"simple_invalid_float_test">>,
+simple_invalid_double_test() ->
+    DDL = make_ddl(<<"simple_invalid_double_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = float},
+                                   type     = double},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
-                                   type     = float},
+                                   type     = double},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({432.22, -23423.22, [a, b, d]}),
@@ -1318,13 +1318,13 @@ simple_invalid_set_test() ->
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary},
+                                   type     = varchar},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
                                    type     = set},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [444.44], 4.4}),
@@ -1385,19 +1385,19 @@ simple_invalid_map_1_test() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yarple">>,
                                 position = 1,
-                                type     = binary}
+                                type     = varchar}
                 ]},
     DDL = make_ddl(<<"simple_invalid_map_1_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary},
+                                   type     = varchar},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
                                    type     = Map},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {99}, 4.4}),
@@ -1407,22 +1407,22 @@ simple_invalid_map_2_test() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yarple">>,
                                 position = 1,
-                                type     = binary},
+                                type     = varchar},
                  #riak_field_v1{name     = <<"yip">>,
                                 position = 2,
-                                type     = binary}
+                                type     = varchar}
                 ]},
     DDL = make_ddl(<<"simple_invalid_map_2_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary},
+                                   type     = varchar},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
                                    type     = Map},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"erer">>}, 4.4}),
@@ -1432,22 +1432,22 @@ simple_invalid_map_3_test() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yarple">>,
                                 position = 1,
-                                type     = binary},
+                                type     = varchar},
                  #riak_field_v1{name     = <<"yip">>,
                                 position = 2,
-                                type     = binary}
+                                type     = varchar}
                 ]},
     DDL = make_ddl(<<"simple_invalid_map_3_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary},
+                                   type     = varchar},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
                                    type     = Map},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"bingo">>, <<"bango">>, <<"erk">>}, 4.4}),
@@ -1457,19 +1457,19 @@ simple_invalid_map_4_test() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yarple">>,
                                 position = 1,
-                                type     = binary}
+                                type     = varchar}
                 ]},
     DDL = make_ddl(<<"simple_invalid_map_4_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary},
+                                   type     = varchar},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
                                    type     = Map},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [99], 4.4}),
@@ -1479,33 +1479,33 @@ complex_invalid_map_1_test() ->
     Map2 = {map, [
                   #riak_field_v1{name     = <<"dingle">>,
                                  position = 1,
-                                 type     = binary},
+                                 type     = varchar},
                   #riak_field_v1{name     = <<"zoomer">>,
                                  position = 2,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     Map1 = {map, [
                   #riak_field_v1{name     = <<"yarple">>,
                                  position = 1,
-                                 type     = binary},
+                                 type     = varchar},
                   #riak_field_v1{name     = <<"yoplait">>,
                                  position = 2,
                                  type     = Map2},
                   #riak_field_v1{name     = <<"yowl">>,
                                  position = 3,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     DDL = make_ddl(<<"complex_invalid_map_1_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary},
+                                   type     = varchar},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
                                    type     = Map1},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({<<"ewrewr">>,
@@ -1521,13 +1521,13 @@ too_small_tuple_test() ->
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = float},
+                                   type     = double},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
-                                   type     = float},
+                                   type     = double},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({432.22, -23423.22}),
@@ -1538,13 +1538,13 @@ too_big_tuple_test() ->
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = float},
+                                   type     = double},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
-                                   type     = float},
+                                   type     = double},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:validate_obj({432.22, -23423.22, 44.44, 65.43}),
@@ -1555,15 +1555,15 @@ too_big_tuple_test() ->
 simple_invalid_position_test() ->
     Duff = #riak_field_v1{name     = <<"erkle">>,
                           position = 4,
-                          type     = float},
+                          type     = double},
     DDL = make_ddl(<<"simple_invalid_position_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = float},
+                                   type     = double},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
-                                   type     = float},
+                                   type     = double},
                     Duff
                    ]),
     {error, Err} = mk_helper_m2(DDL),
@@ -1587,7 +1587,7 @@ simple_invalid_optional_test() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yando">>,
                                 position = 1,
-                                type     = integer,
+                                type     = sint64,
                                 optional = true}
                 ]},
     Duff = #riak_field_v1{name     = <<"ribbit">>,
@@ -1611,7 +1611,7 @@ complex_invalid_vals_test() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yando">>,
                                 position = 1,
-                                type     = integer,
+                                type     = sint64,
                                 optional = true},
                  Duff
                 ]},
@@ -1619,7 +1619,7 @@ complex_invalid_vals_test() ->
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary,
+                                   type     = varchar,
                                    optional = true},
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 2,
@@ -1640,7 +1640,7 @@ simplest_valid_extract_test() ->
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary}
+                                   type     = varchar}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Obj = {<<"yarble">>},
@@ -1652,10 +1652,10 @@ simple_valid_extract_test() ->
                    [
                     #riak_field_v1{name     = <<"scoobie">>,
                                    position = 1,
-                                   type     = integer},
+                                   type     = sint64},
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 2,
-                                   type     = binary}
+                                   type     = varchar}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Obj = {44, <<"yarble">>},
@@ -1666,19 +1666,19 @@ simple_valid_map_extract_test() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yarple">>,
                                 position = 1,
-                                type     = binary}
+                                type     = varchar}
                 ]},
     DDL = make_ddl(<<"simple_valid_map_extract_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary},
+                                   type     = varchar},
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
                                    type     = Map},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Obj = {<<"erk">>, {<<"jibjib">>}, 3.0},
@@ -1689,17 +1689,17 @@ complex_valid_map_extract_test() ->
     Map3 = {map, [
                   #riak_field_v1{name     = <<"in_Map_2">>,
                                  position = 1,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     Map2 = {map, [
                   #riak_field_v1{name     = <<"in_Map_1">>,
                                  position = 1,
-                                 type     = integer}
+                                 type     = sint64}
                  ]},
     Map1 = {map, [
                   #riak_field_v1{name     = <<"Level_1_1">>,
                                  position = 1,
-                                 type     = integer},
+                                 type     = sint64},
                   #riak_field_v1{name     = <<"Level_1_map1">>,
                                  position = 2,
                                  type     = Map2},
@@ -1737,7 +1737,7 @@ make_complex_ddl_ddl() ->
 		 #riak_field_v1{
 		    name     = <<"user_id">>,
 		    position = 2,
-		    type     = binary,
+		    type     = varchar,
 		    optional = false}
 		],
        partition_key = #key_v1{ast = [
@@ -1770,22 +1770,22 @@ simple_valid_map_add_cols_test() ->
     Map = {map, [
                  #riak_field_v1{name     = <<"yarple">>,
                                 position = 1,
-                                type     = binary},
+                                type     = varchar},
                  #riak_field_v1{name     = <<"yoplait">>,
                                 position = 2,
-                                type     = integer}
+                                type     = sint64}
                 ]},
     DDL = make_ddl(<<"simple_valid_map_2_test">>,
                    [
                     #riak_field_v1{name     = <<"yando">>,
                                    position = 1,
-                                   type     = binary},
+                                   type     = varchar},
 		    #riak_field_v1{name     = <<"erko">>,
 				   position = 2,
                                    type     = Map},
                     #riak_field_v1{name     = <<"erkle">>,
                                    position = 3,
-                                   type     = float}
+                                   type     = double}
                    ]),
     {module, Module} = mk_helper_m2(DDL),
     Result = Module:add_column_info({1, {2, 3}, 4}),
@@ -1809,14 +1809,14 @@ simple_valid_map_add_cols_test() ->
 simplest_valid_get_test() ->
     ?ddl_roundtrip_assert(make_simplest_valid_ddl).
 
-simple_valid_binary_get_test() ->
-    ?ddl_roundtrip_assert(make_simple_valid_binary_ddl).
+simple_valid_varchar_get_test() ->
+    ?ddl_roundtrip_assert(make_simple_valid_varchar_ddl).
 
-simple_valid_integer_get_test() ->
-    ?ddl_roundtrip_assert(make_simple_valid_integer_ddl).
+simple_valid_sint64_get_test() ->
+    ?ddl_roundtrip_assert(make_simple_valid_sint64_ddl).
 
-simple_valid_float_get_test() ->
-    ?ddl_roundtrip_assert(make_simple_valid_float_ddl).
+simple_valid_double_get_test() ->
+    ?ddl_roundtrip_assert(make_simple_valid_double_ddl).
 
 simple_valid_boolean_get_test() ->
     ?ddl_roundtrip_assert(make_simple_valid_boolean_ddl).
@@ -1870,11 +1870,11 @@ make_timeseries_ddl() ->
     Fields = [
 	      #riak_field_v1{name     = <<"geohash">>,
 			     position = 1,
-			     type     = binary,
+			     type     = varchar,
 			     optional = false},
 	      #riak_field_v1{name     = <<"user">>,
 			     position = 2,
-			     type     = binary,
+			     type     = varchar,
 			     optional = false},
 	      #riak_field_v1{name     = <<"time">>,
 			     position = 3,
@@ -1882,11 +1882,11 @@ make_timeseries_ddl() ->
 			     optional = false},
 	      #riak_field_v1{name     = <<"weather">>,
 			     position = 4,
-			     type     = binary,
+			     type     = varchar,
 			     optional = false},
 	      #riak_field_v1{name     = <<"temperature">>,
 			     position = 5,
-			     type     = binary,
+			     type     = varchar,
 			     optional = true}
 	     ],
     PK = #key_v1{ ast = [

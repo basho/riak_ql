@@ -81,26 +81,23 @@ keyword_general_test_() ->
       ).
 
 
-keyword_int_type_test_() ->
+keyword_int_test_() ->
     ?_assertEqual(
-        [{int_type, <<"integer">>},
-         {int_type, <<"INTEGER">>},
-         {int_type, <<"iNteger">>},
-         {int_type, <<"InTeger">>}],
-        riak_ql_lexer:get_tokens("integer INTEGER iNteger InTeger")
-    ).
+       [{sint64, <<"sint64">>},
+        {sint64, <<"SINT64">>},
+        {sint64, <<"siNT64">>},
+        {sint64, <<"Sint64">>}],
+       riak_ql_lexer:get_tokens("sint64 SINT64 siNT64 Sint64")
+      ).
 
-keyword_float_type_test_() ->
+keyword_double_test_() ->
     ?_assertEqual(
-        [{float_type, <<"float">>},
-         {float_type, <<"Float">>},
-         {float_type, <<"fLoat">>},
-         {float_type, <<"flOat">>},
-         {float_type, <<"floAt">>},
-         {float_type, <<"floaT">>},
-         {float_type, <<"FLOAT">>}],
-        riak_ql_lexer:get_tokens("float Float fLoat flOat floAt floaT FLOAT")
-    ).
+       [{double, <<"double">>},
+        {double, <<"Double">>},
+        {double, <<"dOuble">>},
+        {double, <<"DOUBLE">>}],
+       riak_ql_lexer:get_tokens("double Double dOuble DOUBLE")
+      ).
 
 keywords_create_test_() ->
     Got = riak_ql_lexer:get_tokens("create table not null primary key"),
@@ -112,7 +109,7 @@ keywords_create_test_() ->
 
 words_containing_keywords_test_() ->
     Got = riak_ql_lexer:get_tokens("error or horror and handy andy or "
-				   "zfloatcintxcreateyb or jimmy3boy or jimmy4"),
+                                   "zdoublecintxcreateyb or jimmy3boy or jimmy4"),
     Expected = [
                 {chars, <<"error">>},
                 {or_,   <<"or">>},
@@ -121,7 +118,7 @@ words_containing_keywords_test_() ->
                 {chars, <<"handy">>},
                 {chars, <<"andy">>},
                 {or_,   <<"or">>},
-		{chars, <<"zfloatcintxcreateyb">>},
+                {chars, <<"zdoublecintxcreateyb">>},
                 {or_,   <<"or">>},
                 {chars, <<"jimmy3boy">>},
                 {or_,   <<"or">>},
@@ -201,10 +198,10 @@ brackets_test_() ->
     ?_assertEqual(Expected, Got).
 
 keywords_in_words_test_() ->
-    Got = riak_ql_lexer:get_tokens("myfloat myinteger myboolean mycreate myany"),
+    Got = riak_ql_lexer:get_tokens("mydouble mysint64 myboolean mycreate myany"),
     Expected = [
-                {chars, <<"myfloat">>},
-                {chars, <<"myinteger">>},
+                {chars, <<"mydouble">>},
+                {chars, <<"mysint64">>},
                 {chars, <<"myboolean">>},
                 {chars, <<"mycreate">>},
                 {chars, <<"myany">>}
@@ -247,10 +244,27 @@ not_a_date_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+multiple_single_quotes_test_() ->
+    Got = riak_ql_lexer:get_tokens("'user_1' 'San Fierro' 'klingon''name'"),
+    Expected = [
+                {chars, <<"user_1">>},
+                {chars, <<"San Fierro">>},
+                {chars, <<"klingon'name">>}
+               ],
+    ?_assertEqual(Expected, Got).
+
 double_quote_1_test_() ->
     Got = riak_ql_lexer:get_tokens("\" yardle hoop !@#$%^&*() _ -\""),
     Expected = [
-                {quoted, <<"yardle hoop !@#$%^&*() _ -">>}
+                {quoted, <<" yardle hoop !@#$%^&*() _ -">>}
+               ],
+    ?_assertEqual(Expected, Got).
+
+double_quote_2_test_() ->
+    Got = riak_ql_lexer:get_tokens("\"first quote\" \"second quote\""),
+    Expected = [
+                {quoted, <<"first quote">>},
+                {quoted, <<"second quote">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -319,55 +333,55 @@ general_test_() ->
 
 timeseries_test_() ->
     Got = riak_ql_lexer:get_tokens("CREATE TABLE Geo ("
-				   ++ "geohash varchar not_null, "
-				   ++ "user varchar not_null, "
-				   ++ "time timestamp not_null, "
-				   ++ "weather varchar not_null, "
-				   ++ "temperature float not_null, "
-				   ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
+                                   ++ "geohash varchar not_null, "
+                                   ++ "user varchar not_null, "
+                                   ++ "time timestamp not_null, "
+                                   ++ "weather varchar not_null, "
+                                   ++ "temperature double not_null, "
+                                   ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
     Expected = [
-		{create_table, <<"CREATE TABLE">>},
-		{chars,<<"Geo">>},
-		{openb, <<"(">>},
-		{chars,<<"geohash">>},
-		{varchar, <<"varchar">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{chars,<<"user">>},
-		{varchar, <<"varchar">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{chars,<<"time">>},
-		{timestamp, <<"timestamp">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{chars,<<"weather">>},
-		{varchar, <<"varchar">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{chars,<<"temperature">>},
-		{float_type, <<"float">>},
-		{chars,<<"not_null">>},
-		{comma, <<",">>},
-		{primary_key, <<"PRIMARY KEY">>},
-		{openb, <<"(">>},
-		{openb, <<"(">>},
-		{chars,<<"geohash">>},
-		{comma, <<",">>},
-		{quantum, <<"quantum">>},
-		{openb, <<"(">>},
-		{chars,<<"time">>},
-		{comma, <<",">>},
-		{integer,15},
-		{comma, <<",">>},
-		{chars,<<"m">>},
-		{closeb, <<")">>},
-		{comma, <<",">>},
-		{chars,<<"time">>},
-		{comma, <<",">>},
-		{chars,<<"user">>},
-		{closeb, <<")">>}
-	       ],
+                {create_table, <<"CREATE TABLE">>},
+                {chars,<<"Geo">>},
+                {openb, <<"(">>},
+                {chars,<<"geohash">>},
+                {varchar, <<"varchar">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"user">>},
+                {varchar, <<"varchar">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"time">>},
+                {timestamp, <<"timestamp">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"weather">>},
+                {varchar, <<"varchar">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {chars,<<"temperature">>},
+                {double, <<"double">>},
+                {chars,<<"not_null">>},
+                {comma, <<",">>},
+                {primary_key, <<"PRIMARY KEY">>},
+                {openb, <<"(">>},
+                {openb, <<"(">>},
+                {chars,<<"geohash">>},
+                {comma, <<",">>},
+                {quantum, <<"quantum">>},
+                {openb, <<"(">>},
+                {chars,<<"time">>},
+                {comma, <<",">>},
+                {integer,15},
+                {comma, <<",">>},
+                {chars,<<"m">>},
+                {closeb, <<")">>},
+                {comma, <<",">>},
+                {chars,<<"time">>},
+                {comma, <<",">>},
+                {chars,<<"user">>},
+                {closeb, <<")">>}
+               ],
     ?_assertEqual(Expected, Got).
 
 unquoted_strings_test() ->
