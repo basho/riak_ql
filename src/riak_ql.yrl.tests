@@ -5,6 +5,7 @@
         Exp2 = fix(Expected),
         Toks = riak_ql_lexer:get_tokens(String),
         Got = parse(Toks),
+io:format(standard_error, "~n~p~n~p~n", [Expected, Got]),
         ?assertEqual({ok, Exp2}, Got)).
 
 -define(where_test(Uncanonical, Expected),
@@ -82,6 +83,19 @@ select_fields_from_lists_sql_test() ->
 select_where_1_sql_test() ->
     ?sql_compilation_assert("select value from response_times " ++
                                 "where time > '2013-08-12 23:32:01' and time < '2013-08-13 12:34:56'",
+                            #riak_sql_v1{'SELECT' = [[<<"value">>]],
+                                         'FROM'   = <<"response_times">>,
+                                         'WHERE'  = [
+                                                     {and_,
+                                                      {'<', <<"time">>, {datetime, {{2013, 8, 13}, {12, 34, 56}}}},
+                                                      {'>', <<"time">>, {datetime, {{2013, 8, 12}, {23, 32, 1}}}}
+                                                     }
+                                                    ]
+                                        }).
+
+select_where_1_reverse_sql_test() ->
+    ?sql_compilation_assert("select value from response_times " ++
+                                "where '2013-08-12 23:32:01' < time and '2013-08-13 12:34:56' > time",
                             #riak_sql_v1{'SELECT' = [[<<"value">>]],
                                          'FROM'   = <<"response_times">>,
                                          'WHERE'  = [

@@ -223,8 +223,8 @@ Erlang code.
 %% unused/but not to be exported in the yecc source
 %% no way to stop rebar borking on it AFAIK
 -export([
-	 return_error/2
-	 ]).
+         return_error/2
+         ]).
 
 -ifdef(TEST).
 -include("riak_ql.yrl.tests").
@@ -237,23 +237,23 @@ fix_up_keys(A) ->
     A.
 
 convert(#outputs{type    = select,
-		 buckets = B,
-		 fields  = F,
-		 limit   = L,
-		 where   = W}) ->
+                 buckets = B,
+                 fields  = F,
+                 limit   = L,
+                 where   = W}) ->
     Q = case B of
-	    {Type, _} when Type =:= list orelse Type =:= regex ->
-		#riak_sql_v1{'SELECT' = F,
-			     'FROM'   = B,
-			     'WHERE'  = W,
-			     'LIMIT'  = L};
-	    _ ->
-		#riak_sql_v1{'SELECT'   = F,
-			     'FROM'     = B,
-			     'WHERE'    = W,
-			     'LIMIT'    = L,
-			     helper_mod = riak_ql_ddl:make_module_name(B)}
-	end,
+            {Type, _} when Type =:= list orelse Type =:= regex ->
+                #riak_sql_v1{'SELECT' = F,
+                             'FROM'   = B,
+                             'WHERE'  = W,
+                             'LIMIT'  = L};
+            _ ->
+                #riak_sql_v1{'SELECT'   = F,
+                             'FROM'     = B,
+                             'WHERE'    = W,
+                             'LIMIT'    = L,
+                             helper_mod = riak_ql_ddl:make_module_name(B)}
+        end,
     Q;
 convert(#outputs{type = create} = O) ->
     O.
@@ -274,10 +274,10 @@ make_clause({select, _}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
                 regex  -> regex
             end,
     Bucket = case Type2 of
-		 string -> D;
-		 list   -> {Type2, [X || X <- D]};
-		 regex  -> {Type2, D}
-	     end,
+                 string -> D;
+                 list   -> {Type2, [X || X <- D]};
+                 regex  -> {Type2, D}
+             end,
     _O = #outputs{type    = select,
                   fields  = [[X] || X <- B],
                   buckets = Bucket,
@@ -297,9 +297,9 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
              div_      -> '/';
              gt        -> '>';
              lt        -> '<';
-	     gte       -> '>=';
-	     lte       -> '<=';
-	     eq        -> '=';
+             gte       -> '>=';
+             lte       -> '<=';
+             eq        -> '=';
              ne        -> '<>';
              approx    -> '=~';
              notapprox -> '!~';
@@ -325,48 +325,56 @@ canonicalise(WhereClause) ->
     Canonical = canon2(WhereClause),
     _NewWhere = hoist(Canonical).
 
+canon2({Cond, A, B}) when is_binary(B) andalso not is_binary(A) ->
+    canonicalize_condition_order({Cond, B, A});
 canon2({Cond, A, B}) when Cond =:= and_ orelse
-			  Cond =:= or_  ->
+                          Cond =:= or_  ->
     %% this is stack busting non-tail recursion
     %% but our where clauses are bounded in size so thats OK
     A1 = canon2(A),
     B1 = canon2(B),
     case is_lower(A1, B1) of
-	true  -> {Cond, A1, B1};
-	false -> {Cond, B1, A1}
+        true  -> {Cond, A1, B1};
+        false -> {Cond, B1, A1}
     end;
 canon2(A) ->
     A.
+
+-spec canonicalize_condition_order({atom(), any(), binary()}) -> {atom(), binary(), any()}.
+canonicalize_condition_order({'>', Reference, Column}) ->
+    canon2({'<', Column, Reference});
+canonicalize_condition_order({'<', Reference, Column}) ->
+    canon2({'>', Column, Reference}).
 
 hoist({and_, {and_, A, B}, C}) ->
     Hoisted = {and_, A, hoist({and_, B, C})},
     _Sort = sort(Hoisted);
 hoist({A, B, C}) ->
     B2 = case B of
-	     {and_, _, _} -> hoist(B);
-	     _            -> B
-	 end,
+             {and_, _, _} -> hoist(B);
+             _            -> B
+         end,
     C2 = case C of
-	     {and_, _, _} -> hoist(C);
-	     _            -> C
-	 end,
+             {and_, _, _} -> hoist(C);
+             _            -> C
+         end,
     {A, B2, C2}.
 
 %% a truly horendous bubble sort algo which is also
 %% not tail recursive
 sort({and_, A, {and_, B, C}}) ->
     case is_lower(A, B) of
-	true  -> {and_, B1, C1} = sort({and_, B, C}),
-		 case is_lower(A, B1) of
-		     true  -> {and_, A, {and_, B1, C1}};
-		     false -> sort({and_, B1, {and_, A, C1}})
-		 end;
-	false -> sort({and_, B, sort({and_, A, C})})
+        true  -> {and_, B1, C1} = sort({and_, B, C}),
+                 case is_lower(A, B1) of
+                     true  -> {and_, A, {and_, B1, C1}};
+                     false -> sort({and_, B1, {and_, A, C1}})
+                 end;
+        false -> sort({and_, B, sort({and_, A, C})})
     end;
 sort({Op, A, B}) ->
     case is_lower(A, B) of
-	true  -> {Op, A, B};
-	false -> {Op, B, A}
+        true  -> {Op, A, B};
+        false -> {Op, B, A}
     end.
 
 is_lower(Ands, {_, _, _}) when is_list(Ands)->
@@ -376,28 +384,28 @@ is_lower({_, _, _}, Ands) when is_list(Ands)->
 is_lower(Ands1, Ands2) when is_list(Ands1) andalso is_list(Ands2) ->
     true;
 is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
-					 Op1 =:= or_  orelse
-					 Op1 =:= '>'  orelse
-					 Op1 =:= '<'  orelse
-					 Op1 =:= '>='  orelse
-					 Op1 =:= '<='  orelse
-					 Op1 =:= '='  orelse
-					 Op1 =:= '<>' orelse
-					 Op1 =:= '=~' orelse
-					 Op1 =:= '!~' orelse
-					 Op1 =:= '!=')
-					andalso
-					(Op2 =:= and_ orelse
-					 Op2 =:= or_  orelse
-					 Op2 =:= '>'  orelse
-					 Op2 =:= '<'  orelse
-					 Op2 =:= '>='  orelse
-					 Op2 =:= '<='  orelse
-					 Op2 =:= '='  orelse
-					 Op2 =:= '<>' orelse
-					 Op2 =:= '=~' orelse
-					 Op2 =:= '!~' orelse
-					 Op2 =:= '!=') ->
+                                         Op1 =:= or_  orelse
+                                         Op1 =:= '>'  orelse
+                                         Op1 =:= '<'  orelse
+                                         Op1 =:= '>='  orelse
+                                         Op1 =:= '<='  orelse
+                                         Op1 =:= '='  orelse
+                                         Op1 =:= '<>' orelse
+                                         Op1 =:= '=~' orelse
+                                         Op1 =:= '!~' orelse
+                                         Op1 =:= '!=')
+                                        andalso
+                                        (Op2 =:= and_ orelse
+                                         Op2 =:= or_  orelse
+                                         Op2 =:= '>'  orelse
+                                         Op2 =:= '<'  orelse
+                                         Op2 =:= '>='  orelse
+                                         Op2 =:= '<='  orelse
+                                         Op2 =:= '='  orelse
+                                         Op2 =:= '<>' orelse
+                                         Op2 =:= '=~' orelse
+                                         Op2 =:= '!~' orelse
+                                         Op2 =:= '!=') ->
     (A < B).
 
 remove_conditionals({conditional, A}) ->
@@ -503,11 +511,11 @@ find_local_key([_Head | Rest]) ->
 make_modfun(quantum, {list, Args}) ->
     [Param, Quantity, Unit] = lists:reverse(Args),
     {modfun, #hash_fn_v1{
-		mod  = riak_ql_quanta,
-		fn   = quantum,
-		args = [#param_v1{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
-		type = timestamp
-	       }}.
+                mod  = riak_ql_quanta,
+                fn   = quantum,
+                args = [#param_v1{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
+                type = timestamp
+               }}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(1, Elements, []).
@@ -519,4 +527,3 @@ find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
     find_fields(Count + 1, Rest, [PositionedField | Elements]);
 find_fields(Count, [_Head | Rest], Elements) ->
     find_fields(Count, Rest, Elements).
-
