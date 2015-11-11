@@ -111,26 +111,26 @@ words_containing_keywords_test_() ->
     Got = riak_ql_lexer:get_tokens("error or horror and handy andy or "
                                    "zdoublecintxcreateyb or jimmy3boy or jimmy4"),
     Expected = [
-                {chars, <<"error">>},
+                {identifier, <<"error">>},
                 {or_,   <<"or">>},
-                {chars, <<"horror">>},
+                {identifier, <<"horror">>},
                 {and_,  <<"and">>},
-                {chars, <<"handy">>},
-                {chars, <<"andy">>},
+                {identifier, <<"handy">>},
+                {identifier, <<"andy">>},
                 {or_,   <<"or">>},
-                {chars, <<"zdoublecintxcreateyb">>},
+                {identifier, <<"zdoublecintxcreateyb">>},
                 {or_,   <<"or">>},
-                {chars, <<"jimmy3boy">>},
+                {identifier, <<"jimmy3boy">>},
                 {or_,   <<"or">>},
-                {chars, <<"jimmy4">>}
+                {identifier, <<"jimmy4">>}
                ],
     ?_assertEqual(Expected, Got).
 
 words_containing_digits_test_() ->
     Got = riak_ql_lexer:get_tokens("'sha512' sha 512"),
     Expected = [
-                {chars, <<"sha512">>},
-                {chars, <<"sha">>},
+                {character_literal, <<"sha512">>},
+                {identifier, <<"sha">>},
                 {integer, 512}
                ],
     ?_assertEqual(Expected, Got).
@@ -171,11 +171,11 @@ brackets_test_() ->
 keywords_in_words_test_() ->
     Got = riak_ql_lexer:get_tokens("mydouble mysint64 myboolean mycreate myany"),
     Expected = [
-                {chars, <<"mydouble">>},
-                {chars, <<"mysint64">>},
-                {chars, <<"myboolean">>},
-                {chars, <<"mycreate">>},
-                {chars, <<"myany">>}
+                {identifier, <<"mydouble">>},
+                {identifier, <<"mysint64">>},
+                {identifier, <<"myboolean">>},
+                {identifier, <<"mycreate">>},
+                {identifier, <<"myany">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -211,31 +211,31 @@ datetime_1d_test_() ->
 not_a_date_test_() ->
     Got = riak_ql_lexer:get_tokens("'ergle'"),
     Expected = [
-                {chars, <<"ergle">>}
+                {character_literal, <<"ergle">>}
                ],
     ?_assertEqual(Expected, Got).
 
 multiple_single_quotes_test_() ->
     Got = riak_ql_lexer:get_tokens("'user_1' 'San Fierro' 'klingon''name'"),
     Expected = [
-                {chars, <<"user_1">>},
-                {chars, <<"San Fierro">>},
-                {chars, <<"klingon'name">>}
+                {character_literal, <<"user_1">>},
+                {character_literal, <<"San Fierro">>},
+                {character_literal, <<"klingon'name">>}
                ],
     ?_assertEqual(Expected, Got).
 
 double_quote_1_test_() ->
     Got = riak_ql_lexer:get_tokens("\" yardle hoop !@#$%^&*() _ -\""),
     Expected = [
-                {quoted, <<" yardle hoop !@#$%^&*() _ -">>}
+                {identifier, <<" yardle hoop !@#$%^&*() _ -">>}
                ],
     ?_assertEqual(Expected, Got).
 
 double_quote_2_test_() ->
     Got = riak_ql_lexer:get_tokens("\"first quote\" \"second quote\""),
     Expected = [
-                {quoted, <<"first quote">>},
-                {quoted, <<"second quote">>}
+                {identifier, <<"first quote">>},
+                {identifier, <<"second quote">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -267,9 +267,9 @@ regex_3_test_() ->
 chars_test_() ->
     Got = riak_ql_lexer:get_tokens("r_t , ee where"),
     Expected = [
-                {chars, <<"r_t">>},
+                {identifier, <<"r_t">>},
                 {comma, <<",">>},
-                {chars, <<"ee">>},
+                {identifier, <<"ee">>},
                 {where, <<"where">>}
                ],
     io:format("Expected is ~p~n", [Expected]),
@@ -290,11 +290,11 @@ general_test_() ->
     Got = riak_ql_lexer:get_tokens("select v from r_t where time > '23 April 63 1:2:3'"),
     Expected = [
                 {select, <<"select">>},
-                {chars,  <<"v">>},
+                {identifier,  <<"v">>},
                 {from, <<"from">>},
-                {chars, <<"r_t">>},
+                {identifier, <<"r_t">>},
                 {where, <<"where">>},
-                {chars, <<"time">>},
+                {identifier, <<"time">>},
                 {gt, <<">">>},
                 {datetime, {{63, 4, 23}, {1, 2, 3}}}
                ],
@@ -312,57 +312,57 @@ timeseries_test_() ->
                                    ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
     Expected = [
                 {create_table, <<"CREATE TABLE">>},
-                {chars,<<"Geo">>},
+                {identifier,<<"Geo">>},
                 {openb, <<"(">>},
-                {chars,<<"geohash">>},
+                {identifier,<<"geohash">>},
                 {varchar, <<"varchar">>},
-                {chars,<<"not_null">>},
+                {identifier,<<"not_null">>},
                 {comma, <<",">>},
-                {chars,<<"user">>},
+                {identifier,<<"user">>},
                 {varchar, <<"varchar">>},
-                {chars,<<"not_null">>},
+                {identifier,<<"not_null">>},
                 {comma, <<",">>},
-                {chars,<<"time">>},
+                {identifier,<<"time">>},
                 {timestamp, <<"timestamp">>},
-                {chars,<<"not_null">>},
+                {identifier,<<"not_null">>},
                 {comma, <<",">>},
-                {chars,<<"weather">>},
+                {identifier,<<"weather">>},
                 {varchar, <<"varchar">>},
-                {chars,<<"not_null">>},
+                {identifier,<<"not_null">>},
                 {comma, <<",">>},
-                {chars,<<"temperature">>},
+                {identifier,<<"temperature">>},
                 {double, <<"double">>},
-                {chars,<<"not_null">>},
+                {identifier,<<"not_null">>},
                 {comma, <<",">>},
                 {primary_key, <<"PRIMARY KEY">>},
                 {openb, <<"(">>},
                 {openb, <<"(">>},
-                {chars,<<"geohash">>},
+                {identifier,<<"geohash">>},
                 {comma, <<",">>},
                 {quantum, <<"quantum">>},
                 {openb, <<"(">>},
-                {chars,<<"time">>},
+                {identifier,<<"time">>},
                 {comma, <<",">>},
                 {integer,15},
                 {comma, <<",">>},
-                {chars,<<"m">>},
+                {identifier,<<"m">>},
                 {closeb, <<")">>},
                 {comma, <<",">>},
-                {chars,<<"time">>},
+                {identifier,<<"time">>},
                 {comma, <<",">>},
-                {chars,<<"user">>},
+                {identifier,<<"user">>},
                 {closeb, <<")">>}
                ],
     ?_assertEqual(Expected, Got).
 
-unquoted_strings_test() ->
+unquoted_identifiers_test() ->
     String = "cats = be a st",
     Got = riak_ql_lexer:get_tokens(String),
     Expected = [
-                {chars, <<"cats">>},
+                {identifier, <<"cats">>},
                 {eq, <<"=">>},
-                {chars, <<"be">>},
-                {chars, <<"a">>},
-                {chars, <<"st">>}
+                {identifier, <<"be">>},
+                {identifier, <<"a">>},
+                {identifier, <<"st">>}
                ],
     ?_assertEqual(Expected, Got).
