@@ -6,6 +6,7 @@ create table
 delete
 double
 drop
+false
 from
 global
 groupby
@@ -27,6 +28,7 @@ select
 system versioning
 temporary
 timestamp
+true
 varchar
 where
 with
