@@ -14,6 +14,7 @@ CREATE_TABLE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)\s(T|t)(A|a)(B|b)(L|l)(E|e)
 DELETE = (D|d)(E|e)(L|l)(E|e)(T|t)(E|e)
 DOUBLE = (D|d)(O|o)(U|u)(B|b)(L|l)(E|e)
 DROP = (D|d)(R|r)(O|o)(P|p)
+FALSE = (F|f)(A|a)(L|l)(S|s)(E|e)
 FROM = (F|f)(R|r)(O|o)(M|m)
 GLOBAL = (G|g)(L|l)(O|o)(B|b)(A|a)(L|l)
 GROUPBY = (G|g)(R|r)(O|o)(U|u)(P|p)(B|b)(Y|y)
@@ -37,6 +38,7 @@ SINT64 = ((S|s)(I|i)(N|n)(T|t)64)
 SYSTEM_VERSIONING = (S|s)(Y|y)(S|s)(T|t)(E|e)(M|m)\s(V|v)(E|e)(R|r)(S|s)(I|i)(O|o)(N|n)(I|i)(N|n)(G|g)
 TEMPORARY = (T|t)(E|e)(M|m)(P|p)(O|o)(R|r)(A|a)(R|r)(Y|y)
 TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
+TRUE = (T|t)(R|r)(U|u)(E|e)
 VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
 WITH = (W|w)(I|i)(T|t)(H|h)
@@ -83,6 +85,7 @@ Rules.
 {DELETE} : {token, {delete, list_to_binary(TokenChars)}}.
 {DOUBLE} : {token, {double, list_to_binary(TokenChars)}}.
 {DROP} : {token, {drop, list_to_binary(TokenChars)}}.
+{FALSE} : {token, {false, TokenChars}}.
 {FROM} : {token, {from, list_to_binary(TokenChars)}}.
 {GLOBAL} : {token, {global, list_to_binary(TokenChars)}}.
 {GROUPBY} : {token, {groupby, list_to_binary(TokenChars)}}.
@@ -106,6 +109,7 @@ Rules.
 {SYSTEM_VERSIONING} : {token, {system_versioning, list_to_binary(TokenChars)}}.
 {TEMPORARY} : {token, {temporary, list_to_binary(TokenChars)}}.
 {TIMESTAMP} : {token, {timestamp, list_to_binary(TokenChars)}}.
+{TRUE} : {token, {true, TokenChars}}.
 {VARCHAR} : {token, {varchar, list_to_binary(TokenChars)}}.
 {WHERE} : {token, {where, list_to_binary(TokenChars)}}.
 {WITH} : {token, {with, list_to_binary(TokenChars)}}.
@@ -177,6 +181,7 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= identifier orelse
                                                  Word1 =:= delete orelse
                                                  Word1 =:= drop orelse
                                                  Word1 =:= double orelse
+                                                 Word1 =:= false orelse
                                                  Word1 =:= from orelse
                                                  Word1 =:= global orelse
                                                  Word1 =:= groupby orelse
@@ -197,6 +202,7 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= identifier orelse
                                                  Word1 =:= system_versioning orelse
                                                  Word1 =:= temporary orelse
                                                  Word1 =:= timestamp orelse
+                                                 Word1 =:= true orelse
                                                  Word1 =:= varchar orelse
                                                  Word1 =:= where orelse
                                                  Word1 =:= with orelse
@@ -211,6 +217,7 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= identifier orelse
                                                  Word2 =:= delete orelse
                                                  Word2 =:= double orelse
                                                  Word2 =:= drop orelse
+                                                 Word2 =:= false orelse
                                                  Word2 =:= from orelse
                                                  Word2 =:= global orelse
                                                  Word2 =:= groupby orelse
@@ -231,6 +238,7 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= identifier orelse
                                                  Word2 =:= system_versioning orelse
                                                  Word2 =:= temporary orelse
                                                  Word2 =:= timestamp orelse
+                                                 Word2 =:= true orelse
                                                  Word2 =:= varchar orelse
                                                  Word2 =:= where orelse
                                                  Word2 =:= with orelse

@@ -85,6 +85,8 @@ timestamp
 varchar
 %% atom
 quantum
+true
+false
 .
 
 Rootsymbol Statement.
@@ -143,6 +145,8 @@ Val -> float     : '$1'.
 Val -> datetime  : '$1'.
 Val -> varchar   : '$1'.
 Val -> CharacterLiteral : '$1'.
+Val -> true : {boolean, true}.
+Val -> false : {boolean, false}.
 
 Logic -> and_ : '$1'.
 Logic -> or_  : '$1'.
