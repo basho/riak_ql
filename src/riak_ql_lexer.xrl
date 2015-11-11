@@ -111,8 +111,11 @@ Rules.
 {WITH} : {token, {with, list_to_binary(TokenChars)}}.
 
 {INTNUM}   : {token, {integer, list_to_integer(TokenChars)}}.
-{FLOATDEC} : {token, {float, list_to_float(TokenChars)}}.
-{FLOATSCI} : {token, {float, sci_to_float(TokenChars)}}.
+
+% float chars do not get converted to floats, if they are part of a word
+% then converting it and converting it back will alter the chars
+{FLOATDEC} : {token, {float, TokenChars}}.
+{FLOATSCI} : {token, {float_sci, TokenChars}}.
 
 {EQ}          : {token, {eq,     list_to_binary(TokenChars)}}.
 {APPROXMATCH} : {token, {approx, list_to_binary(TokenChars)}}.
@@ -176,6 +179,9 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word1 =:= create_table orelse
 						 Word1 =:= delete orelse
 						 Word1 =:= drop orelse
+						 Word1 =:= float orelse
+						 Word1 =:= float_sci orelse
+						 Word1 =:= float_type orelse
 						 Word1 =:= double orelse
 						 Word1 =:= from orelse
 						 Word1 =:= global orelse
@@ -211,6 +217,9 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word2 =:= delete orelse
 						 Word2 =:= double orelse
 						 Word2 =:= drop orelse
+						 Word2 =:= float orelse
+						 Word2 =:= float_sci orelse
+						 Word2 =:= float_type orelse
 						 Word2 =:= from orelse
 						 Word2 =:= global orelse
 						 Word2 =:= groupby orelse
@@ -237,12 +246,17 @@ post_p([{Word1, W1}, {Word2, W2} | T], Acc) when Word1 =:= chars orelse
 						 Word2 =:= quantum orelse
 						 Word2 =:= integer ->
     W2a = case Word2 of
-              integer -> integer_to_binary(W2);
-              _       -> <<W2/binary>>
-          end,
+	      integer            -> integer_to_binary(W2);
+	      _ when is_list(W2) -> list_to_binary(W2);
+	      _                  -> <<W2/binary>>
+	  end,
     post_p([{chars, <<W1/binary, W2a/binary>>} | T], Acc);
 post_p([{chars, TokenChars} | T], Acc) when is_list(TokenChars)->
     post_p(T, [{chars, list_to_binary(TokenChars)} | Acc]);
+post_p([{float, TokenChars} | T], Acc) ->
+    post_p(T, [{float, list_to_float(TokenChars)} | Acc]);
+post_p([{float_sci, TokenChars} | T], Acc) ->
+    post_p(T, [{float, sci_to_float(TokenChars)} | Acc]);
 post_p([H | T], Acc) ->
     post_p(T, [H | Acc]).
 
