@@ -291,6 +291,15 @@ make_clause({select, _SelectBytes},
 add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
 
+make_expr({LiteralFlavor, Literal},
+          {ComparisonType, _ComparisonBytes},
+          {identifier, IdentifierName})
+  when LiteralFlavor /= identifier
+->
+    FlippedComparison = flip_comparison(ComparisonType),
+    make_expr({identifier, IdentifierName},
+              {FlippedComparison, <<"flipped">>},
+              {LiteralFlavor, Literal});
 make_expr({_, A}, {B, _}, {Type, C}) ->
     B1 = case B of
              and_      -> and_;
@@ -318,6 +327,11 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
 make_where({where, A}, {conditional, B}) ->
     NewB = remove_conditionals(B),
     {A, [canonicalise(NewB)]}.
+
+flip_comparison(lt) -> gt;
+flip_comparison(gt) -> lt;
+flip_comparison(lte) -> gte;
+flip_comparison(gte) -> lte.
 
 %%
 %% rewrite the where clause to have a canonical form
