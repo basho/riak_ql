@@ -90,7 +90,7 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
         ++ "PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
 
 -define(SQL, "SELECT * FROM GeoCheckin WHERE " ++
-            "geohash = erk and user = berk and time > 1 and time < 1000 and ").
+            "geohash = 'erk' and user = 'berk' and time > 1 and time < 1000 and ").
 
 %% Timestamps
 
