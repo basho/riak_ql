@@ -26,8 +26,8 @@
 
 %% this function can be used to work out which Module to use
 -export([
-	 make_module_name/1
-	]).
+         make_module_name/1
+        ]).
 
 %% a helper function for destructuring data objects
 %% and testing the validity of field names
@@ -43,11 +43,11 @@
 -export([syntax_error_to_msg/1]).
 
 -type query_syntax_error() ::
-	{bucket_type_mismatch, DDL_bucket::binary(), Query_bucket::binary()} |
-	{incompatible_type, Field::binary(), simple_field_type(), atom()} |
-	{incompatible_operator, Field::binary(), simple_field_type(), relational_op()}  |
-	{unexpected_where_field, Field::binary()} |
-	{unexpected_select_field, Field::binary()}.
+        {bucket_type_mismatch, DDL_bucket::binary(), Query_bucket::binary()} |
+        {incompatible_type, Field::binary(), simple_field_type(), atom()} |
+        {incompatible_operator, Field::binary(), simple_field_type(), relational_op()}  |
+        {unexpected_where_field, Field::binary()} |
+        {unexpected_select_field, Field::binary()}.
 
 -export_type([query_syntax_error/0]).
 
@@ -61,7 +61,7 @@
 -define(CANTBEBLANK, false).
 
 -spec make_module_name(Table::binary()) ->
-	    module().
+            module().
 make_module_name(Table) when is_binary(Table) ->
     Nonce = binary_to_list(base64:encode(crypto:hash(md4, Table))),
     Nonce2 = remove_hooky_chars(Nonce),
@@ -85,7 +85,7 @@ get_local_key(#ddl_v1{table = T, local_key = LK}, Obj)
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
 make_key(_Mod, none, _Vals) -> [];
 make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso
-					     is_list(Vals) ->
+                                             is_list(Vals) ->
     mk_k(AST, Vals, Mod, []).
 
 %% TODO there is a mismatch between how the fields in the where clause
@@ -93,9 +93,9 @@ make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso
 mk_k([], _Vals, _Mod, Acc) ->
     lists:reverse(Acc);
 mk_k([#hash_fn_v1{mod = Md,
-		  fn   = Fn,
-		  args = Args,
-		  type = Ty} | T1], Vals, Mod, Acc) ->
+                  fn   = Fn,
+                  args = Args,
+                  type = Ty} | T1], Vals, Mod, Acc) ->
     A2 = extract(Args, Vals, []),
     V  = erlang:apply(Md, Fn, A2),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
@@ -121,9 +121,9 @@ build([#param_v1{name = Nm} | T], Obj, Mod, A) ->
     Type = Mod:get_field_type(Nm),
     build(T, Obj, Mod, [{Type, Val} | A]);
 build([#hash_fn_v1{mod  = Md,
-		   fn   = Fn,
-		   args = Args,
-		   type = Ty} | T], Obj, Mod, A) ->
+                   fn   = Fn,
+                   args = Args,
+                   type = Ty} | T], Obj, Mod, A) ->
     A2 = convert(Args, Obj, Mod, []),
     Val = erlang:apply(Md, Fn, A2),
     build(T, Obj, Mod, [{Ty, Val} | A]).
@@ -140,10 +140,10 @@ convert([Constant | T], Obj, Mod, Acc) ->
 %% Convert an error emmitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
 -spec syntax_error_to_msg(query_syntax_error()) ->
-	    Msg::binary().
+            Msg::binary().
 syntax_error_to_msg(E) ->
-	{Fmt, Args} = syntax_error_to_msg2(E),
-	iolist_to_binary(io_lib:format(Fmt, Args)).
+        {Fmt, Args} = syntax_error_to_msg2(E),
+        iolist_to_binary(io_lib:format(Fmt, Args)).
 
 %%
 syntax_error_to_msg2({bucket_type_mismatch, B1, B2}) ->
@@ -165,7 +165,7 @@ syntax_error_to_msg2({unexpected_select_field, Field}) ->
 -spec is_query_valid(module(), #ddl_v1{}, #riak_sql_v1{}) ->
         true | {false, [query_syntax_error()]}.
 is_query_valid(_,
-	           #ddl_v1{ table = T1 },
+                   #ddl_v1{ table = T1 },
                #riak_sql_v1{ 'FROM' = T2 }) when T1 =/= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _,
@@ -217,8 +217,8 @@ normalise(X) -> X.
 -spec is_compatible_type(ColType::atom(), WhereType::atom(), any()) ->
         boolean().
 is_compatible_type(timestamp, integer, _)       -> true;
-is_compatible_type(boolean,   binary,  "true")  -> true;
-is_compatible_type(boolean,   binary,  "false") -> true;
+is_compatible_type(boolean,   boolean,  true)   -> true;
+is_compatible_type(boolean,   boolean,  false)  -> true;
 is_compatible_type(sint64,    integer, _)       -> true;
 is_compatible_type(double,    float,   _)       -> true;
 is_compatible_type(varchar,   binary,  _)       -> true;
@@ -227,14 +227,14 @@ is_compatible_type(_, _, _) -> false.
 %% Check that the operation being performed in a where clause, for example
 %% we cannot check if one binary is greated than another one in SQL.
 -spec is_compatible_operator(OP::relational_op(),
-	                         ExpectedType::simple_field_type(),
-	                         RHS_type::atom()) -> boolean().
+                                 ExpectedType::simple_field_type(),
+                                 RHS_type::atom()) -> boolean().
 is_compatible_operator('=',  varchar, binary) -> true;
 is_compatible_operator('!=', varchar, binary) -> true;
 is_compatible_operator(_,    varchar, binary) -> false;
-is_compatible_operator('=',  boolean, binary) -> true;
-is_compatible_operator('!=', boolean, binary) -> true;
-is_compatible_operator(_,    boolean, binary) -> false;
+is_compatible_operator('=',  boolean, boolean)-> true;
+is_compatible_operator('!=', boolean, boolean)-> true;
+is_compatible_operator(_,    boolean, boolean)-> false;
 is_compatible_operator(_,_,_)                 -> true.
 
 are_selections_valid(_, [], ?CANTBEBLANK) ->
@@ -242,14 +242,14 @@ are_selections_valid(_, [], ?CANTBEBLANK) ->
 are_selections_valid(Mod, Selections, _) ->
     CheckFn = fun(X, {Acc, Status}) ->
                       case Mod:is_field_valid(X) of
-			  true  -> {Acc, Status};
-			  false -> Msg = {unexpected_select_field, hd(X)},
-				   {[Msg | Acc], false}
-		      end
-	      end,
+                          true  -> {Acc, Status};
+                          false -> Msg = {unexpected_select_field, hd(X)},
+                                   {[Msg | Acc], false}
+                      end
+              end,
     case lists:foldl(CheckFn, {[], true}, Selections) of
-	{[],   true}  -> true;
-	{Msgs, false} -> {false, lists:reverse(Msgs)}
+        {[],   true}  -> true;
+        {Msgs, false} -> {false, lists:reverse(Msgs)}
     end.
 
 %% Fold over the syntax tree for a where clause.
@@ -289,9 +289,9 @@ make_ddl(Table, Fields, PK) when is_binary(Table) ->
 make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
   when is_binary(Table) ->
     #ddl_v1{table         = Table,
-	    fields        = Fields,
-	    partition_key = PK,
-	    local_key     = LK}.
+            fields        = Fields,
+            partition_key = PK,
+            local_key     = LK}.
 
 %%
 %% get partition_key tests
@@ -300,15 +300,15 @@ make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
 simplest_partition_key_test() ->
     Name = <<"yando">>,
     PK = #key_v1{ast = [
-			#param_v1{name = [Name]}
-		       ]},
+                        #param_v1{name = [Name]}
+                       ]},
     DDL = make_ddl(<<"simplest_partition_key_test">>,
-		   [
-		    #riak_field_v1{name     = Name,
-				   position = 1,
-				   type     = varchar}
-		   ],
-		   PK),
+                   [
+                    #riak_field_v1{name     = Name,
+                                   position = 1,
+                                   type     = varchar}
+                   ],
+                   PK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {Name},
     Result = (catch get_partition_key(DDL, Obj)),
@@ -318,22 +318,22 @@ simple_partition_key_test() ->
     Name1 = <<"yando">>,
     Name2 = <<"buckle">>,
     PK = #key_v1{ast = [
-			#param_v1{name = [Name1]},
-			#param_v1{name = [Name2]}
-		       ]},
+                        #param_v1{name = [Name1]},
+                        #param_v1{name = [Name2]}
+                       ]},
     DDL = make_ddl(<<"simple_partition_key_test">>,
-		   [
-		    #riak_field_v1{name     = Name2,
-				   position = 1,
-				   type     = varchar},
-		    #riak_field_v1{name     = <<"sherk">>,
-				   position = 2,
-				   type     = varchar},
-		    #riak_field_v1{name     = Name1,
-				   position = 3,
-				   type     = varchar}
-		   ],
-		   PK),
+                   [
+                    #riak_field_v1{name     = Name2,
+                                   position = 1,
+                                   type     = varchar},
+                    #riak_field_v1{name     = <<"sherk">>,
+                                   position = 2,
+                                   type     = varchar},
+                    #riak_field_v1{name     = Name1,
+                                   position = 3,
+                                   type     = varchar}
+                   ],
+                   PK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {<<"one">>, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
@@ -343,30 +343,30 @@ function_partition_key_test() ->
     Name1 = <<"yando">>,
     Name2 = <<"buckle">>,
     PK = #key_v1{ast = [
-			#param_v1{name = [Name1]},
-			#hash_fn_v1{mod  = ?MODULE,
-				    fn   = mock_partition_fn,
-				    args = [
-					    #param_v1{name = [Name2]},
-					    15,
-					    m
-					   ],
-				    type = timestamp
-				   }
-		       ]},
+                        #param_v1{name = [Name1]},
+                        #hash_fn_v1{mod  = ?MODULE,
+                                    fn   = mock_partition_fn,
+                                    args = [
+                                            #param_v1{name = [Name2]},
+                                            15,
+                                            m
+                                           ],
+                                    type = timestamp
+                                   }
+                       ]},
     DDL = make_ddl(<<"function_partition_key_test">>,
-		   [
-		    #riak_field_v1{name     = Name2,
-				   position = 1,
-				   type     = timestamp},
-		    #riak_field_v1{name     = <<"sherk">>,
-				   position = 2,
-				   type     = varchar},
-		    #riak_field_v1{name     = Name1,
-				   position = 3,
-				   type     = varchar}
-		   ],
-		   PK),
+                   [
+                    #riak_field_v1{name     = Name2,
+                                   position = 1,
+                                   type     = timestamp},
+                    #riak_field_v1{name     = <<"sherk">>,
+                                   position = 2,
+                                   type     = varchar},
+                    #riak_field_v1{name     = Name1,
+                                   position = 3,
+                                   type     = varchar}
+                   ],
+                   PK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {1234567890, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
@@ -381,65 +381,65 @@ complex_partition_key_test() ->
     Name2 = <<"buckle">>,
     Name3 = <<"doodle">>,
     PK = #key_v1{ast = [
-			#param_v1{name = [Name0, Name1]},
-			#hash_fn_v1{mod  = ?MODULE,
-				    fn   = mock_partition_fn,
-				    args = [
-					    #param_v1{name = [
-							      Name0,
-							      Name2,
-							      Name3
-							     ]},
-					    "something",
-					    pong
-					   ],
-				    type = poodle
-				   },
-			#hash_fn_v1{mod  = ?MODULE,
-				    fn   = mock_partition_fn,
-				    args = [
-					    #param_v1{name = [
-							      Name0,
-							      Name1
-							     ]},
-					    #param_v1{name = [
-							      Name0,
-							      Name2,
-							      Name3
-							     ]},
-					    pang
-					   ],
-				    type = wombat
-				   }
-		       ]},
+                        #param_v1{name = [Name0, Name1]},
+                        #hash_fn_v1{mod  = ?MODULE,
+                                    fn   = mock_partition_fn,
+                                    args = [
+                                            #param_v1{name = [
+                                                              Name0,
+                                                              Name2,
+                                                              Name3
+                                                             ]},
+                                            "something",
+                                            pong
+                                           ],
+                                    type = poodle
+                                   },
+                        #hash_fn_v1{mod  = ?MODULE,
+                                    fn   = mock_partition_fn,
+                                    args = [
+                                            #param_v1{name = [
+                                                              Name0,
+                                                              Name1
+                                                             ]},
+                                            #param_v1{name = [
+                                                              Name0,
+                                                              Name2,
+                                                              Name3
+                                                             ]},
+                                            pang
+                                           ],
+                                    type = wombat
+                                   }
+                       ]},
     Map3 = {map, [
-		  #riak_field_v1{name     = <<"in_Map_2">>,
-				 position = 1,
-				 type     = sint64}
-		 ]},
+                  #riak_field_v1{name     = <<"in_Map_2">>,
+                                 position = 1,
+                                 type     = sint64}
+                 ]},
     Map2 = {map, [
-		  #riak_field_v1{name     = Name3,
-				 position = 1,
-				 type     = sint64}
-		 ]},
+                  #riak_field_v1{name     = Name3,
+                                 position = 1,
+                                 type     = sint64}
+                 ]},
     Map1 = {map, [
-		  #riak_field_v1{name     = Name1,
-				 position = 1,
-				 type     = sint64},
-		  #riak_field_v1{name     = Name2,
-				 position = 2,
-				 type     = Map2},
-		  #riak_field_v1{name     = <<"Level_1_map2">>,
-				 position = 3,
-				 type     = Map3}
-		 ]},
+                  #riak_field_v1{name     = Name1,
+                                 position = 1,
+                                 type     = sint64},
+                  #riak_field_v1{name     = Name2,
+                                 position = 2,
+                                 type     = Map2},
+                  #riak_field_v1{name     = <<"Level_1_map2">>,
+                                 position = 3,
+                                 type     = Map3}
+                 ]},
     DDL = make_ddl(<<"complex_partition_key_test">>,
-		   [
-		    #riak_field_v1{name     = Name0,
-				   position = 1,
-				   type     = Map1}
-		   ],
-		   PK),
+                   [
+                    #riak_field_v1{name     = Name0,
+                                   position = 1,
+                                   type     = Map1}
+                   ],
+                   PK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {{2, {3}, {4}}},
     Result = (catch get_partition_key(DDL, Obj)),
@@ -453,18 +453,18 @@ complex_partition_key_test() ->
 local_key_test() ->
     Name = <<"yando">>,
     PK = #key_v1{ast = [
-			#param_v1{name = [Name]}
-		       ]},
+                        #param_v1{name = [Name]}
+                       ]},
     LK = #key_v1{ast = [
-			#param_v1{name = [Name]}
-		       ]},
+                        #param_v1{name = [Name]}
+                       ]},
     DDL = make_ddl(<<"simplest_key_key_test">>,
-		   [
-		    #riak_field_v1{name     = Name,
-				   position = 1,
-				   type     = varchar}
-		   ],
-		   PK, LK),
+                   [
+                    #riak_field_v1{name     = Name,
+                                   position = 1,
+                                   type     = varchar}
+                   ],
+                   PK, LK),
     {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Obj = {Name},
     Result = (catch get_local_key(DDL, Obj)),
@@ -476,76 +476,76 @@ local_key_test() ->
 
 simple_valid_map_get_type_1_test() ->
     Map = {map, [
-		 #riak_field_v1{name     = <<"yarple">>,
-				position = 1,
-				type     = sint64}
-		]},
+                 #riak_field_v1{name     = <<"yarple">>,
+                                position = 1,
+                                type     = sint64}
+                ]},
     DDL = make_ddl(<<"simple_valid_map_get_type_1_test">>,
-		   [
-		    #riak_field_v1{name     = <<"yando">>,
-				   position = 1,
-				   type     = varchar},
-		    #riak_field_v1{name     = <<"erko">>,
-				   position = 2,
-				   type     = Map},
-		    #riak_field_v1{name     = <<"erkle">>,
-				   position = 3,
-				   type     = double}
-		   ]),
+                   [
+                    #riak_field_v1{name     = <<"yando">>,
+                                   position = 1,
+                                   type     = varchar},
+                    #riak_field_v1{name     = <<"erko">>,
+                                   position = 2,
+                                   type     = Map},
+                    #riak_field_v1{name     = <<"erkle">>,
+                                   position = 3,
+                                   type     = double}
+                   ]),
     {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Result = (catch Module:get_field_type([<<"erko">>, <<"yarple">>])),
     ?assertEqual(sint64, Result).
 
 simple_valid_map_get_type_2_test() ->
     Map = {map, [
-		 #riak_field_v1{name     = <<"yarple">>,
-				position = 1,
-				type     = sint64}
-		]},
+                 #riak_field_v1{name     = <<"yarple">>,
+                                position = 1,
+                                type     = sint64}
+                ]},
     DDL = make_ddl(<<"simple_valid_map_get_type_2_test">>,
-		   [
-		    #riak_field_v1{name     = <<"yando">>,
-				   position = 1,
-				   type     = varchar},
-		    #riak_field_v1{name     = <<"erko">>,
-				   position = 2,
-				   type     = Map},
-		    #riak_field_v1{name     = <<"erkle">>,
-				   position = 3,
-				   type     = double}
-		   ]),
+                   [
+                    #riak_field_v1{name     = <<"yando">>,
+                                   position = 1,
+                                   type     = varchar},
+                    #riak_field_v1{name     = <<"erko">>,
+                                   position = 2,
+                                   type     = Map},
+                    #riak_field_v1{name     = <<"erkle">>,
+                                   position = 3,
+                                   type     = double}
+                   ]),
     {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Result = (catch Module:get_field_type([<<"erko">>])),
     ?assertEqual(map, Result).
 
 complex_valid_map_get_type_test() ->
     Map3 = {map, [
-		  #riak_field_v1{name     = <<"in_Map_2">>,
-				 position = 1,
-				 type     = sint64}
-		 ]},
+                  #riak_field_v1{name     = <<"in_Map_2">>,
+                                 position = 1,
+                                 type     = sint64}
+                 ]},
     Map2 = {map, [
-		  #riak_field_v1{name     = <<"in_Map_1">>,
-				 position = 1,
-				 type     = sint64}
-		 ]},
+                  #riak_field_v1{name     = <<"in_Map_1">>,
+                                 position = 1,
+                                 type     = sint64}
+                 ]},
     Map1 = {map, [
-		  #riak_field_v1{name     = <<"Level_1_1">>,
-				 position = 1,
-				 type     = sint64},
-		  #riak_field_v1{name     = <<"Level_1_map1">>,
-				 position = 2,
-				 type     = Map2},
-		  #riak_field_v1{name     = <<"Level_1_map2">>,
-				 position = 3,
-				 type     = Map3}
-		 ]},
+                  #riak_field_v1{name     = <<"Level_1_1">>,
+                                 position = 1,
+                                 type     = sint64},
+                  #riak_field_v1{name     = <<"Level_1_map1">>,
+                                 position = 2,
+                                 type     = Map2},
+                  #riak_field_v1{name     = <<"Level_1_map2">>,
+                                 position = 3,
+                                 type     = Map3}
+                 ]},
     DDL = make_ddl(<<"complex_valid_map_get_type_test">>,
-		   [
-		    #riak_field_v1{name     = <<"Top_Map">>,
-				   position = 1,
-				   type     = Map1}
-		   ]),
+                   [
+                    #riak_field_v1{name     = <<"Top_Map">>,
+                                   position = 1,
+                                   type     = Map1}
+                   ]),
     {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Path = [<<"Top_Map">>, <<"Level_1_map1">>, <<"in_Map_1">>],
     Res = (catch Module:get_field_type(Path)),
@@ -557,25 +557,25 @@ complex_valid_map_get_type_test() ->
 
 make_plain_key_test() ->
     Key = #key_v1{ast = [
-			 #param_v1{name = [<<"user">>]},
-			 #param_v1{name = [<<"time">>]}
-			]},
+                         #param_v1{name = [<<"user">>]},
+                         #param_v1{name = [<<"time">>]}
+                        ]},
     DDL = make_ddl(<<"make_plain_key_test">>,
-		   [
-		    #riak_field_v1{name     = <<"user">>,
-				   position = 1,
-				   type     = varchar},
-		    #riak_field_v1{name     = <<"time">>,
-				   position = 2,
-				   type     = timestamp}
-		   ],
-		   Key, %% use the same key for both
-		   Key),
+                   [
+                    #riak_field_v1{name     = <<"user">>,
+                                   position = 1,
+                                   type     = varchar},
+                    #riak_field_v1{name     = <<"time">>,
+                                   position = 2,
+                                   type     = timestamp}
+                   ],
+                   Key, %% use the same key for both
+                   Key),
     Time = 12345,
     Vals = [
-	    {<<"user">>, <<"user_1">>},
-	    {<<"time">>, Time}
-	   ],
+            {<<"user">>, <<"user_1">>},
+            {<<"time">>, Time}
+           ],
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Got = make_key(Mod, Key, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, Time}],
@@ -583,33 +583,33 @@ make_plain_key_test() ->
 
 make_functional_key_test() ->
     Key = #key_v1{ast = [
-			 #param_v1{name = [<<"user">>]},
-			 #hash_fn_v1{mod  = ?MODULE,
-				     fn   = mock_partition_fn,
-				     args = [
-					     #param_v1{name = [<<"time">>]},
-					     15,
-					     m
-					    ],
-				     type = timestamp
-				    }
-			]},
+                         #param_v1{name = [<<"user">>]},
+                         #hash_fn_v1{mod  = ?MODULE,
+                                     fn   = mock_partition_fn,
+                                     args = [
+                                             #param_v1{name = [<<"time">>]},
+                                             15,
+                                             m
+                                            ],
+                                     type = timestamp
+                                    }
+                        ]},
     DDL = make_ddl(<<"make_plain_key_test">>,
-		   [
-		    #riak_field_v1{name     = <<"user">>,
-				   position = 1,
-				   type     = varchar},
-		    #riak_field_v1{name     = <<"time">>,
-				   position = 2,
-				   type     = timestamp}
-		   ],
-		   Key, %% use the same key for both
-		   Key),
+                   [
+                    #riak_field_v1{name     = <<"user">>,
+                                   position = 1,
+                                   type     = varchar},
+                    #riak_field_v1{name     = <<"time">>,
+                                   position = 2,
+                                   type     = timestamp}
+                   ],
+                   Key, %% use the same key for both
+                   Key),
     Time = 12345,
     Vals = [
-	    {<<"user">>, <<"user_1">>},
-	    {<<"time">>, Time}
-	   ],
+            {<<"user">>, <<"user_1">>},
+            {<<"time">>, Time}
+           ],
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Got = make_key(Mod, Key, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
@@ -623,14 +623,14 @@ make_functional_key_test() ->
 partial_wildcard_are_selections_valid_test() ->
     Selections  = [[<<"*">>]],
     DDL = make_ddl(<<"partial_wildcard_are_selections_valid_test">>,
-		   [
-		    #riak_field_v1{name     = <<"temperature">>,
-				   position = 1,
-				   type     = sint64},
-		    #riak_field_v1{name     = <<"geohash">>,
-				   position = 2,
-				   type     = sint64}
-		   ]),
+                   [
+                    #riak_field_v1{name     = <<"temperature">>,
+                                   position = 1,
+                                   type     = sint64},
+                    #riak_field_v1{name     = <<"geohash">>,
+                                   position = 2,
+                                   type     = sint64}
+                   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     ?assertEqual(
         true,
@@ -641,14 +641,14 @@ partial_wildcard_are_selections_valid_test() ->
 partial_are_selections_valid_fail_test() ->
     Selections  = [],
     DDL = make_ddl(<<"partial_are_selections_valid_fail_test">>,
-		   [
-		    #riak_field_v1{name     = <<"temperature">>,
-				   position = 1,
-				   type     = sint64},
-		    #riak_field_v1{name     = <<"geohash">>,
-				   position = 2,
-				   type     = sint64}
-		   ]),
+                   [
+                    #riak_field_v1{name     = <<"temperature">>,
+                                   position = 1,
+                                   type     = sint64},
+                    #riak_field_v1{name     = <<"geohash">>,
+                                   position = 2,
+                                   type     = sint64}
+                   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     ?assertEqual(
         {false, [{selections_cant_be_blank, []}]},
@@ -663,16 +663,16 @@ simple_is_query_valid_test() ->
     Bucket = <<"simple_is_query_valid_test">>,
     Selections  = [[<<"temperature">>], [<<"geohash">>]],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-			 'SELECT' = Selections},
+                         'SELECT' = Selections},
     DDL = make_ddl(Bucket,
-		   [
-		    #riak_field_v1{name     = <<"temperature">>,
-				   position = 1,
-				   type     = sint64},
-		    #riak_field_v1{name     = <<"geohash">>,
-				   position = 2,
-				   type     = sint64}
-		   ]),
+                   [
+                    #riak_field_v1{name     = <<"temperature">>,
+                                   position = 1,
+                                   type     = sint64},
+                    #riak_field_v1{name     = <<"geohash">>,
+                                   position = 2,
+                                   type     = sint64}
+                   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     ?assertEqual(
         true,
@@ -686,21 +686,21 @@ simple_is_query_valid_map_test() ->
     Name2 = <<"geo">>,
     Selections  = [[<<"temp">>, <<"geo">>], [<<"name">>]],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-			 'SELECT' = Selections},
+                         'SELECT' = Selections},
     Map = {map, [
-		 #riak_field_v1{name     = Name2,
-				position = 1,
-				type     = sint64}
-		]},
+                 #riak_field_v1{name     = Name2,
+                                position = 1,
+                                type     = sint64}
+                ]},
     DDL = make_ddl(Bucket,
-		   [
-		    #riak_field_v1{name     = Name0,
-				   position = 1,
-				   type     = sint64},
-		    #riak_field_v1{name     = Name1,
-				   position = 2,
-				   type     = Map}
-		   ]),
+                   [
+                    #riak_field_v1{name     = Name0,
+                                   position = 1,
+                                   type     = sint64},
+                    #riak_field_v1{name     = Name1,
+                                   position = 2,
+                                   type     = Map}
+                   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     ?assertEqual(
         true,
@@ -714,21 +714,21 @@ simple_is_query_valid_map_wildcard_test() ->
     Name2 = <<"geo">>,
     Selections  = [[<<"temp">>, <<"*">>], [<<"name">>]],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-			 'SELECT' = Selections},
+                         'SELECT' = Selections},
     Map = {map, [
-		 #riak_field_v1{name     = Name2,
-				position = 1,
-				type     = sint64}
-		]},
+                 #riak_field_v1{name     = Name2,
+                                position = 1,
+                                type     = sint64}
+                ]},
     DDL = make_ddl(Bucket,
-		   [
-		    #riak_field_v1{name     = Name0,
-				   position = 1,
-				   type     = sint64},
-		    #riak_field_v1{name     = Name1,
-				   position = 2,
-				   type     = Map}
-		   ]),
+                   [
+                    #riak_field_v1{name     = Name0,
+                                   position = 1,
+                                   type     = sint64},
+                    #riak_field_v1{name     = Name1,
+                                   position = 2,
+                                   type     = Map}
+                   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     ?assertEqual(
         true,
@@ -742,23 +742,23 @@ simple_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
     Selections = [[<<"temperature">>], [<<"geohash">>]],
     Where = [
-	     {and_,
-	      {'>', <<"temperature">>, {integer, 1}},
-	      {'<', <<"temperature">>, {integer, 15}}
-	     }
-	    ],
+             {and_,
+              {'>', <<"temperature">>, {integer, 1}},
+              {'<', <<"temperature">>, {integer, 15}}
+             }
+            ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-			 'SELECT' = Selections,
-			 'WHERE'  = Where},
+                         'SELECT' = Selections,
+                         'WHERE'  = Where},
     DDL = make_ddl(Bucket,
-		   [
-		    #riak_field_v1{name     = <<"temperature">>,
-				   position = 1,
-				   type     = sint64},
-		    #riak_field_v1{name     = <<"geohash">>,
-				   position = 2,
-				   type     = sint64}
-		   ]),
+                   [
+                    #riak_field_v1{name     = <<"temperature">>,
+                                   position = 1,
+                                   type     = sint64},
+                    #riak_field_v1{name     = <<"geohash">>,
+                                   position = 2,
+                                   type     = sint64}
+                   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
@@ -767,34 +767,34 @@ full_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
     Selections = [[<<"temperature">>]],
     Where = [
-	     {and_,
-	      {'>', <<"temperature">>, {integer, 1}},
-	      {and_,
-	       {'<', <<"temperature">>, {integer, 15}},
-	       {or_,
-		{'!=', <<"ne field">>,   {integer, 15}},
-		{and_,
-		 {'<=', <<"lte field">>,  {integer, 15}},
-		 {'>=', <<"gte field">>,  {integer, 15}}}}}}
-	    ],
+             {and_,
+              {'>', <<"temperature">>, {integer, 1}},
+              {and_,
+               {'<', <<"temperature">>, {integer, 15}},
+               {or_,
+                {'!=', <<"ne field">>,   {integer, 15}},
+                {and_,
+                 {'<=', <<"lte field">>,  {integer, 15}},
+                 {'>=', <<"gte field">>,  {integer, 15}}}}}}
+            ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-			 'SELECT' = Selections,
-			 'WHERE'  = Where},
+                         'SELECT' = Selections,
+                         'WHERE'  = Where},
     DDL = make_ddl(Bucket,
-		   [
-		    #riak_field_v1{name     = <<"temperature">>,
-				   position = 1,
-				   type     = sint64},
-		    #riak_field_v1{name     = <<"ne field">>,
-				   position = 2,
-				   type     = sint64},
-		    #riak_field_v1{name     = <<"lte field">>,
-				   position = 3,
-				   type     = sint64},
-		    #riak_field_v1{name     = <<"gte field">>,
-				   position = 4,
-				   type     = sint64}
-		   ]),
+                   [
+                    #riak_field_v1{name     = <<"temperature">>,
+                                   position = 1,
+                                   type     = sint64},
+                    #riak_field_v1{name     = <<"ne field">>,
+                                   position = 2,
+                                   type     = sint64},
+                    #riak_field_v1{name     = <<"lte field">>,
+                                   position = 3,
+                                   type     = sint64},
+                    #riak_field_v1{name     = <<"gte field">>,
+                                   position = 4,
+                                   type     = sint64}
+                   ]),
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
@@ -804,58 +804,58 @@ timeseries_filter_test() ->
     Bucket = <<"timeseries_filter_test">>,
     Selections = [[<<"weather">>]],
     Where = [
-	     {and_,
-	      {and_,
-	       {'>', <<"time">>, {integer, 3000}},
-	       {'<', <<"time">>, {integer, 5000}}
-	      },
-	      {'=', <<"user">>, {binary, <<"user_1">>}
-	      }
-	     }
-	    ],
+             {and_,
+              {and_,
+               {'>', <<"time">>, {integer, 3000}},
+               {'<', <<"time">>, {integer, 5000}}
+              },
+              {'=', <<"user">>, {binary, <<"user_1">>}
+              }
+             }
+            ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-			 'SELECT' = Selections,
-			 'WHERE'  = Where},
+                         'SELECT' = Selections,
+                         'WHERE'  = Where},
     Fields = [
-	      #riak_field_v1{name     = <<"geohash">>,
-			     position = 1,
-			     type     = varchar,
-			     optional = false},
-	      #riak_field_v1{name     = <<"user">>,
-			     position = 2,
-			     type     = varchar,
-			     optional = false},
-	      #riak_field_v1{name     = <<"time">>,
-			     position = 3,
-			     type     = timestamp,
-			     optional = false},
-	      #riak_field_v1{name     = <<"weather">>,
-			     position = 4,
-			     type     = varchar,
-			     optional = false},
-	      #riak_field_v1{name     = <<"temperature">>,
-			     position = 5,
-			     type     = varchar,
-			     optional = true}
-	     ],
+              #riak_field_v1{name     = <<"geohash">>,
+                             position = 1,
+                             type     = varchar,
+                             optional = false},
+              #riak_field_v1{name     = <<"user">>,
+                             position = 2,
+                             type     = varchar,
+                             optional = false},
+              #riak_field_v1{name     = <<"time">>,
+                             position = 3,
+                             type     = timestamp,
+                             optional = false},
+              #riak_field_v1{name     = <<"weather">>,
+                             position = 4,
+                             type     = varchar,
+                             optional = false},
+              #riak_field_v1{name     = <<"temperature">>,
+                             position = 5,
+                             type     = varchar,
+                             optional = true}
+             ],
     PK = #key_v1{ast = [
-			#hash_fn_v1{mod  = riak_ql_quanta,
-				    fn   = quantum,
-				    args = [
-					    #param_v1{name = [<<"time">>]},
-					    15,
-					    s
-					   ]}
-		       ]},
+                        #hash_fn_v1{mod  = riak_ql_quanta,
+                                    fn   = quantum,
+                                    args = [
+                                            #param_v1{name = [<<"time">>]},
+                                            15,
+                                            s
+                                           ]}
+                       ]},
     LK = #key_v1{ast = [
-			#param_v1{name = [<<"time">>]},
-			#param_v1{name = [<<"user">>]}]
-		},
+                        #param_v1{name = [<<"time">>]},
+                        #param_v1{name = [<<"user">>]}]
+                },
     DDL = #ddl_v1{table         = <<"timeseries_filter_test">>,
-		  fields        = Fields,
-		  partition_key = PK,
-		  local_key     = LK
-		 },
+                  fields        = Fields,
+                  partition_key = PK,
+                  local_key     = LK
+                 },
     {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     Expected = true,
