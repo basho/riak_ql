@@ -900,7 +900,7 @@ is_query_valid_3_test() ->
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 10 AND time < 11"
-            "AND myseries = 'bob")
+            "AND myseries = 'bob'")
     ).
 
 is_query_valid_4_test() ->
@@ -909,7 +909,7 @@ is_query_valid_4_test() ->
         is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "SELECT * FROM mytab "
             "WHERE time > 10 AND time < 11"
-            "AND myseries != 'bob")
+            "AND myseries != 'bob'")
     ).
 
 is_query_valid_where_1_test() ->
