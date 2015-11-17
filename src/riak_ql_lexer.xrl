@@ -116,7 +116,7 @@ Rules.
 
 {INTNUM}   : {token, {integer, list_to_integer(TokenChars)}}.
 {FLOATDEC} : {token, {float, list_to_float(TokenChars)}}.
-{FLOATSCI} : {token, {float, list_to_float(TokenChars)}}.
+{FLOATSCI} : {token, {float, sci_to_float(TokenChars)}}.
 
 {EQ}          : {token, {eq,     list_to_binary(TokenChars)}}.
 {APPROXMATCH} : {token, {approx, list_to_binary(TokenChars)}}.
@@ -270,7 +270,26 @@ fix_up_date(Date) ->
         ParsedDate        -> {datetime, ParsedDate}
     end.
 
-
 strip_quoted(QuotedString) ->
     StrippedOutsideQuotes = string:strip(QuotedString, both, $"),
     re:replace(StrippedOutsideQuotes, "\"\"", "\"", [global, {return, binary}]).
+
+sci_to_float(Chars) ->
+    [Mantissa, Exponent] = re:split(Chars, "E|e", [{return, list}]),
+    M2 = normalise_mant(Mantissa),
+    E2 = normalise_exp(Exponent),
+    sci_to_f2(M2, E2).
+
+sci_to_f2(M2, E) when E =:= "+0" orelse
+                      E =:= "-0" -> list_to_float(M2);
+sci_to_f2(M2, E2) -> list_to_float(M2 ++ "e" ++ E2).
+
+normalise_mant(Mantissa) ->
+    case length(re:split(Mantissa, "\\.", [{return, list}])) of
+        1 -> Mantissa ++ ".0";
+        2 -> Mantissa
+    end.
+
+normalise_exp("+" ++ No) -> "+" ++ No;
+normalise_exp("-" ++ No) -> "-" ++ No;
+normalise_exp(No)        -> "+" ++ No.
