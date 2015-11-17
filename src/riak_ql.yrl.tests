@@ -35,6 +35,28 @@ fix(Other) ->
     Other.
 
 %% Tests
+
+rts_433_regression_test() ->
+    ?sql_compilation_assert("select * from HardDrivesV14 where date >= 123 " ++
+				"and date <= 567 " ++
+				"and family = 'Hitachi HDS5C4040ALE630' " ++
+				"and series = 'true'",
+			    #riak_sql_v1{'SELECT' = [[<<"*">>]],
+					 'FROM'   = <<"HardDrivesV14">>,
+					 'WHERE'  = [
+						     {and_,
+						      {'=', <<"series">>, {binary, <<"true">>}},
+						      {and_,
+						       {'=', <<"family">>, {binary, <<"Hitachi HDS5C4040ALE630">>}},
+						       {and_,
+							{'<=', <<"date">>, {integer, 567}},
+							{'>=', <<"date">>, {integer, 123}}
+						       }
+						      }
+						     }
+						    ]
+					}).
+
 select_sql_test() ->
     ?sql_compilation_assert("select * from argle",
                             #riak_sql_v1{'SELECT' = [[<<"*">>]],
