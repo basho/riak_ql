@@ -18,7 +18,7 @@
 -type time_ms() :: non_neg_integer().
 %% A timestamp in millisconds representing number of millisconds from Unix epoch
 
--type time_unit() :: y | mo | d | h | m | s.
+-type time_unit() :: d | h | m | s.
 %%  The units of quantization available to quantum/3
 
 -type err() :: {error, term()}.
@@ -74,17 +74,6 @@ quantum(Time, QuantaSize, Unit) when Unit == d;
     Ms = unit_to_ms(Unit),
     Diff = Time rem (QuantaSize*Ms),
     Time - Diff;
-quantum(Time, QuantaSize, mo) ->
-    Timestamp = ms_to_timestamp(Time),
-    Month = months_since_1970(Timestamp),
-    MonthQuanta = Month - (Month rem QuantaSize),
-    months_since_1970_to_ms(MonthQuanta);
-quantum(Time, QuantaSize, y) ->
-    Timestamp = ms_to_timestamp(Time),
-    {{Year, _, _}, _} = calendar:now_to_universal_time(Timestamp),
-    YearsSince1970 = Year - 1970,
-    YearQuanta = Year - (YearsSince1970 rem QuantaSize),
-    years_since_1970_to_ms(YearQuanta);
 quantum(_, _, Unit) ->
     {error, {invalid_unit, Unit}}.
 
@@ -100,31 +89,6 @@ ms_to_timestamp(Time) ->
     MicroSeconds = (Time rem 1000) * 1000,
     {0, Seconds, MicroSeconds}.
 
-%% @doc Return the time in milliseconds since 00:00 GMT Jan 1, 1970 (Unix Epoch)
-%% This accounts for leap years. Yay!
--spec years_since_1970_to_ms(non_neg_integer()) -> time_ms().
-years_since_1970_to_ms(Year) ->
-    DaysSince0 = calendar:date_to_gregorian_days(Year, 1, 1),
-    DaysSince1970 = DaysSince0 - ?DAYS_FROM_0_TO_1970,
-    DaysSince1970 * unit_to_ms(d).
-
-%% @doc Return the time in milliseconds since 00:00 GMT Jan 1, 1970 (Unix Epoch)
-%% This accounts for variable length months. Yay!
--spec months_since_1970_to_ms(non_neg_integer()) -> time_ms().
-months_since_1970_to_ms(Months) ->
-    Year = 1970 + Months div 12,
-    %% 0 Months since January is January
-    Month = Months rem 12 + 1,
-    DaysSince0 = calendar:date_to_gregorian_days(Year, Month, 1),
-    DaysSince1970 = DaysSince0 - ?DAYS_FROM_0_TO_1970,
-    DaysSince1970 * unit_to_ms(d).
-
--spec months_since_1970(erlang:timestamp()) -> non_neg_integer().
-months_since_1970(Timestamp) ->
-    {{Year, Month, _}, _} = calendar:now_to_universal_time(Timestamp),
-    %% 12 months = 1 year and 0 months
-    (Year - 1970) * 12 + Month - 1.
-
 -spec unit_to_ms(s | m | h | d) -> time_ms().
 unit_to_ms(s) ->
     1000;
@@ -137,31 +101,6 @@ unit_to_ms(d) ->
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-
-assert_year(Year0) ->
-    Ms = years_since_1970_to_ms(Year0),
-    {{Year, _, _}, _} = calendar:now_to_universal_time(ms_to_timestamp(Ms)),
-    ?assertEqual(Year0, Year).
-
-years_since_1970_to_ms_test() ->
-    %% Plain old year
-    assert_year(1979),
-    %% leap year
-    assert_year(2000),
-    %% epoch
-    assert_year(1970),
-    %% older than epoch
-    assert_year(1).
-
-assert_months(Months) ->
-    Ms = months_since_1970_to_ms(Months),
-    ?assertEqual(Months, months_since_1970(ms_to_timestamp(Ms))).
-
-months_since_1970_to_ms_test() ->
-    assert_months(1),
-    assert_months(12),
-    assert_months(18),
-    assert_months(24).
 
 assert_minutes(Quanta, OkTimes) ->
     Time = timestamp_to_ms(os:timestamp()),
@@ -290,11 +229,6 @@ quantum_now_from_datetime(DateTime, Quanta, Unit) ->
     QuantaMs = quantum(DateMs, Quanta, Unit),
     ms_to_timestamp(QuantaMs).
 
-quantum_in_ms(Quanta, mo) ->
-    months_since_1970_to_ms(Quanta + 1);
-quantum_in_ms(Quanta, y) ->
-    %% Just use max # days in year for safety
-    Quanta*366*unit_to_ms(d);
 quantum_in_ms(Quanta, Unit) ->
     Quanta*unit_to_ms(Unit).
 
@@ -305,16 +239,8 @@ date_gen() ->
 time_gen() ->
     {choose(0, 23), choose(0, 59), choose(0, 59)}.
 
-month_gen() ->
-    {choose(1, 100), mo}.
-
-year_gen() ->
-    {choose(1, 40), y}.
-
 quantum_gen() ->
-    oneof([month_gen(),
-           year_gen(),
-           {choose(1,2000), h},
+    oneof([ {choose(1,2000), h},
            {choose(1, 60), m}]).
 
 -endif.
