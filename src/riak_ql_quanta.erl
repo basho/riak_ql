@@ -1,10 +1,10 @@
-%% @doc This module serves to generate time quanta on multi - (year, month, day, hour, minute,
+%% @doc This module serves to generate time quanta on multi - (day, hour, minute,
 %% second) boundaries. The quantum are based on an origin time of Jan 1, 1970 00:00:00 (Unix Epoch).
 %% The function <em>quantum/3</em> takes a time in milliseconds to bucketize, a size of the quantum, and the
 %% units of said quantum. For instance, the following call would create buckets for timestamps on 15
 %% minute boundaries: <em>quantum(Time, 15, m)</em>. The quantum time is returned in milliseconds since the
 %% Unix epoch.
-%% the function <em>quanta/4</em> takes 2 times in millisecnds and size of the quantum
+%% the function <em>quanta/4</em> takes 2 times in milliseconds and size of the quantum
 %% and the of units of said quantum and returns a list of quantum boundaries that span the time
 -module(riak_ql_quanta).
 
@@ -184,12 +184,6 @@ prop_quantum_bounded_test() ->
             eqc:numtests(1000, prop_quantum_bounded()))
     ).
 
-prop_quantum_month_boundary_test() ->
-    ?assertEqual(true, eqc:quickcheck(?QC_OUT(prop_quantum_month_boundary()))).
-
-prop_quantum_year_boundary_test() ->
-    ?assertEqual(true, eqc:quickcheck(?QC_OUT(prop_quantum_year_boundary()))).
-
 %% Ensure that Quantas are always bounded, meaning that any time is no more
 %% than one quantum ahead of the quantum start.
 prop_quantum_bounded() ->
@@ -203,24 +197,6 @@ prop_quantum_bounded() ->
             QuantaMs = quantum(DateMs, Quanta, Unit),
             QuantaSize = quantum_in_ms(Quanta, Unit),
             (DateMs - QuantaMs) =< QuantaSize
-        end).
-
-%% Ensure quantums for months are always on a monthly boundary
-prop_quantum_month_boundary() ->
-    ?FORALL({Date, Time, {Quanta, Unit}}, {date_gen(), time_gen(), month_gen()},
-        begin
-            Timestamp = quantum_now_from_datetime({Date, Time}, Quanta, Unit),
-            {{_, _, Day}, QuantaTime} = calendar:now_to_datetime(Timestamp),
-            Day =:= 1 andalso QuantaTime =:= {0,0,0}
-        end).
-
-%% Ensure quantums for years are always on a yearly boundary
-prop_quantum_year_boundary() ->
-    ?FORALL({Date, Time, {Quanta, Unit}}, {date_gen(), time_gen(), year_gen()},
-        begin
-            Timestamp = quantum_now_from_datetime({Date, Time}, Quanta, Unit),
-            {{_, Month, Day}, QuantaTime} = calendar:now_to_datetime(Timestamp),
-            Month =:= 1 andalso Day =:= 1 andalso QuantaTime =:= {0,0,0}
         end).
 
 quantum_now_from_datetime(DateTime, Quanta, Unit) ->
