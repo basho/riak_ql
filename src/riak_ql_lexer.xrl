@@ -147,7 +147,7 @@ Rules.
 
 \n : {end_token, {'$end'}}.
 
-.  : {token, {chars, list_to_binary(TokenChars)}}.
+.  : {token, {literal, list_to_binary(TokenChars)}}.
 
 Erlang code.
 
