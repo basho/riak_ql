@@ -176,6 +176,10 @@ post_p([], Acc) ->
     [{Type, X} || {Type, X} <- lists:reverse(Acc), Type =/= whitespace];
 post_p([{identifier, TokenChars} | T], Acc) when is_list(TokenChars)->
     post_p(T, [{identifier, list_to_binary(TokenChars)} | Acc]);
+post_p([{float, TokenChars} | T], Acc) ->
+    post_p(T, [{float, parse_float(TokenChars)} | Acc]);
+post_p([{float_sci, TokenChars} | T], Acc) ->
+    post_p(T, [{float, sci_to_float(TokenChars)} | Acc]);
 post_p([H | T], Acc) ->
     post_p(T, [H | Acc]).
 
@@ -218,3 +222,10 @@ normalise_mant(Mantissa) ->
 normalise_exp("+" ++ No) -> "+" ++ No;
 normalise_exp("-" ++ No) -> "-" ++ No;
 normalise_exp(No)        -> "+" ++ No.
+
+parse_float([$- | _RemainTokenChars] = TokenChars) ->
+    list_to_float(TokenChars);
+parse_float([$. | _RemainTokenChars] = TokenChars) ->
+    list_to_float([$0 | TokenChars]);
+parse_float(TokenChars) ->
+    list_to_float(TokenChars).
