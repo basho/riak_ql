@@ -7,6 +7,7 @@ create table
 delete
 double
 drop
+false
 float
 float_sci
 float_type
@@ -30,6 +31,7 @@ select
 system versioning
 temporary
 timestamp
+true
 varchar
 where
 with

@@ -45,13 +45,13 @@ end
 
 puts
 
-# these two sets generate the when guard for the 
+# these two sets generate the when guard for the
 # token post processor that concatenates the token
 
 # char concatenator (1)
 # this generates the post-processor clauses in the lexer
 # needs to start with chars
-puts "Word1 =:= chars orelse"
+puts "Word1 =:= identifier orelse"
 keywords.each do |kw_name, keyword|
   kw_token = kw_name.downcase
   if ERLANG_RESERVED.include? kw_token
@@ -70,7 +70,7 @@ puts
 # char concatenator (2)
 # this generates the post-processor clauses in the lexer
 # needs to start with chars
-puts "Word2 =:= chars orelse"
+puts "Word2 =:= identifier orelse"
 keywords.each do |kw_name, keyword|
   kw_token = kw_name.downcase
   if ERLANG_RESERVED.include? kw_token

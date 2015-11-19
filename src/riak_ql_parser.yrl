@@ -12,7 +12,8 @@ Bucket
 Buckets
 Field
 Fields
-Word
+Identifier
+CharacterLiteral
 Where
 Cond
 Conds
@@ -53,7 +54,6 @@ and_
 %% as
 datetime
 regex
-quoted
 integer
 float
 any
@@ -76,14 +76,17 @@ minus
 maybetimes
 div_
 comma
-chars
+identifier
+character_literal
 create_table
 not_null
 primary_key
 timestamp
 varchar
-atom
+%% atom
 quantum
+true
+false
 .
 
 Rootsymbol Statement.
@@ -102,20 +105,23 @@ Where -> where Conds : make_where('$1', '$2').
 Fields -> Fields comma Field : make_list('$1', '$3').
 Fields -> Field              : make_list('$1').
 
-Field -> Word                : '$1'.
+Field -> Identifier                : '$1'.
 Field -> maybetimes          : '$1'.
 
 Buckets -> Buckets comma Bucket : make_list('$1', '$3').
 Buckets -> Bucket               : '$1'.
 
-Bucket -> Word   : '$1'.
+Bucket -> Identifier   : '$1'.
 Bucket -> regex  : '$1'.
-Bucket -> quoted : '$1'.
 
-Word -> chars      : process('$1').
+%% Word -> chars      : process('$1').
 
-Funcall -> Word openb     closeb : make_funcall('$1').
-Funcall -> Word openb Val closeb : make_funcall('$1').
+Identifier -> identifier : '$1'.
+
+CharacterLiteral -> character_literal : character_literal_to_binary('$1').
+
+Funcall -> Identifier openb     closeb : make_funcall('$1').
+Funcall -> Identifier openb Val closeb : make_funcall('$1').
 
 Conds -> openb Conds closeb             : make_expr('$2').
 Conds -> Conds Logic Cond               : make_expr('$1', '$2', '$3').
@@ -131,14 +137,16 @@ Vals -> Vals div_       Val : make_expr('$1', '$2', '$3').
 Vals -> regex               : '$1'.
 Vals -> Val                 : '$1'.
 Vals -> Funcall             : '$1'.
-Vals -> Word                : '$1'.
+Vals -> Identifier          : '$1'.
 
-Val -> integer chars : add_unit('$1', '$2').
+Val -> integer identifier : add_unit('$1', '$2').
 Val -> integer       : '$1'.
 Val -> float     : '$1'.
 Val -> datetime  : '$1'.
 Val -> varchar   : '$1'.
-Val -> quoted    : make_word('$1').
+Val -> CharacterLiteral : '$1'.
+Val -> true : {boolean, true}.
+Val -> false : {boolean, false}.
 
 Logic -> and_ : '$1'.
 Logic -> or_  : '$1'.
@@ -170,9 +178,9 @@ TableElement -> ColumnDefinition : '$1'.
 TableElement -> KeyDefinition : '$1'.
 
 ColumnDefinition ->
-    Field DataType ColumnConstraint : make_column('$1', '$2', '$3').
+    Identifier DataType ColumnConstraint : make_column('$1', '$2', '$3').
 ColumnDefinition ->
-    Field DataType : make_column('$1', '$2').
+    Identifier DataType : make_column('$1', '$2').
 ColumnConstraint -> not_null : '$1'.
 
 DataType -> datetime  : '$1'.
@@ -192,7 +200,7 @@ KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
 KeyFieldList -> KeyField : make_list({list, []}, '$1').
 
 KeyField -> quantum openb KeyFieldArgList closeb : make_modfun(quantum, '$3').
-KeyField -> Word : '$1'.
+KeyField -> Identifier : '$1'.
 
 KeyFieldArgList ->
     KeyFieldArg comma KeyFieldArgList : make_list('$3', '$1').
@@ -201,8 +209,9 @@ KeyFieldArgList ->
 
 KeyFieldArg -> integer : '$1'.
 KeyFieldArg -> float   : '$1'.
-KeyFieldArg -> Word    : '$1'.
-KeyFieldArg -> atom openb Word closeb : make_atom('$3').
+KeyFieldArg -> CharacterLiteral    : '$1'.
+KeyFieldArg -> Identifier : '$1'.
+%% KeyFieldArg -> atom openb Word closeb : make_atom('$3').
 
 Erlang code.
 
@@ -223,8 +232,8 @@ Erlang code.
 %% unused/but not to be exported in the yecc source
 %% no way to stop rebar borking on it AFAIK
 -export([
-	 return_error/2
-	 ]).
+         return_error/2
+         ]).
 
 -ifdef(TEST).
 -include("riak_ql.yrl.tests").
@@ -237,47 +246,42 @@ fix_up_keys(A) ->
     A.
 
 convert(#outputs{type    = select,
-		 buckets = B,
-		 fields  = F,
-		 limit   = L,
-		 where   = W}) ->
+                 buckets = B,
+                 fields  = F,
+                 limit   = L,
+                 where   = W}) ->
     Q = case B of
-	    {Type, _} when Type =:= list orelse Type =:= regex ->
-		#riak_sql_v1{'SELECT' = F,
-			     'FROM'   = B,
-			     'WHERE'  = W,
-			     'LIMIT'  = L};
-	    _ ->
-		#riak_sql_v1{'SELECT'   = F,
-			     'FROM'     = B,
-			     'WHERE'    = W,
-			     'LIMIT'    = L,
-			     helper_mod = riak_ql_ddl:make_module_name(B)}
-	end,
+            {Type, _} when Type =:= list orelse Type =:= regex ->
+                #riak_sql_v1{'SELECT' = F,
+                             'FROM'   = B,
+                             'WHERE'  = W,
+                             'LIMIT'  = L};
+            _ ->
+                #riak_sql_v1{'SELECT'   = F,
+                             'FROM'     = B,
+                             'WHERE'    = W,
+                             'LIMIT'    = L,
+                             helper_mod = riak_ql_ddl:make_module_name(B)}
+        end,
     Q;
 convert(#outputs{type = create} = O) ->
     O.
 
-process({chars, A}) ->
-    {binary, A}.
-
-make_atom({binary, SomeWord}) ->
-    {atom, binary_to_atom(SomeWord, utf8)}.
+%% make_atom({binary, SomeWord}) ->
+%%     {atom, binary_to_atom(SomeWord, utf8)}.
 
 make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, []}).
 
-make_clause({select, _}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
-    Type2 = case Type of
-                list   -> list;
-                binary -> string;
-                quoted -> string;
-                regex  -> regex
-            end,
-    Bucket = case Type2 of
-		 string -> D;
-		 list   -> {Type2, [X || X <- D]};
-		 regex  -> {Type2, D}
-	     end,
+make_clause({select, _SelectBytes},
+            {_FieldListType, B},
+            {from, _FromBytes},
+            {Type, D},
+            {_WhereType, E}) ->
+    Bucket = case Type of
+                 identifier -> D;
+                 list   -> {list, [X || X <- D]};
+                 regex  -> {regex, D}
+             end,
     _O = #outputs{type    = select,
                   fields  = [[X] || X <- B],
                   buckets = Bucket,
@@ -287,6 +291,15 @@ make_clause({select, _}, {_, B}, {from, _C}, {Type, D}, {_, E}) ->
 add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
 
+make_expr({LiteralFlavor, Literal},
+          {ComparisonType, _ComparisonBytes},
+          {identifier, IdentifierName})
+  when LiteralFlavor /= identifier
+->
+    FlippedComparison = flip_comparison(ComparisonType),
+    make_expr({identifier, IdentifierName},
+              {FlippedComparison, <<"flipped">>},
+              {LiteralFlavor, Literal});
 make_expr({_, A}, {B, _}, {Type, C}) ->
     B1 = case B of
              and_      -> and_;
@@ -297,9 +310,9 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
              div_      -> '/';
              gt        -> '>';
              lt        -> '<';
-	     gte       -> '>=';
-	     lte       -> '<=';
-	     eq        -> '=';
+             gte       -> '>=';
+             lte       -> '<=';
+             eq        -> '=';
              ne        -> '<>';
              approx    -> '=~';
              notapprox -> '!~';
@@ -311,11 +324,14 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
          end,
     {conditional, {B1, A, C2}}.
 
-make_word({quoted, Q}) -> {binary, Q}.
-
 make_where({where, A}, {conditional, B}) ->
     NewB = remove_conditionals(B),
     {A, [canonicalise(NewB)]}.
+
+flip_comparison(lt) -> gt;
+flip_comparison(gt) -> lt;
+flip_comparison(lte) -> gte;
+flip_comparison(gte) -> lte.
 
 %%
 %% rewrite the where clause to have a canonical form
@@ -325,48 +341,56 @@ canonicalise(WhereClause) ->
     Canonical = canon2(WhereClause),
     _NewWhere = hoist(Canonical).
 
+canon2({Cond, A, B}) when is_binary(B) andalso not is_binary(A) ->
+    canonicalize_condition_order({Cond, B, A});
 canon2({Cond, A, B}) when Cond =:= and_ orelse
-			  Cond =:= or_  ->
+                          Cond =:= or_  ->
     %% this is stack busting non-tail recursion
     %% but our where clauses are bounded in size so thats OK
     A1 = canon2(A),
     B1 = canon2(B),
     case is_lower(A1, B1) of
-	true  -> {Cond, A1, B1};
-	false -> {Cond, B1, A1}
+        true  -> {Cond, A1, B1};
+        false -> {Cond, B1, A1}
     end;
 canon2(A) ->
     A.
+
+-spec canonicalize_condition_order({atom(), any(), binary()}) -> {atom(), binary(), any()}.
+canonicalize_condition_order({'>', Reference, Column}) ->
+    canon2({'<', Column, Reference});
+canonicalize_condition_order({'<', Reference, Column}) ->
+    canon2({'>', Column, Reference}).
 
 hoist({and_, {and_, A, B}, C}) ->
     Hoisted = {and_, A, hoist({and_, B, C})},
     _Sort = sort(Hoisted);
 hoist({A, B, C}) ->
     B2 = case B of
-	     {and_, _, _} -> hoist(B);
-	     _            -> B
-	 end,
+             {and_, _, _} -> hoist(B);
+             _            -> B
+         end,
     C2 = case C of
-	     {and_, _, _} -> hoist(C);
-	     _            -> C
-	 end,
+             {and_, _, _} -> hoist(C);
+             _            -> C
+         end,
     {A, B2, C2}.
 
 %% a truly horendous bubble sort algo which is also
 %% not tail recursive
 sort({and_, A, {and_, B, C}}) ->
     case is_lower(A, B) of
-	true  -> {and_, B1, C1} = sort({and_, B, C}),
-		 case is_lower(A, B1) of
-		     true  -> {and_, A, {and_, B1, C1}};
-		     false -> sort({and_, B1, {and_, A, C1}})
-		 end;
-	false -> sort({and_, B, sort({and_, A, C})})
+        true  -> {and_, B1, C1} = sort({and_, B, C}),
+                 case is_lower(A, B1) of
+                     true  -> {and_, A, {and_, B1, C1}};
+                     false -> sort({and_, B1, {and_, A, C1}})
+                 end;
+        false -> sort({and_, B, sort({and_, A, C})})
     end;
 sort({Op, A, B}) ->
     case is_lower(A, B) of
-	true  -> {Op, A, B};
-	false -> {Op, B, A}
+        true  -> {Op, A, B};
+        false -> {Op, B, A}
     end.
 
 is_lower(Ands, {_, _, _}) when is_list(Ands)->
@@ -376,28 +400,28 @@ is_lower({_, _, _}, Ands) when is_list(Ands)->
 is_lower(Ands1, Ands2) when is_list(Ands1) andalso is_list(Ands2) ->
     true;
 is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
-					 Op1 =:= or_  orelse
-					 Op1 =:= '>'  orelse
-					 Op1 =:= '<'  orelse
-					 Op1 =:= '>='  orelse
-					 Op1 =:= '<='  orelse
-					 Op1 =:= '='  orelse
-					 Op1 =:= '<>' orelse
-					 Op1 =:= '=~' orelse
-					 Op1 =:= '!~' orelse
-					 Op1 =:= '!=')
-					andalso
-					(Op2 =:= and_ orelse
-					 Op2 =:= or_  orelse
-					 Op2 =:= '>'  orelse
-					 Op2 =:= '<'  orelse
-					 Op2 =:= '>='  orelse
-					 Op2 =:= '<='  orelse
-					 Op2 =:= '='  orelse
-					 Op2 =:= '<>' orelse
-					 Op2 =:= '=~' orelse
-					 Op2 =:= '!~' orelse
-					 Op2 =:= '!=') ->
+                                         Op1 =:= or_  orelse
+                                         Op1 =:= '>'  orelse
+                                         Op1 =:= '<'  orelse
+                                         Op1 =:= '>='  orelse
+                                         Op1 =:= '<='  orelse
+                                         Op1 =:= '='  orelse
+                                         Op1 =:= '<>' orelse
+                                         Op1 =:= '=~' orelse
+                                         Op1 =:= '!~' orelse
+                                         Op1 =:= '!=')
+                                        andalso
+                                        (Op2 =:= and_ orelse
+                                         Op2 =:= or_  orelse
+                                         Op2 =:= '>'  orelse
+                                         Op2 =:= '<'  orelse
+                                         Op2 =:= '>='  orelse
+                                         Op2 =:= '<='  orelse
+                                         Op2 =:= '='  orelse
+                                         Op2 =:= '<>' orelse
+                                         Op2 =:= '=~' orelse
+                                         Op2 =:= '!~' orelse
+                                         Op2 =:= '!=') ->
     (A < B).
 
 remove_conditionals({conditional, A}) ->
@@ -413,13 +437,17 @@ make_funcall({A, B}) ->
 make_funcall({_A, B}, C) ->
     {funcall, {B, C}}.
 
-add_unit({Type, A}, {chars, U}) when U =:= <<"s">> -> {Type, A};
-add_unit({Type, A}, {chars, U}) when U =:= <<"m">> -> {Type, A*60};
-add_unit({Type, A}, {chars, U}) when U =:= <<"h">> -> {Type, A*60*60};
-add_unit({Type, A}, {chars, U}) when U =:= <<"d">> -> {Type, A*60*60*24}.
+character_literal_to_binary({character_literal, CharacterLiteralBytes})
+  when is_binary(CharacterLiteralBytes) ->
+    {binary, CharacterLiteralBytes}.
+
+add_unit({Type, A}, {identifier, U}) when U =:= <<"s">> -> {Type, A};
+add_unit({Type, A}, {identifier, U}) when U =:= <<"m">> -> {Type, A*60};
+add_unit({Type, A}, {identifier, U}) when U =:= <<"h">> -> {Type, A*60*60};
+add_unit({Type, A}, {identifier, U}) when U =:= <<"d">> -> {Type, A*60*60*24}.
 
 make_list({maybetimes, A}) -> {list, [A]};
-make_list({binary,       A}) -> {list, [A]};
+make_list({identifier,       A}) -> {list, [A]};
 make_list(A)               -> {list, [A]}.
 
 make_list({list, A}, {_, B}) -> {list, A ++ [B]};
@@ -428,13 +456,13 @@ make_list({_,    A}, {_, B}) -> {list, [A, B]}.
 make_expr(A) ->
     {conditional, A}.
 
-make_column({binary, FieldName}, {DataType, _}) ->
+make_column({identifier, FieldName}, {DataType, _}) ->
     #riak_field_v1{
        name     = FieldName,
        type     = DataType,
        optional = true}.
 
-make_column({binary, FieldName}, {DataType, _}, {not_null, _}) ->
+make_column({identifier, FieldName}, {DataType, _}, {not_null, _}) ->
     #riak_field_v1{
        name     = FieldName,
        type     = DataType,
@@ -472,7 +500,7 @@ extract_key_field_list({list, [Field | Rest]}, Extracted) ->
     [#param_v1{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
-make_table_definition({binary, Table}, Contents) ->
+make_table_definition({identifier, Table}, Contents) ->
     PartitionKey = find_partition_key(Contents),
     LocalKey = find_local_key(Contents),
     Fields = find_fields(Contents),
@@ -503,11 +531,11 @@ find_local_key([_Head | Rest]) ->
 make_modfun(quantum, {list, Args}) ->
     [Param, Quantity, Unit] = lists:reverse(Args),
     {modfun, #hash_fn_v1{
-		mod  = riak_ql_quanta,
-		fn   = quantum,
-		args = [#param_v1{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
-		type = timestamp
-	       }}.
+                mod  = riak_ql_quanta,
+                fn   = quantum,
+                args = [#param_v1{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
+                type = timestamp
+               }}.
 
 find_fields({table_element_list, Elements}) ->
     find_fields(1, Elements, []).
@@ -519,4 +547,3 @@ find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
     find_fields(Count + 1, Rest, [PositionedField | Elements]);
 find_fields(Count, [_Head | Rest], Elements) ->
     find_fields(Count, Rest, Elements).
-
