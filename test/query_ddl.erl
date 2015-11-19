@@ -138,7 +138,7 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
 
 ?invalid_query_test(boolean_1d_test,
                     ?STANDARDTABLE,
-                    ?SQL ++ "myboolean = yardle").
+                    ?SQL ++ "myboolean = 'yardle'").
 
 ?valid_query_test(boolean_2_test,
                   ?STANDARDTABLE,
