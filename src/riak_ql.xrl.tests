@@ -191,6 +191,15 @@ unicode_identifier_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+inner_zero_test_() ->
+    Got = riak_ql_lexer:get_tokens("foo01 \"foo01\" 'foo01'"),
+    Expected = [
+                {identifier, <<"foo01">>},
+                {identifier, <<"foo01">>},
+                {character_literal, <<"foo01">>}
+               ],
+    ?_assertEqual(Expected, Got).
+
 keywords_in_words_test_() ->
     Got = riak_ql_lexer:get_tokens("mydouble mysint64 myboolean mycreate myany"),
     Expected = [
