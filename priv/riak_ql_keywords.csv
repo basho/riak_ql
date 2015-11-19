@@ -1,4 +1,5 @@
 and
+any
 as
 atom
 boolean
@@ -7,6 +8,9 @@ delete
 double
 drop
 false
+float
+float_sci
+float_type
 from
 global
 groupby
@@ -22,7 +26,6 @@ on commit
 or
 primary key
 preserve
-quanta
 rows
 select
 system versioning

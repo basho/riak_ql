@@ -29,6 +29,10 @@
          make_module_name/1
         ]).
 
+-type ddl() :: #ddl_v1{}.
+-export_type([ddl/0]).
+
+
 %% a helper function for destructuring data objects
 %% and testing the validity of field names
 %% the generated helper functions cannot contain

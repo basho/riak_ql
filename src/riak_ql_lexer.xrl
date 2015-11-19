@@ -116,8 +116,11 @@ Rules.
 {WITH} : {token, {with, list_to_binary(TokenChars)}}.
 
 {INTNUM}   : {token, {integer, list_to_integer(TokenChars)}}.
-{FLOATDEC} : {token, {float, list_to_float(TokenChars)}}.
-{FLOATSCI} : {token, {float, sci_to_float(TokenChars)}}.
+
+% float chars do not get converted to floats, if they are part of a word
+% then converting it and converting it back will alter the chars
+{FLOATDEC} : {token, {float, TokenChars}}.
+{FLOATSCI} : {token, {float_sci, TokenChars}}.
 
 {EQ}          : {token, {eq,     list_to_binary(TokenChars)}}.
 {APPROXMATCH} : {token, {approx, list_to_binary(TokenChars)}}.
