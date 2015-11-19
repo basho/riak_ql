@@ -408,6 +408,9 @@ select_quoted_where_sql_test() ->
                                                    ]
                                         }).
 
+select_field_to_field_forbidden_test() ->
+    ?sql_compilation_fail("select * from table where time = time").
+
 %%
 %% canonicalise WHERE clauses tests
 %%
