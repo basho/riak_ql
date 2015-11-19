@@ -300,6 +300,10 @@ make_expr({LiteralFlavor, Literal},
     make_expr({identifier, IdentifierName},
               {FlippedComparison, <<"flipped">>},
               {LiteralFlavor, Literal});
+make_expr({identifier, _LeftIdentifier},
+          {_ComparisonType, _ComparisonBin},
+          {identifier, _RightIdentifier}) ->
+    return_error(0, <<"Comparing or otherwise operating on two fields is not supported">>);
 make_expr({_, A}, {B, _}, {Type, C}) ->
     B1 = case B of
              and_      -> and_;
