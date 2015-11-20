@@ -84,7 +84,6 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
         ++ "mytimestamp timestamp not null, "
         ++ "myboolean boolean not null, "
         ++ "mydouble double not null, "
-        ++ "myany any not null, "
         ++ "mysint64 sint64 not null, "
         ++ "myvarchar varchar not null, "
         ++ "PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
@@ -201,32 +200,6 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
 ?valid_query_test(double_6_test,
                   ?STANDARDTABLE,
                   ?SQL ++ "mydouble >= 3.4").
-
-%% any's
-
-?invalid_query_test(any_1_test,
-                    ?STANDARDTABLE,
-                    ?SQL ++ "myany = 3.4").
-
-?invalid_query_test(any_2_test,
-                    ?STANDARDTABLE,
-                    ?SQL ++ "myany != 3.4").
-
-?invalid_query_test(any_3_test,
-                    ?STANDARDTABLE,
-                    ?SQL ++ "myany < 3.4").
-
-?invalid_query_test(any_4_test,
-                    ?STANDARDTABLE,
-                    ?SQL ++ "myany <= 3.4").
-
-?invalid_query_test(any_5_test,
-                    ?STANDARDTABLE,
-                    ?SQL ++ "myany > 3.4").
-
-?invalid_query_test(any_6_test,
-                    ?STANDARDTABLE,
-                    ?SQL ++ "myany >= 3.4").
 
 %% sint64s
 

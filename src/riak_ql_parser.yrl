@@ -56,7 +56,6 @@ datetime
 regex
 integer
 float
-any
 boolean
 sint64
 double
@@ -189,7 +188,6 @@ DataType -> sint64    : '$1'.
 DataType -> timestamp : '$1'.
 DataType -> varchar   : '$1'.
 DataType -> boolean   : '$1'.
-DataType -> any       : '$1'.
 
 KeyDefinition ->
     primary_key       openb KeyFieldList closeb                           : make_local_key('$3').
