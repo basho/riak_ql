@@ -65,10 +65,10 @@ gt
 lt
 gte
 lte
-ne
+%% ne
 nomatch
-approx
-notapprox
+%% approx
+%% notapprox
 openb
 closeb
 plus
@@ -151,15 +151,15 @@ Val -> false : {boolean, false}.
 Logic -> and_ : '$1'.
 Logic -> or_  : '$1'.
 
-Comp -> approx    : '$1'.
+%% Comp -> approx    : '$1'.
 Comp -> eq        : '$1'.
 Comp -> gt        : '$1'.
 Comp -> lt        : '$1'.
 Comp -> gte       : '$1'.
 Comp -> lte       : '$1'.
-Comp -> ne        : '$1'.
+%% Comp -> ne        : '$1'.
 Comp -> nomatch   : '$1'.
-Comp -> notapprox : '$1'.
+%% Comp -> notapprox : '$1'.
 
 %% TABLE DEFINTITION
 
