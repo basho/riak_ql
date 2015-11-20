@@ -766,13 +766,11 @@ create_all_types_sql_test() ->
         ++ "time timestamp not null, "
         ++ "isweather boolean not null, "
         ++ "temperature double not null, "
-        ++ "options any not null, "
         ++ "mysint64 sint64 not null, "
         ++ "user2 varchar, "
         ++ "time2 timestamp, "
         ++ "isweather2 boolean, "
         ++ "temperature2 double, "
-        ++ "options2 any, "
         ++ "mysint642 sint64, "
         ++ "PRIMARY KEY ((geohash, quantum(time, 15, 'm')), time, user))",
     Toks = riak_ql_lexer:get_tokens(String),
@@ -809,43 +807,33 @@ create_all_types_sql_test() ->
                    type = double,
                    optional = false},
                 #riak_field_v1{
-                   name = <<"options">>,
-                   position = 6,
-                   type = any,
-                   optional = false},
-                #riak_field_v1{
                    name = <<"mysint64">>,
-                   position = 7,
+                   position = 6,
                    type = sint64,
                    optional = false},
                 #riak_field_v1{
                    name = <<"user2">>,
-                   position = 8,
+                   position = 7,
                    type = varchar,
                    optional = true},
                 #riak_field_v1{
                    name = <<"time2">>,
-                   position = 9,
+                   position = 8,
                    type = timestamp,
                    optional = true},
                 #riak_field_v1{
                    name = <<"isweather2">>,
-                   position = 10,
+                   position = 9,
                    type = boolean,
                    optional = true},
                 #riak_field_v1{
                    name = <<"temperature2">>,
-                   position = 11,
+                   position = 10,
                    type = double,
                    optional = true},
                 #riak_field_v1{
-                   name = <<"options2">>,
-                   position = 12,
-                   type = any,
-                   optional = true},
-                #riak_field_v1{
                    name = <<"mysint642">>,
-                   position = 13,
+                   position = 11,
                    type = sint64,
                    optional = true}
                ],
