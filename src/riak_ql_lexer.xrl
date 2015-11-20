@@ -49,8 +49,10 @@ REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
 QUOTED = ("([^\"]|(\"\"))*")
 IDENTIFIER = ([a-zA-Z][a-zA-Z0-9_\-]*)
-UNICODE = ([^\x00-\x7F])
 WHITESPACE = ([\000-\s]*)
+
+% characters not in the ascii range
+UNICODE = ([^\x00-\x7F])
 
 INTNUM   = (\-*[0-9]+)
 FLOATDEC = (\-*([0-9]+)?\.[0-9]+)
