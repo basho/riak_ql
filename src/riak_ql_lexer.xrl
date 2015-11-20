@@ -49,7 +49,7 @@ REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
 QUOTED = ("([^\"]|(\"\"))*")
 IDENTIFIER = ([a-zA-Z][a-zA-Z0-9_\-]*)
-
+UNICODE = ([^\x00-\x7F])
 WHITESPACE = ([\000-\s]*)
 
 INTNUM   = (\-*[0-9]+)
@@ -150,6 +150,7 @@ Rules.
 \n : {end_token, {'$end'}}.
 
 {IDENTIFIER} : {token, {identifier, list_to_binary(TokenChars)}}.
+{UNICODE} : error(unicode_not_supported).
 
 .  : {token, {identifier, list_to_binary(TokenChars)}}.
 
