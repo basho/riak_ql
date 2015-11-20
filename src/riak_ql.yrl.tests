@@ -194,14 +194,8 @@ select_where_8_sql_test() ->
                                                     ]
                                         }).
 
-select_where_9_sql_test() ->
-    ?sql_compilation_assert("select * from log_lines where line =~ /error/i",
-                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
-                                         'FROM'   = <<"log_lines">>,
-                                         'WHERE'  = [
-                                                     {'=~', <<"line">>, {regex, <<"/error/i">>}}
-                                                    ]
-                                        }).
+select_where_approxmatch_sql_test() ->
+    ?sql_compilation_fail("select * from log_lines where line =~ /error/i").
 
 select_where_10_sql_test() ->
     ?sql_compilation_assert("select * from events where customer_id = 23 and type = 'click10'",
@@ -242,23 +236,11 @@ select_where_11b_sql_test() ->
                                                     ]
                                         }).
 
-select_where_12_sql_test() ->
-    ?sql_compilation_assert("select * from events where email !~ /.*gmail.*/",
-                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
-                                         'FROM'   = <<"events">>,
-                                         'WHERE'  = [
-                                                     {'!~', <<"email">>, {regex, <<"/.*gmail.*/">>}}
-                                                    ]
-                                        }).
+select_where_not_approx_sql_test() ->
+    ?sql_compilation_fail("select * from events where email !~ /.*gmail.*/").
 
-select_where_13_sql_test() ->
-    ?sql_compilation_assert("select * from nagios_checks where status <> 0",
-                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
-                                         'FROM'   = <<"nagios_checks">>,
-                                         'WHERE'  = [
-                                                     {'<>', <<"status">>, {integer, 0}}
-                                                    ]
-                                        }).
+select_where_ne_sql_test() ->
+    ?sql_compilation_fail("select * from nagios_checks where status <> 0").
 
 select_where_14_sql_test() ->
     ?sql_compilation_assert("select * from events where signed_in = false",
@@ -269,21 +251,9 @@ select_where_14_sql_test() ->
                                                     ]
                                         }).
 
-select_where_15_sql_test() ->
-    ?sql_compilation_assert("select * from events where (email =~ /.*gmail.*/ or " ++
-                                "email =~ /.*yahoo.*/) and state = 'ny'",
-                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
-                                         'FROM'   = <<"events">>,
-                                         'WHERE'  = [
-                                                     {and_,
-                                                      {'=', <<"state">>, {binary, <<"ny">>}},
-                                                      {or_,
-                                                       {'=~', <<"email">>, {regex, <<"/.*gmail.*/">>}},
-                                                       {'=~', <<"email">>, {regex, <<"/.*yahoo.*/">>}}
-                                                      }
-                                                     }
-                                                    ]
-                                        }).
+select_where_approx_or_approx_sql_test() ->
+    ?sql_compilation_fail("select * from events where (email =~ /.*gmail.*/ or " ++
+                                "email =~ /.*yahoo.*/) and state = 'ny'").
 
 select_where_letters_nos_in_strings_1a_test() ->
     ?sql_compilation_assert("select * from events where user = 'user 1'",
