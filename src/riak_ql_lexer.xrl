@@ -49,8 +49,10 @@ REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
 QUOTED = ("([^\"]|(\"\"))*")
 IDENTIFIER = ([a-zA-Z][a-zA-Z0-9_\-]*)
-
 WHITESPACE = ([\000-\s]*)
+
+% characters not in the ascii range
+UNICODE = ([^\x00-\x7F])
 
 INTNUM   = (\-*[0-9]+)
 FLOATDEC = (\-*([0-9]+)?\.[0-9]+)
@@ -153,6 +155,7 @@ Rules.
 \n : {end_token, {'$end'}}.
 
 {IDENTIFIER} : {token, {identifier, list_to_binary(TokenChars)}}.
+{UNICODE} : error(unicode_in_identifier).
 
 .  : {token, {identifier, list_to_binary(TokenChars)}}.
 
@@ -200,6 +203,9 @@ fix_up_date(Date) ->
     end.
 
 strip_quoted(QuotedString) ->
+    % if there are unicode characters in the string, throw an error
+    [error(unicode_in_quotes) || U <- QuotedString, U > 127],
+
     StrippedOutsideQuotes = string:strip(QuotedString, both, $"),
     re:replace(StrippedOutsideQuotes, "\"\"", "\"", [global, {return, binary}]).
 
