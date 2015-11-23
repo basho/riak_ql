@@ -10,7 +10,7 @@ AS = (A|a)(S|s)
 ATOM = (A|a)(T|t)(O|o)(M|m)
 ANY  = (A|a)(N|n)(Y|y)
 BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
-CREATE_TABLE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)\s(T|t)(A|a)(B|b)(L|l)(E|e)
+CREATE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)
 DELETE = (D|d)(E|e)(L|l)(E|e)(T|t)(E|e)
 DOUBLE = (D|d)(O|o)(U|u)(B|b)(L|l)(E|e)
 DROP = (D|d)(R|r)(O|o)(P|p)
@@ -37,6 +37,7 @@ ROWS = (R|r)(O|o)(W|w)(S|s)
 SELECT = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
 SINT64 = ((S|s)(I|i)(N|n)(T|t)64)
 SYSTEM_VERSIONING = (S|s)(Y|y)(S|s)(T|t)(E|e)(M|m)\s(V|v)(E|e)(R|r)(S|s)(I|i)(O|o)(N|n)(I|i)(N|n)(G|g)
+TABLE = (T|t)(A|a)(B|b)(L|l)(E|e)
 TEMPORARY = (T|t)(E|e)(M|m)(P|p)(O|o)(R|r)(A|a)(R|r)(Y|y)
 TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
 TRUE = (T|t)(R|r)(U|u)(E|e)
@@ -83,7 +84,8 @@ Rules.
 {ANY} : {token, {any, list_to_binary(TokenChars)}}.
 {ATOM} : {token, {atom, list_to_binary(TokenChars)}}.
 {BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
-{CREATE_TABLE} : {token, {create_table, list_to_binary(TokenChars)}}.
+{CREATE} : {token, {create, list_to_binary(TokenChars)}}.
+{TABLE} : {token, {table, list_to_binary(TokenChars)}}.
 {DELETE} : {token, {delete, list_to_binary(TokenChars)}}.
 {DOUBLE} : {token, {double, list_to_binary(TokenChars)}}.
 {DROP} : {token, {drop, list_to_binary(TokenChars)}}.

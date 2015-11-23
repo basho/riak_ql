@@ -36,6 +36,7 @@ KeyField
 KeyFieldArgList
 KeyFieldArg
 NotNull
+CreateTable
 .
 
 Terminals
@@ -78,7 +79,8 @@ div_
 comma
 identifier
 character_literal
-create_table
+create
+table
 not_
 null
 primary_key
@@ -162,13 +164,14 @@ Comp -> lte       : '$1'.
 Comp -> nomatch   : '$1'.
 %% Comp -> notapprox : '$1'.
 
+CreateTable -> create table : create_table.
 
 NotNull -> not_ null : '$1'.
 
 %% TABLE DEFINTITION
 
 TableDefinition ->
-    create_table Bucket TableContentsSource :
+    CreateTable Bucket TableContentsSource :
         make_table_definition('$2', '$3').
 
 TableContentsSource -> TableElementList : '$1'.

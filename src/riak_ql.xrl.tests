@@ -102,7 +102,8 @@ keyword_double_test_() ->
 keywords_create_test_() ->
     Got = riak_ql_lexer:get_tokens("create table not null primary key"),
     Expected = [
-                {create_table, <<"create table">>},
+                {create, <<"create">>},
+                {table, <<"table">>},
                 {not_, <<"not">>},
                 {null, <<"null">>},
                 {primary_key, <<"primary key">>}],
@@ -367,7 +368,8 @@ timeseries_test_() ->
                                    ++ "temperature double not_null, "
                                    ++ "PRIMARY KEY ((geohash, quantum(time, 15, m), time, user)"),
     Expected = [
-                {create_table, <<"CREATE TABLE">>},
+                {create, <<"CREATE">>},
+                {table, <<"TABLE">>},
                 {identifier,<<"Geo">>},
                 {openb, <<"(">>},
                 {identifier,<<"geohash">>},
