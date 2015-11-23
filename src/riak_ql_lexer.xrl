@@ -150,7 +150,7 @@ Rules.
 
 {COMMA} : {token, {comma, list_to_binary(TokenChars)}}.
 
-{WHITESPACE} : {token, {whitespace, list_to_binary(TokenChars)}}.
+{WHITESPACE} : skip_token.
 
 \n : {end_token, {'$end'}}.
 
@@ -175,7 +175,7 @@ post_process(X) ->
 
 %% filter out the whitespaces at the end
 post_p([], Acc) ->
-    [{Type, X} || {Type, X} <- lists:reverse(Acc), Type =/= whitespace];
+     lists:reverse(Acc);
 post_p([{identifier, TokenChars} | T], Acc) when is_list(TokenChars)->
     post_p(T, [{identifier, list_to_binary(TokenChars)} | Acc]);
 post_p([{float, TokenChars} | T], Acc) ->
