@@ -184,8 +184,15 @@ unicode_character_literal_test_() ->
 unicode_identifier_test_() ->
     ?_assertException(
         error,
-        unicode_not_supported,
+        unicode_in_identifier,
         riak_ql_lexer:get_tokens("πίτσα пицца ピザ 比萨")
+    ).
+
+unicode_quoted_test_() ->
+    ?_assertException(
+        error,
+        unicode_in_quotes,
+        riak_ql_lexer:get_tokens("\"helピザlo\"")
     ).
 
 inner_zero_test_() ->

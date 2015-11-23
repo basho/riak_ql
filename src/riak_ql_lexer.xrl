@@ -152,7 +152,7 @@ Rules.
 \n : {end_token, {'$end'}}.
 
 {IDENTIFIER} : {token, {identifier, list_to_binary(TokenChars)}}.
-{UNICODE} : error(unicode_not_supported).
+{UNICODE} : error(unicode_in_identifier).
 
 .  : {token, {identifier, list_to_binary(TokenChars)}}.
 
@@ -196,6 +196,9 @@ fix_up_date(Date) ->
     end.
 
 strip_quoted(QuotedString) ->
+    % if there are unicode characters in the string, throw an error
+    [error(unicode_in_quotes) || U <- QuotedString, U > 127],
+
     StrippedOutsideQuotes = string:strip(QuotedString, both, $"),
     re:replace(StrippedOutsideQuotes, "\"\"", "\"", [global, {return, binary}]).
 
