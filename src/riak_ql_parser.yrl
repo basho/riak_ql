@@ -35,6 +35,7 @@ KeyFieldList
 KeyField
 KeyFieldArgList
 KeyFieldArg
+NotNull
 .
 
 Terminals
@@ -78,7 +79,8 @@ comma
 identifier
 character_literal
 create_table
-not_null
+not_
+null
 primary_key
 timestamp
 varchar
@@ -160,6 +162,9 @@ Comp -> lte       : '$1'.
 Comp -> nomatch   : '$1'.
 %% Comp -> notapprox : '$1'.
 
+
+NotNull -> not_ null : '$1'.
+
 %% TABLE DEFINTITION
 
 TableDefinition ->
@@ -180,7 +185,8 @@ ColumnDefinition ->
     Identifier DataType ColumnConstraint : make_column('$1', '$2', '$3').
 ColumnDefinition ->
     Identifier DataType : make_column('$1', '$2').
-ColumnConstraint -> not_null : '$1'.
+
+ColumnConstraint -> NotNull : not_null.
 
 DataType -> datetime  : '$1'.
 DataType -> double    : '$1'.
@@ -464,7 +470,7 @@ make_column({identifier, FieldName}, {DataType, _}) ->
        type     = DataType,
        optional = true}.
 
-make_column({identifier, FieldName}, {DataType, _}, {not_null, _}) ->
+make_column({identifier, FieldName}, {DataType, _}, not_null) ->
     #riak_field_v1{
        name     = FieldName,
        type     = DataType,

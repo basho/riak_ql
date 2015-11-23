@@ -25,7 +25,8 @@ LOCAL = (L|l)(O|o)(C|c)(A|a)(L|l)
 LOCAL_KEY = (L|l)(O|o)(C|c)(A|a)(L|l)\s(K|k)(E|e)(Y|y)
 MERGE = (M|m)(E|e)(R|r)(G|g)(E|e)
 MODFUN = (M|m)(O|o)(D|d)(F|f)(U|u)(N|n)
-NOT_NULL = (N|n)(O|o)(T|t)\s(N|n)(U|u)(L|l)(L|l)
+NOT = (N|n)(O|o)(T|t)
+NULL = (N|n)(U|u)(L|l)(L|l)
 OF = (O|o)(F|f)
 ON_COMMIT = (O|o)(N|n)\s(C|c)(O|o)(M|m)(M|m)(I|i)(T|t)
 OR = (O|o)(R|r)
@@ -97,7 +98,8 @@ Rules.
 {LOCAL_KEY} : {token, {local_key, list_to_binary(TokenChars)}}.
 {MERGE} : {token, {merge, list_to_binary(TokenChars)}}.
 {MODFUN} : {token, {modfun, list_to_binary(TokenChars)}}.
-{NOT_NULL} : {token, {not_null, list_to_binary(TokenChars)}}.
+{NOT} : {token, {not_, list_to_binary(TokenChars)}}.
+{NULL} : {token, {null, list_to_binary(TokenChars)}}.
 {OF} : {token, {of_, list_to_binary(TokenChars)}}.
 {ON_COMMIT} : {token, {on_commit, list_to_binary(TokenChars)}}.
 {OR} : {token, {or_, list_to_binary(TokenChars)}}.

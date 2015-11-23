@@ -103,7 +103,8 @@ keywords_create_test_() ->
     Got = riak_ql_lexer:get_tokens("create table not null primary key"),
     Expected = [
                 {create_table, <<"create table">>},
-                {not_null, <<"not null">>},
+                {not_, <<"not">>},
+                {null, <<"null">>},
                 {primary_key, <<"primary key">>}],
     ?_assertEqual(Expected, Got).
 
