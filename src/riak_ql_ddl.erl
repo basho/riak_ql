@@ -67,10 +67,10 @@
 -spec make_module_name(Table::binary()) ->
             module().
 make_module_name(Table) when is_binary(Table) ->
-    Nonce = binary_to_list(base64:encode(crypto:hash(md4, Table))),
+    Nonce = base64:encode(crypto:hash(md4, Table)),
     Nonce2 = remove_hooky_chars(Nonce),
-    ModName = "riak_ql_ddl_helper_mod_" ++ Nonce2,
-    list_to_atom(ModName).
+    ModName = <<"riak_ql_ddl_helper_mod_", Table/binary, "_", Nonce2/binary>>,
+    list_to_atom(binary_to_list(ModName)).
 
 -spec get_partition_key(#ddl_v1{}, tuple()) -> term().
 get_partition_key(#ddl_v1{table = T, partition_key = PK}, Obj)
@@ -268,7 +268,7 @@ fold_where_tree(Clause, Acc, Fn) ->
     Fn(Clause, Acc).
 
 remove_hooky_chars(Nonce) ->
-    re:replace(Nonce, "[/|\+|\.|=]", "", [global, {return, list}]).
+    << <<C>> || <<C>> <= Nonce, not lists:member(C, "[/|\+|\.|=]")>>.
 
 -ifdef(TEST).
 -compile(export_all).
