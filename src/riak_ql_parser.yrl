@@ -35,57 +35,52 @@ KeyFieldList
 KeyField
 KeyFieldArgList
 KeyFieldArg
+NotNull
+CreateTable
+PrimaryKey
 .
 
 Terminals
 
-select
-from
-limit
-where
+or_
 and_
- or_
-%% delete
-%% drop
-%% groupby
-%% merge
-%% inner
-%% join
-%% as
-datetime
-regex
-integer
-float
 boolean
-sint64
+character_literal
+closeb
+comma
+create
+datetime
+div_
 double
 eq
-gt
-lt
-gte
-lte
-%% ne
-nomatch
-%% approx
-%% notapprox
-openb
-closeb
-plus
-minus
-maybetimes
-div_
-comma
-identifier
-character_literal
-create_table
-not_null
-primary_key
-timestamp
-varchar
-%% atom
-quantum
-true
 false
+float
+from
+gt
+gte
+identifier
+integer
+key
+limit
+lt
+lte
+maybetimes
+minus
+nomatch
+not_
+null
+openb
+plus
+primary
+quantum
+regex
+select
+sint64
+table
+timestamp
+true
+varchar
+where
 .
 
 Rootsymbol Statement.
@@ -160,10 +155,14 @@ Comp -> lte       : '$1'.
 Comp -> nomatch   : '$1'.
 %% Comp -> notapprox : '$1'.
 
+CreateTable -> create table : create_table.
+
+NotNull -> not_ null : '$1'.
+
 %% TABLE DEFINTITION
 
 TableDefinition ->
-    create_table Bucket TableContentsSource :
+    CreateTable Bucket TableContentsSource :
         make_table_definition('$2', '$3').
 
 TableContentsSource -> TableElementList : '$1'.
@@ -180,7 +179,8 @@ ColumnDefinition ->
     Identifier DataType ColumnConstraint : make_column('$1', '$2', '$3').
 ColumnDefinition ->
     Identifier DataType : make_column('$1', '$2').
-ColumnConstraint -> not_null : '$1'.
+
+ColumnConstraint -> NotNull : not_null.
 
 DataType -> datetime  : '$1'.
 DataType -> double    : '$1'.
@@ -189,10 +189,12 @@ DataType -> timestamp : '$1'.
 DataType -> varchar   : '$1'.
 DataType -> boolean   : '$1'.
 
+PrimaryKey -> primary key : primary_key.
+
 KeyDefinition ->
-    primary_key       openb KeyFieldList closeb                           : make_local_key('$3').
+    PrimaryKey openb KeyFieldList closeb : make_local_key('$3').
 KeyDefinition ->
-    primary_key openb openb KeyFieldList closeb comma KeyFieldList closeb : make_partition_and_local_keys('$4', '$7').
+    PrimaryKey openb openb KeyFieldList closeb comma KeyFieldList closeb : make_partition_and_local_keys('$4', '$7').
 
 KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
 KeyFieldList -> KeyField : make_list({list, []}, '$1').
@@ -464,7 +466,7 @@ make_column({identifier, FieldName}, {DataType, _}) ->
        type     = DataType,
        optional = true}.
 
-make_column({identifier, FieldName}, {DataType, _}, {not_null, _}) ->
+make_column({identifier, FieldName}, {DataType, _}, not_null) ->
     #riak_field_v1{
        name     = FieldName,
        type     = DataType,
