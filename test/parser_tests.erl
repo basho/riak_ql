@@ -44,4 +44,15 @@ primary_key_white_space_test() ->
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
     ).
 
+missing_primary_key_error_test() ->
+    ?assertEqual(
+        {error,{'$undefined',riak_ql_parser,"primary_key_missing"}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens("CREATE TABLE bad8 ( f sint64 )"))
+    ).
 
+missing_primary_key_no_fields_error_test() ->
+    ?assertMatch(
+        {error, _}, % syntax error, just make sure that ti fails
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "CREATE TABLE bad8 ( )"))
+    ).
