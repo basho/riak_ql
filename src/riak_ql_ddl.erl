@@ -26,7 +26,7 @@
 
 %% this function can be used to work out which Module to use
 -export([
-         make_module_name/1
+         make_module_name/1, make_module_name/2
         ]).
 
 -type ddl() :: #ddl_v1{}.
@@ -66,11 +66,28 @@
 
 -spec make_module_name(Table::binary()) ->
             module().
-make_module_name(Table) when is_binary(Table) ->
-    Nonce = base64:encode(crypto:hash(md4, Table)),
-    Nonce2 = remove_hooky_chars(Nonce),
-    ModName = <<"riak_ql_ddl_helper_mod_", Table/binary, "_", Nonce2/binary>>,
-    list_to_atom(binary_to_list(ModName)).
+%% @doc Generate a unique module name for Table at version 1. @see
+%%      make_module_name/2.
+make_module_name(Table) ->
+    make_module_name(Table, 1).
+
+-spec make_module_name(Table::binary(), Version::integer()) ->
+            module().
+%% @doc Generate a unique, but readable and recognizable, module name
+%%      for Table at a certain Version, by 'escaping' non-ascii chars
+%%      in Table a la C++.
+make_module_name(Table, Version)
+  when is_binary(Table), is_integer(Version) ->
+    T4BL3 = << <<(maybe_mangle_char(C))/binary>> || <<C>> <= Table>>,
+    ModName = <<"riak_ql_ddl_helper_mod_", T4BL3/binary, $$, ($0 + Version)>>,
+    binary_to_atom(ModName, latin1).
+maybe_mangle_char(C) when (C >= $a andalso C =< $z);
+                          (C >= $A andalso C =< $Z);
+                          (C == $_) ->
+    <<C>>;
+maybe_mangle_char(C) ->
+    <<$$, (list_to_binary(integer_to_list(C)))/binary>>.
+
 
 -spec get_partition_key(#ddl_v1{}, tuple()) -> term().
 get_partition_key(#ddl_v1{table = T, partition_key = PK}, Obj)
@@ -266,9 +283,6 @@ fold_where_tree({Op, LHS, RHS}, Acc1, Fn) when Op == and_; Op == or_ ->
     fold_where_tree(RHS, Acc2, Fn);
 fold_where_tree(Clause, Acc, Fn) ->
     Fn(Clause, Acc).
-
-remove_hooky_chars(Nonce) ->
-    << <<C>> || <<C>> <= Nonce, not lists:member(C, "[/|\+|\.|=]")>>.
 
 -ifdef(TEST).
 -compile(export_all).
