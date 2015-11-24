@@ -79,14 +79,15 @@ make_module_name(Table) ->
 make_module_name(Table, Version)
   when is_binary(Table), is_integer(Version) ->
     T4BL3 = << <<(maybe_mangle_char(C))/binary>> || <<C>> <= Table>>,
-    ModName = <<"riak_ql_ddl_helper_mod_", T4BL3/binary, $$, ($0 + Version)>>,
+    ModName = <<"riak_ql_table_", T4BL3/binary, $$, (list_to_binary(integer_to_list(Version)))/binary>>,
     binary_to_atom(ModName, latin1).
+
 maybe_mangle_char(C) when (C >= $a andalso C =< $z);
                           (C >= $A andalso C =< $Z);
                           (C == $_) ->
     <<C>>;
 maybe_mangle_char(C) ->
-    <<$$, (list_to_binary(integer_to_list(C)))/binary>>.
+    <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
 
 -spec get_partition_key(#ddl_v1{}, tuple()) -> term().
@@ -291,6 +292,12 @@ fold_where_tree(Clause, Acc, Fn) ->
 -define(INVALID, false).
 
 -include_lib("eunit/include/eunit.hrl").
+
+make_module_name_test() ->
+    ?assertEqual('riak_ql_table_fafa$1', make_module_name(<<"fafa">>)),
+    ?assertEqual('riak_ql_table_fafa$2', make_module_name(<<"fafa">>, 2)),
+    ?assertEqual('riak_ql_table_FaFa$1', make_module_name(<<"FaFa">>, 1)),
+    ?assertEqual('riak_ql_table_Fa%32%94%36$43', make_module_name(<<"Fa ^$">>, 43)).
 
 %%
 %% Helper Fn for unit tests
