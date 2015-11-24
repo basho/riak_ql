@@ -106,7 +106,8 @@ keywords_create_test_() ->
                 {table, <<"table">>},
                 {not_, <<"not">>},
                 {null, <<"null">>},
-                {primary_key, <<"primary key">>}],
+                {primary, <<"primary">>},
+                {key, <<"key">>}],
     ?_assertEqual(Expected, Got).
 
 words_containing_keywords_test_() ->
@@ -392,7 +393,8 @@ timeseries_test_() ->
                 {double, <<"double">>},
                 {identifier,<<"not_null">>},
                 {comma, <<",">>},
-                {primary_key, <<"PRIMARY KEY">>},
+                {primary, <<"PRIMARY">>},
+                {key, <<"KEY">>},
                 {openb, <<"(">>},
                 {openb, <<"(">>},
                 {identifier,<<"geohash">>},
