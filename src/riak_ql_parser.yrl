@@ -515,23 +515,23 @@ make_table_definition({identifier, Table}, Contents) ->
          local_key = LocalKey,
          fields = Fields}).
 
-find_partition_key([]) ->
-    none;
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
 find_partition_key([{partition_key, Key} | _Rest]) ->
     Key;
 find_partition_key([_Head | Rest]) ->
-    find_partition_key(Rest).
+    find_partition_key(Rest);
+find_partition_key(_) ->
+    none.
 
-find_local_key([]) ->
-    none;
 find_local_key({table_element_list, Elements}) ->
     find_local_key(Elements);
 find_local_key([{local_key, Key} | _Rest]) ->
     Key;
 find_local_key([_Head | Rest]) ->
-    find_local_key(Rest).
+    find_local_key(Rest);
+find_local_key(_) ->
+    none.
 
 make_modfun(quantum, {list, Args}) ->
     [Param, Quantity, Unit] = lists:reverse(Args),
@@ -557,11 +557,20 @@ find_fields(Count, [_Head | Rest], Elements) ->
 %% DDL validation
 
 validate_ddl(DDL) ->
+    ok = assert_keys_present(DDL),
     ok = assert_unique_fields_in_pk(DDL),
     ok = assert_partition_key_length(DDL),
     ok = assert_primary_and_local_keys_match(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
     DDL.
+
+%% @doc Ensure DDL can haz keys
+assert_keys_present(#ddl_v1{local_key = LK, partition_key = PK})
+  when LK == none;
+       PK == none ->
+    flat_out("Missing primary key");
+assert_keys_present(_GoodDDL) ->
+    ok.
 
 %% @doc Ensure all fields appearing in PRIMARY KEY are not null.
 assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
