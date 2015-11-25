@@ -508,11 +508,12 @@ make_table_definition({identifier, Table}, Contents) ->
     PartitionKey = find_partition_key(Contents),
     LocalKey = find_local_key(Contents),
     Fields = find_fields(Contents),
-    #ddl_v1{
-       table = Table,
-       partition_key = PartitionKey,
-       local_key = LocalKey,
-       fields = Fields}.
+    validate_ddl(
+      #ddl_v1{
+         table = Table,
+         partition_key = PartitionKey,
+         local_key = LocalKey,
+         fields = Fields}).
 
 find_partition_key([]) ->
     none;
@@ -551,3 +552,78 @@ find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
     find_fields(Count + 1, Rest, [PositionedField | Elements]);
 find_fields(Count, [_Head | Rest], Elements) ->
     find_fields(Count, Rest, Elements).
+
+
+%% DDL validation
+
+validate_ddl(DDL) ->
+    ok = assert_unique_fields_in_pk(DDL),
+    ok = assert_partition_key_length(DDL),
+    ok = assert_primary_and_local_keys_match(DDL),
+    ok = assert_primary_key_fields_non_null(DDL),
+    DDL.
+
+%% @doc Ensure all fields appearing in PRIMARY KEY are not null.
+assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
+                                           fields = Fields}) ->
+    PKFieldNames = [N || #param_v1{name = [N]} <- LK],
+    OnlyPKFields = [F || #riak_field_v1{name = N} = F <- Fields,
+                         lists:member(N, PKFieldNames)],
+    lists:foreach(
+      fun(#riak_field_v1{optional = true}) ->
+              flat_out("All fields in primary key must be not null");
+         (_) ->
+              ok
+      end,
+      OnlyPKFields),
+    ok.
+
+%% @doc Verify that the primary key has three components
+%%      and the first element is a quantum
+assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) when length(Key) == 3 ->
+    assert_third_param_is_quantum(lists:nth(3, Key));
+assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) ->
+    flat_out("Primary key must consist of exactly 3 fields (has ~b)", [length(Key)]).
+
+%% @doc Verify that the first element of the primary key is a quantum
+assert_third_param_is_quantum(#hash_fn_v1{mod=riak_ql_quanta, fn=quantum}) ->
+    ok;
+assert_third_param_is_quantum(_KeyComponent) ->
+    flat_out("Third element of primary key must be a quantum").
+
+%% @doc Verify primary key and local partition have the same elements
+assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primary},
+                                            local_key = #key_v1{ast = Local}}) ->
+    PrimaryList = [query_field_name(F) || F <- Primary],
+    LocalList = [query_field_name(F) || F <- Local],
+    case PrimaryList == LocalList of
+        true ->
+            ok;
+        false ->
+            flat_out("Local key does not match primary key")
+    end.
+
+assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
+    Fields = [N || #param_v1{name = [N]} <- LK],
+    case length(Fields) == length(lists:usort(Fields)) of
+        true ->
+            ok;
+        false ->
+            flat_out("Primary key has duplicate fields")
+    end.
+
+%% Pull the name out of the appropriate record
+query_field_name(#hash_fn_v1{args = Args}) ->
+    Param = lists:keyfind(param_v1, 1, Args),
+    query_field_name(Param);
+query_field_name(#param_v1{name = Field}) ->
+    Field.
+
+-spec flat_out(string()) -> no_return().
+flat_out(F) ->
+    flat_out(F, []).
+-spec flat_out(string(), [term()]) -> no_return().
+flat_out(F, A) ->
+    return_error(
+      0,
+      list_to_binary(lists:flatten(io_lib:format(F, A)))).
