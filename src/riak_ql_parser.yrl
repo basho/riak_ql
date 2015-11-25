@@ -170,7 +170,8 @@ TableElementList -> openb TableElements closeb : '$2'.
 
 TableElements ->
     TableElement comma TableElements : make_table_element_list('$1', '$3').
-TableElements -> TableElement : '$1'.
+TableElements ->
+    TableElement : make_table_element_list('$1', []).
 
 TableElement -> ColumnDefinition : '$1'.
 TableElement -> KeyDefinition : '$1'.
@@ -508,29 +509,36 @@ make_table_definition({identifier, Table}, Contents) ->
     PartitionKey = find_partition_key(Contents),
     LocalKey = find_local_key(Contents),
     Fields = find_fields(Contents),
-    #ddl_v1{
-       table = Table,
-       partition_key = PartitionKey,
-       local_key = LocalKey,
-       fields = Fields}.
+    case {PartitionKey, LocalKey} of
+        {{error, _} = E, _} ->
+            E;
+        {_, {error, _} = E} ->
+            E;
+        _ ->
+            #ddl_v1{
+               table = Table,
+               partition_key = PartitionKey,
+               local_key = LocalKey,
+               fields = Fields}
+    end.
 
-find_partition_key([]) ->
-    none;
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
 find_partition_key([{partition_key, Key} | _Rest]) ->
     Key;
 find_partition_key([_Head | Rest]) ->
-    find_partition_key(Rest).
+    find_partition_key(Rest);
+find_partition_key(_) ->
+    return_error('$undefined', "primary_key_missing").
 
-find_local_key([]) ->
-    none;
 find_local_key({table_element_list, Elements}) ->
     find_local_key(Elements);
 find_local_key([{local_key, Key} | _Rest]) ->
     Key;
 find_local_key([_Head | Rest]) ->
-    find_local_key(Rest).
+    find_local_key(Rest);
+find_local_key(_) ->
+     return_error(10, "local_key_missing").
 
 make_modfun(quantum, {list, Args}) ->
     [Param, Quantity, Unit] = lists:reverse(Args),
