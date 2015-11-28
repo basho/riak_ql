@@ -294,8 +294,7 @@ add_limit(A, _B, {integer, C}) ->
 make_expr({LiteralFlavor, Literal},
           {ComparisonType, _ComparisonBytes},
           {identifier, IdentifierName})
-  when LiteralFlavor /= identifier
-->
+  when LiteralFlavor /= identifier ->
     FlippedComparison = flip_comparison(ComparisonType),
     make_expr({identifier, IdentifierName},
               {FlippedComparison, <<"flipped">>},
@@ -618,8 +617,24 @@ assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
         true ->
             ok;
         false ->
-            flat_out("Primary key has duplicate fields")
+            flat_out("Primary key has duplicate fields (~s)",
+                     [string:join(
+                        which_duplicate(
+                          lists:sort(
+                            [binary_to_list(F) || F <- Fields])),
+                       ", ")])
     end.
+
+which_duplicate(FF) ->
+    which_duplicate(FF, []).
+which_duplicate([], Acc) ->
+    Acc;
+which_duplicate([_], Acc) ->
+    Acc;
+which_duplicate([A,A|_] = [_|T], Acc) ->
+    which_duplicate(T, [A|Acc]);
+which_duplicate([_|T], Acc) ->
+    which_duplicate(T, Acc).
 
 %% Pull the name out of the appropriate record
 query_field_name(#hash_fn_v1{args = Args}) ->
