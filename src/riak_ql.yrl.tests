@@ -539,141 +539,21 @@ canonicalise_where_7_test() ->
 %% create table tests
 %%
 
-create_simple_sql_test() ->
-    ?sql_compilation_assert("create table temperatures " ++
-                                "(time timestamp not null, " ++
-                                "temperature_k double, " ++
-                                "primary key (time))",
-                            #ddl_v1{
-                               table = <<"temperatures">>,
-                               fields = [
-                                         #riak_field_v1{
-                                            name = <<"time">>,
-                                            position = 1,
-                                            type = timestamp,
-                                            optional = false},
-                                         #riak_field_v1{
-                                            name = <<"temperature_k">>,
-                                            position = 2,
-                                            type = double,
-                                            optional = true}
-                                        ],
-                               partition_key = #key_v1{
-                                                  ast = [#param_v1{
-                                                            name = [<<"time">>]
-                                                           }]
-                                                 },
-                               local_key = #key_v1{
-                                              ast = [#param_v1{
-                                                        name = [<<"time">>]
-                                                       }]
-                                             }
-                              }).
-
-create_simple_sql_int_test() ->
-    ?sql_compilation_assert("create table temperatures " ++
-                                "(time timestamp not null, " ++
-                                "temperature_k sint64, " ++
-                                "primary key (time))",
-                            #ddl_v1{
-                               table = <<"temperatures">>,
-                               fields = [
-                                         #riak_field_v1{
-                                            name = <<"time">>,
-                                            position = 1,
-                                            type = timestamp,
-                                            optional = false},
-                                         #riak_field_v1{
-                                            name = <<"temperature_k">>,
-                                            position = 2,
-                                            type = sint64,
-                                            optional = true}
-                                        ],
-                               partition_key = #key_v1{
-                                              ast = [#param_v1{
-                                                        name = [<<"time">>]
-                                                       }]
-                                                 },
-                               local_key = #key_v1{
-                                              ast = [#param_v1{
-                                                        name = [<<"time">>]
-                                                       }]
-                                             }
-                              }).
-
-create_composite_key_sql_test() ->
-    ?sql_compilation_assert("create table temperatures " ++
-                                "(time timestamp not null, " ++
-                                "user_id varchar not null, " ++
-                                "mytype varchar not null, " ++
-                                "primary key ((time, user_id), mytype))",
-                            #ddl_v1{
-                               table = <<"temperatures">>,
-                               fields = [
-                                         #riak_field_v1{
-                                            name = <<"time">>,
-                                            position = 1,
-                                            type = timestamp,
-                                            optional = false},
-                                         #riak_field_v1{
-                                            name = <<"user_id">>,
-                                            position = 2,
-                                            type = varchar,
-                                            optional = false},
-                                         #riak_field_v1{
-                                            name = <<"mytype">>,
-                                            position = 3,
-                                            type = varchar,
-                                            optional = false}
-                                        ],
-                               partition_key = #key_v1{
-                                                  ast = [
-                                                         #param_v1{
-                                                            name = [<<"time">>]
-                                                           },
-                                                         #param_v1{
-                                                            name = [<<"user_id">>]
-                                                           }
-                                                        ]},
-                               local_key = #key_v1{
-                                              ast = [
-                                                     #param_v1{
-                                                        name = [<<"mytype">>]
-                                                       }
-                                                    ]}
-                              }).
-
 create_no_key_sql_test() ->
-    ?sql_compilation_assert("create table temperatures " ++
-                                "(time timestamp not null, " ++
-                                "temperature_k double)",
-                            #ddl_v1{
-                               table = <<"temperatures">>,
-                               fields = [
-                                         #riak_field_v1{
-                                            name = <<"time">>,
-                                            position = 1,
-                                            type = timestamp,
-                                            optional = false},
-                                         #riak_field_v1{
-                                            name = <<"temperature_k">>,
-                                            position = 2,
-                                            type = double,
-                                            optional = true}],
-                               partition_key = none,
-                               local_key = none
-                              }).
+    ?sql_compilation_fail("create table temperatures ("
+                          " time timestamp not null, "
+                          " temperature_k double)").
 
 
-%% need to refactor
 create_timeseries_sql_test() ->
-    String = "CREATE TABLE GeoCheckin "
-    ++ "(geohash varchar not null, "
-    ++ "user varchar not null, "
-    ++ "time timestamp not null, "
-    ++ "weather varchar not null, "
-    ++ "temperature varchar, "
-    ++ "PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))",
+    String =
+        "CREATE TABLE GeoCheckin ("
+        " geohash varchar not null,"
+        " user varchar not null,"
+        " time timestamp not null,"
+        " weather varchar not null,"
+        " temperature varchar,"
+        " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))",
     Toks = riak_ql_lexer:get_tokens(String),
     Got = case parse(Toks) of
               {ok, G} -> G;
@@ -708,41 +588,43 @@ create_timeseries_sql_test() ->
                    type = varchar,
                    optional = true}
                ],
-          partition_key = #key_v1{
-                     ast = [
-                        #param_v1{name = [<<"geohash">>]},
-                        #param_v1{name = [<<"user">>]},
-                        #hash_fn_v1{mod  = riak_ql_quanta,
-                            fn   = quantum,
-                            args = [
-                                #param_v1{name = [<<"time">>]}, 15, m
-                                   ],
-                            type = timestamp}
-                       ]},
-          local_key = #key_v1{
-                 ast = [
-                    #param_v1{name = [<<"geohash">>]},
-                    #param_v1{name = [<<"user">>]},
-                    #param_v1{name = [<<"time">>]}
-                       ]}
+                  partition_key = #key_v1{
+                                     ast = [
+                                            #param_v1{name = [<<"geohash">>]},
+                                            #param_v1{name = [<<"user">>]},
+                                            #hash_fn_v1{mod  = riak_ql_quanta,
+                                                        fn   = quantum,
+                                                        args = [
+                                                                #param_v1{name = [<<"time">>]}, 15, m
+                                                               ],
+                                                        type = timestamp}
+                                           ]},
+                  local_key = #key_v1{
+                                 ast = [
+                                        #param_v1{name = [<<"geohash">>]},
+                                        #param_v1{name = [<<"user">>]},
+                                        #param_v1{name = [<<"time">>]}
+                                       ]}
          },
     ?assertEqual(Expected, Got).
 
 
 create_all_types_sql_test() ->
-    String = "CREATE TABLE GeoCheckin "
-        ++ "(geohash varchar not null, "
-        ++ "user varchar not null, "
-        ++ "time timestamp not null, "
-        ++ "isweather boolean not null, "
-        ++ "temperature double not null, "
-        ++ "mysint64 sint64 not null, "
-        ++ "user2 varchar, "
-        ++ "time2 timestamp, "
-        ++ "isweather2 boolean, "
-        ++ "temperature2 double, "
-        ++ "mysint642 sint64, "
-        ++ "PRIMARY KEY ((geohash, quantum(time, 15, 'm')), time, user))",
+    String =
+        "CREATE TABLE GeoCheckin ("
+        " geohash varchar not null,"
+        " user varchar not null,"
+        " time timestamp not null,"
+        " isweather boolean not null,"
+        " temperature double not null,"
+        " mysint64 sint64 not null,"
+        " user2 varchar,"
+        " time2 timestamp,"
+        " isweather2 boolean,"
+        " temperature2 double,"
+        " mysint642 sint64,"
+        " PRIMARY KEY ((user, geohash, quantum(time, 15, 'm')),"
+        " user, geohash, time))",
     Toks = riak_ql_lexer:get_tokens(String),
     Got = case parse(Toks) of
               {ok, G} -> G;
@@ -807,22 +689,26 @@ create_all_types_sql_test() ->
                    type = sint64,
                    optional = true}
                ],
-          partition_key = #key_v1{
-                     ast = [
-                        #param_v1{name = [<<"geohash">>]},
-                        #hash_fn_v1{mod  = riak_ql_quanta,
-                            fn   = quantum,
-                            args = [
-                                #param_v1{name = [<<"time">>]}, 15, m
-                                   ],
-                            type = timestamp}
-                       ]},
-          local_key = #key_v1{
-                 ast = [
-                    #param_v1{name = [<<"time">>]},
-                    #param_v1{name = [<<"user">>]}
-                       ]}
-         },
+                  partition_key =
+                      #key_v1{
+                         ast = [
+                                #param_v1{name = [<<"user">>]},
+                                #param_v1{name = [<<"geohash">>]},
+                                #hash_fn_v1{mod  = riak_ql_quanta,
+                                            fn   = quantum,
+                                            args = [
+                                                    #param_v1{name = [<<"time">>]}, 15, m
+                                                   ],
+                                            type = timestamp}
+                               ]},
+                  local_key =
+                      #key_v1{
+                         ast = [
+                                #param_v1{name = [<<"user">>]},
+                                #param_v1{name = [<<"geohash">>]},
+                                #param_v1{name = [<<"time">>]}
+                               ]}
+                 },
     ?assertEqual(Expected, Got).
 
 select_sql_case_insensitive_1_test() ->
