@@ -577,14 +577,16 @@ assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
     PKFieldNames = [N || #param_v1{name = [N]} <- LK],
     OnlyPKFields = [F || #riak_field_v1{name = N} = F <- Fields,
                          lists:member(N, PKFieldNames)],
-    lists:foreach(
-      fun(#riak_field_v1{optional = true}) ->
-              flat_out("All fields in primary key must be not null");
-         (_) ->
-              ok
-      end,
-      OnlyPKFields),
-    ok.
+    NonNullFields =
+        [binary_to_list(F) || #riak_field_v1{name = F, optional = Null}
+                                  <- OnlyPKFields, Null == true],
+    case NonNullFields of
+        [] ->
+            ok;
+        NonNullFields ->
+            flat_out("Primary key has 'null' fields (~s)",
+                     [string:join(NonNullFields, ", ")])
+    end.
 
 %% @doc Verify that the primary key has three components
 %%      and the first element is a quantum
