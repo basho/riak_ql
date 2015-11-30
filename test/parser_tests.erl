@@ -86,10 +86,22 @@ function_val_arity_10_test() ->
         riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b') = a"))
     ).
 
-function_val_and_identifier_mix_test() ->
+function_val_and_identifier_mix_1_test() ->
     ?assertMatch(
         {error, {0, riak_ql_parser, <<_/binary>>}},
         riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 10, b, 3.5) = a"))
+    ).
+
+function_val_and_identifier_mix_2_test() ->
+    ?assertMatch(
+        {error, {0, riak_ql_parser, <<_/binary>>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 10, b, 3.5, true) = a"))
+    ).
+
+function_val_and_identifier_mix_3_test() ->
+    ?assertMatch(
+        {error, {0, riak_ql_parser, <<_/binary>>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 10, b, 3.5, false) = a"))
     ).
 
 function_call_error_message_test() ->

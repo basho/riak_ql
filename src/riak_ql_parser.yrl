@@ -120,6 +120,7 @@ FunArg -> Identifier : '$1'.
 FunArg -> Val        : '$1'.
 
 FunArgN -> comma Identifier  : '$1'.
+FunArgN -> comma Identifier FunArgN : '$1'.
 FunArgN -> comma Val         : '$1'.
 FunArgN -> comma Val FunArgN : '$1'.
 
