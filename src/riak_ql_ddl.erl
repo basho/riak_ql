@@ -907,8 +907,8 @@ is_query_valid_test_helper(Table_name, Table_def, Query) ->
     "    time        TIMESTAMP NOT NULL, "
     "    weather     VARCHAR   NOT NULL, "
     "    temperature DOUBLE, "
-    "    PRIMARY KEY ((QUANTUM(time, 15, 'm'), myfamily, myseries), "
-    "    time, myfamily, myseries))"
+    "    PRIMARY KEY ((myfamily, myseries, QUANTUM(time, 15, 'm')), "
+    "    myfamily, myseries, time))"
 ).
 
 is_query_valid_1_test() ->
