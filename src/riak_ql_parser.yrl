@@ -567,7 +567,7 @@ validate_ddl(DDL) ->
 assert_keys_present(#ddl_v1{local_key = LK, partition_key = PK})
   when LK == none;
        PK == none ->
-    flat_out("Missing primary key");
+    return_error_flat("Missing primary key");
 assert_keys_present(_GoodDDL) ->
     ok.
 
@@ -584,8 +584,8 @@ assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
         [] ->
             ok;
         NonNullFields ->
-            flat_out("Primary key has 'null' fields (~s)",
-                     [string:join(NonNullFields, ", ")])
+            return_error_flat("Primary key has 'null' fields (~s)",
+                              [string:join(NonNullFields, ", ")])
     end.
 
 %% @doc Verify that the primary key has three components
@@ -593,13 +593,13 @@ assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
 assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) when length(Key) == 3 ->
     assert_param_is_quantum(lists:nth(3, Key));
 assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) ->
-    flat_out("Primary key must consist of exactly 3 fields (has ~b)", [length(Key)]).
+    return_error_flat("Primary key must consist of exactly 3 fields (has ~b)", [length(Key)]).
 
 %% @doc Verify that the key element is a quantum
 assert_param_is_quantum(#hash_fn_v1{mod = riak_ql_quanta, fn = quantum}) ->
     ok;
 assert_param_is_quantum(_KeyComponent) ->
-    flat_out("Third element of primary key must be a quantum").
+    return_error_flat("Third element of primary key must be a quantum").
 
 %% @doc Verify primary key and local partition have the same elements
 assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primary},
@@ -610,7 +610,7 @@ assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primar
         true ->
             ok;
         false ->
-            flat_out("Local key does not match primary key")
+            return_error_flat("Local key does not match primary key")
     end.
 
 assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
@@ -619,12 +619,13 @@ assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
         true ->
             ok;
         false ->
-            flat_out("Primary key has duplicate fields (~s)",
-                     [string:join(
-                        which_duplicate(
-                          lists:sort(
-                            [binary_to_list(F) || F <- Fields])),
-                       ", ")])
+            return_error_flat(
+              "Primary key has duplicate fields (~s)",
+              [string:join(
+                 which_duplicate(
+                   lists:sort(
+                     [binary_to_list(F) || F <- Fields])),
+                 ", ")])
     end.
 
 which_duplicate(FF) ->
@@ -645,11 +646,10 @@ query_field_name(#hash_fn_v1{args = Args}) ->
 query_field_name(#param_v1{name = Field}) ->
     Field.
 
--spec flat_out(string()) -> no_return().
-flat_out(F) ->
-    flat_out(F, []).
--spec flat_out(string(), [term()]) -> no_return().
-flat_out(F, A) ->
+-spec return_error_flat(string()) -> no_return().
+return_error_flat(F) ->
+    return_error_flat(F, []).
+-spec return_error_flat(string(), [term()]) -> no_return().
+return_error_flat(F, A) ->
     return_error(
-      0,
-      list_to_binary(lists:flatten(io_lib:format(F, A)))).
+      0, iolist_to_binary(io_lib:format(F, A))).
