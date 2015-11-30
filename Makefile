@@ -1,29 +1,15 @@
-.PHONY: deps test
+PROJECT = riak_ql
 
-DIALYZER_FLAGS =
+DEPS = edown sext
 
-all: deps compile
+TEST_DEPS = unite
 
-compile: deps
-	./rebar compile
+dep_unite = git https://github.com/eproxus/unite.git v0.0.1
+dep_sext = git git://github.com/basho/sext 1.1p3
+dep_edown = git git://github.com/uwiger/sext 0.5
 
-deps:
-	./rebar get-deps
+EUNIT_OPTS = no_tty, {report, {unite_compact, []}}
 
-clean:
-	./rebar clean
-	rm -rf test.*-temp-data
+SHELL_OPTS = -sname riak_ql -setcookie riak_ql
 
-distclean: clean
-	./rebar delete-deps
-
-testclean: clean
-	@rm -rf eunit.log .eunit/*
-
-test: testclean compile
-	./rebar eunit skip_deps=true
-
-DIALYZER_APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
-	xmerl webtool snmp public_key mnesia eunit syntax_tools compiler
-
-include tools.mk
+include erlang.mk

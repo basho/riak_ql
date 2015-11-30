@@ -1,4 +1,6 @@
 .eunit
+.erlang.mk/
+riak_ql.d
 deps
 *.o
 *.beam
