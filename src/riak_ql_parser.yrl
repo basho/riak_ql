@@ -38,6 +38,8 @@ KeyFieldArg
 NotNull
 CreateTable
 PrimaryKey
+FunArg
+FunArgN
 .
 
 Terminals
@@ -114,8 +116,16 @@ Identifier -> identifier : '$1'.
 
 CharacterLiteral -> character_literal : character_literal_to_binary('$1').
 
-Funcall -> Identifier openb     closeb : make_funcall('$1').
-Funcall -> Identifier openb Val closeb : make_funcall('$1').
+FunArg -> Identifier : '$1'.
+FunArg -> Val        : '$1'.
+FunArg -> Funcall    : '$1'.
+
+FunArgN -> comma FunArg  : '$1'.
+FunArgN -> comma FunArg FunArgN : '$1'.
+
+Funcall -> Identifier openb     closeb    : make_funcall('$1').
+Funcall -> Identifier openb FunArg closeb : make_funcall('$1').
+Funcall -> Identifier openb FunArg FunArgN closeb : make_funcall('$1').
 
 Conds -> openb Conds closeb             : make_expr('$2').
 Conds -> Conds Logic Cond               : make_expr('$1', '$2', '$3').
@@ -434,11 +444,13 @@ remove_conditionals({A, B, C}) ->
 remove_conditionals(A) ->
     A.
 
-make_funcall({A, B}) ->
-     make_funcall({A, B}, []).
-
-make_funcall({_A, B}, C) ->
-    {funcall, {B, C}}.
+%% Functions are disabled so return an error.
+make_funcall({identifier, FuncName}) ->
+    return_error(0, iolist_to_binary(io_lib:format(
+        "Functions not supported but '~s' called as function.", [FuncName])));
+make_funcall(_) ->
+    % make dialyzer stop erroring on no local return.
+    error.
 
 character_literal_to_binary({character_literal, CharacterLiteralBytes})
   when is_binary(CharacterLiteralBytes) ->

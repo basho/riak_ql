@@ -128,16 +128,6 @@ select_where_1_reverse_sql_test() ->
                                                     ]
                                         }).
 
-select_where_2_sql_test() ->
-    ?sql_compilation_assert("select value from response_times where time > now() - 1h limit 1000",
-                            #riak_sql_v1{'SELECT' = [[<<"value">>]],
-                                         'FROM'   = <<"response_times">>,
-                                         'WHERE'  = [
-                                                     {'>', <<"time">>, {'-', {<<"now">>, []}, {integer, 3600}}}
-                                                    ],
-                                         'LIMIT'  = 1000
-                                        }).
-
 select_where_3_sql_test() ->
     ?sql_compilation_assert("select value from response_times where time > 1388534400",
                             #riak_sql_v1{'SELECT' = [[<<"value">>]],
@@ -166,15 +156,6 @@ select_where_5_sql_test() ->
                                                       {'=', <<"sequence_number">>, {integer, 2321}},
                                                       {'=', <<"time">>,            {integer, 1400497861762723}}
                                                      }
-                                                    ]
-                                        }).
-
-select_where_6_sql_test() ->
-    ?sql_compilation_assert("select * from /^stats\./i where time > now() - 1h",
-                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
-                                         'FROM'   = {regex, <<"/^stats\./i">>},
-                                         'WHERE'  = [
-                                                     {'>', <<"time">>, {'-', {<<"now">>, []}, {integer, 3600}}}
                                                     ]
                                         }).
 
