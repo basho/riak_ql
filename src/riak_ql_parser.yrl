@@ -118,11 +118,10 @@ CharacterLiteral -> character_literal : character_literal_to_binary('$1').
 
 FunArg -> Identifier : '$1'.
 FunArg -> Val        : '$1'.
+FunArg -> Funcall    : '$1'.
 
-FunArgN -> comma Identifier  : '$1'.
-FunArgN -> comma Identifier FunArgN : '$1'.
-FunArgN -> comma Val         : '$1'.
-FunArgN -> comma Val FunArgN : '$1'.
+FunArgN -> comma FunArg  : '$1'.
+FunArgN -> comma FunArg FunArgN : '$1'.
 
 Funcall -> Identifier openb     closeb    : make_funcall('$1').
 Funcall -> Identifier openb FunArg closeb : make_funcall('$1').
