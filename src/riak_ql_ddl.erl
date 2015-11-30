@@ -40,8 +40,8 @@
 %% so this function can be called out to to pick
 %% apart the DDL records
 
--export([get_local_key/2]).
--export([get_partition_key/2]).
+-export([get_local_key/2, get_local_key/3]).
+-export([get_partition_key/2, get_partition_key/3]).
 -export([is_query_valid/3]).
 -export([make_key/3]).
 -export([syntax_error_to_msg/1]).
@@ -90,19 +90,29 @@ maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
 
--spec get_partition_key(#ddl_v1{}, tuple()) -> term().
-get_partition_key(#ddl_v1{table = T, partition_key = PK}, Obj)
+-spec get_partition_key(#ddl_v1{}, tuple(), module()) -> term().
+get_partition_key(#ddl_v1{partition_key = PK}, Obj, Mod)
   when is_tuple(Obj) ->
-    Mod = make_module_name(T),
     #key_v1{ast = Params} = PK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_local_key(#ddl_v1{}, tuple()) -> term().
-get_local_key(#ddl_v1{table = T, local_key = LK}, Obj)
+-spec get_partition_key(#ddl_v1{}, tuple()) -> term().
+get_partition_key(#ddl_v1{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
+    get_partition_key(DDL, Obj, Mod).
+
+-spec get_local_key(#ddl_v1{}, tuple(), module()) -> term().
+get_local_key(#ddl_v1{local_key = LK}, Obj, Mod)
+  when is_tuple(Obj) ->
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
+
+-spec get_local_key(#ddl_v1{}, tuple()) -> term().
+get_local_key(#ddl_v1{table = T}=DDL, Obj)
+  when is_tuple(Obj) ->
+    Mod = make_module_name(T),
+    get_local_key(DDL, Obj, Mod).
 
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
 make_key(_Mod, none, _Vals) -> [];
