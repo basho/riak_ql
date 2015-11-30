@@ -359,6 +359,20 @@ select_quoted_where_sql_test() ->
                                                    ]
                                         }).
 
+select_quoted_escape_sql_test() ->
+    ?sql_compilation_assert("select * from \"table with spaces\" where "
+                            "\"co\"\"or\" = 'klingon''name' or "
+                           "\"co\"\"or\" = '\"'",
+                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                                         'FROM'   = <<"table with spaces">>,
+                                         'WHERE' = [
+                                                    {or_,
+                                                     {'=', <<"co\"or">>, {binary, <<"\"">>}},
+                                                     {'=', <<"co\"or">>, {binary, <<"klingon'name">>}}
+                                                    }
+                                                    ]
+                                         }).
+
 select_field_to_field_forbidden_test() ->
     ?sql_compilation_fail("select * from table where time = time").
 
