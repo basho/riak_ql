@@ -445,8 +445,13 @@ remove_conditionals({A, B, C}) ->
 remove_conditionals(A) ->
     A.
 
+%% Functions are disabled so return an error.
 make_funcall({identifier, FuncName}) ->
-    return_error(0, iolist_to_binary(io_lib:format("Functions not supported but '~s' called as function.", [FuncName]))).
+    return_error(0, iolist_to_binary(io_lib:format(
+        "Functions not supported but '~s' called as function.", [FuncName])));
+make_funcall(_) ->
+    % make dialyzer stop erroring on no local return.
+    error.
 
 character_literal_to_binary({character_literal, CharacterLiteralBytes})
   when is_binary(CharacterLiteralBytes) ->
