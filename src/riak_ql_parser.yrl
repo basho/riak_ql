@@ -51,7 +51,6 @@ character_literal
 closeb
 comma
 create
-datetime
 div_
 double
 eq
@@ -146,7 +145,6 @@ Vals -> Identifier          : '$1'.
 Val -> integer identifier : add_unit('$1', '$2').
 Val -> integer       : '$1'.
 Val -> float     : '$1'.
-Val -> datetime  : '$1'.
 Val -> varchar   : '$1'.
 Val -> CharacterLiteral : '$1'.
 Val -> true : {boolean, true}.
@@ -192,7 +190,6 @@ ColumnDefinition ->
 
 ColumnConstraint -> NotNull : not_null.
 
-DataType -> datetime  : '$1'.
 DataType -> double    : '$1'.
 DataType -> sint64    : '$1'.
 DataType -> timestamp : '$1'.
