@@ -112,6 +112,18 @@ function_call_error_message_test() ->
 
 function_as_arg_test() ->
     ?assertMatch(
-        {error, {0, riak_ql_parser, <<"Functions not supported but 'herfun' called as function.">>}},
+        {error, {0, riak_ql_parser,
+            <<"Functions not supported but 'herfun' called as function.">>}},
         riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun(hisfun(herfun(a))) = 'a'"))
+    ).
+
+% RTS-645
+flubber_test() ->
+    ?assertEqual(
+        {error, {0, riak_ql_parser,
+            <<"Used f as a measure of time in 1f. Only s, m, h and d are allowed.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM ts_X_subquery "
+            "WHERE d > 0 AND d < 1 f = 'f' "
+            "AND s='s' AND ts > 0 AND ts < 100"))
     ).
