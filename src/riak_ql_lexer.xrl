@@ -163,7 +163,7 @@ Rules.
 {IDENTIFIER} : {token, {identifier, list_to_binary(TokenChars)}}.
 {UNICODE} : error(unicode_in_identifier).
 
-.  : {token, {identifier, list_to_binary(TokenChars)}}.
+.  : error(iolist_to_binary(io_lib:format("Unexpected token '~s'.", [TokenChars]))).
 
 Erlang code.
 

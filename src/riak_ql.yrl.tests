@@ -78,17 +78,6 @@ select_nested_quotes_sql_test() ->
                             #riak_sql_v1{'SELECT' = [[<<"*">>]],
                                          'FROM'   = <<"some \"quotes\" in me">>}).
 
-select_regex_sql_test() ->
-    ?sql_compilation_assert("select * from /.*/",
-                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
-                                         'FROM'   = {regex, <<"/.*/">>}}).
-
-select_with_limit_sql_test() ->
-    ?sql_compilation_assert("select * from /.*/ limit 1",
-                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
-                                         'FROM'   = {regex, <<"/.*/">>},
-                                         'LIMIT'  = 1}).
-
 select_from_lists_sql_test() ->
     ?sql_compilation_assert("select * from events, errors",
                             #riak_sql_v1{'SELECT' = [[<<"*">>]],
@@ -157,13 +146,6 @@ select_where_5_sql_test() ->
                                                       {'=', <<"time">>,            {integer, 1400497861762723}}
                                                      }
                                                     ]
-                                        }).
-
-select_where_7_sql_test() ->
-    ?sql_compilation_assert("select * from /.*/ limit 1",
-                            #riak_sql_v1{'SELECT' = [[<<"*">>]],
-                                         'FROM'   = {regex, <<"/.*/">>},
-                                         'LIMIT'  = 1
                                         }).
 
 select_where_8_sql_test() ->
@@ -708,15 +690,6 @@ sql_first_char_is_newline_test() ->
 %%%
 %%% Failure tests
 %%%
-
-failure_sql_test() ->
-    String = "klsdafj kljfd (*((*& 89& 8KHH kJHkj hKJH K K",
-    Expected = error,
-    Got = case parse(riak_ql_lexer:get_tokens(String)) of
-              {error, _Err} -> error;
-              Other         -> {should_not_compile, Other}
-          end,
-    ?assertEqual(Expected, Got).
 
 % RTS-388
 concatenated_unquoted_strings_test() ->

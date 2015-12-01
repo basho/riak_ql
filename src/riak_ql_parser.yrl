@@ -108,9 +108,6 @@ Buckets -> Buckets comma Bucket : make_list('$1', '$3').
 Buckets -> Bucket               : '$1'.
 
 Bucket -> Identifier   : '$1'.
-Bucket -> regex  : '$1'.
-
-%% Word -> chars      : process('$1').
 
 Identifier -> identifier : '$1'.
 
