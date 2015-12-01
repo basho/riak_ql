@@ -508,7 +508,7 @@ make_partition_and_local_keys(PFieldList, LFieldList) ->
 make_table_element_list(A, {table_element_list, B}) ->
     {table_element_list, [A] ++ lists:flatten(B)};
 make_table_element_list(A, B) ->
-    {table_element_list, [A, B]}.
+    {table_element_list, lists:flatten([A, B])}.
 
 extract_key_field_list({list, []}, Extracted) ->
     Extracted;
@@ -521,15 +521,12 @@ extract_key_field_list({list, [Field | Rest]}, Extracted) ->
      extract_key_field_list({list, Rest}, Extracted)].
 
 make_table_definition({identifier, Table}, Contents) ->
-    PartitionKey = find_partition_key(Contents),
-    LocalKey = find_local_key(Contents),
-    Fields = find_fields(Contents),
     validate_ddl(
       #ddl_v1{
          table = Table,
-         partition_key = PartitionKey,
-         local_key = LocalKey,
-         fields = Fields}).
+         partition_key = find_partition_key(Contents),
+         local_key = find_local_key(Contents),
+         fields = find_fields(Contents)}).
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
@@ -577,6 +574,7 @@ validate_ddl(DDL) ->
     ok = assert_unique_fields_in_pk(DDL),
     ok = assert_partition_key_length(DDL),
     ok = assert_primary_and_local_keys_match(DDL),
+    ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
     DDL.
 
@@ -644,6 +642,32 @@ assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
                      [binary_to_list(F) || F <- Fields])),
                  ", ")])
     end.
+
+
+
+%% Ensure that all fields in the primary key exist in the table definition.
+assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,
+                                           partition_key =
+                                               #key_v1{ ast = PK } }) ->
+    MissingFields =
+        [binary_to_list(name_of(F)) || F <- PK, not is_field(F, Fields)],
+    case MissingFields of
+        [] ->
+            ok;
+        _ ->
+            return_error_flat("Primary key fields do not exist (~s).",
+                              [string:join(MissingFields, ", ")])
+    end.
+
+%% Check that the field name exists in the list of fields.
+is_field(Field, Fields) ->
+    (lists:keyfind(name_of(Field), 2, Fields) /= false).
+
+%%
+name_of(#param_v1{ name = [N] }) ->
+    N;
+name_of(#hash_fn_v1{ args = [#param_v1{ name = [N] }|_] }) ->
+    N.
 
 which_duplicate(FF) ->
     which_duplicate(FF, []).

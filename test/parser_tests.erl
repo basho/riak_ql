@@ -127,3 +127,38 @@ flubber_test() ->
             "WHERE d > 0 AND d < 1 f = 'f' "
             "AND s='s' AND ts > 0 AND ts < 100"))
     ).
+
+key_fields_must_exist_1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "time TIMESTAMP NOT NULL, "
+        "series VARCHAR NOT NULL, "
+        "PRIMARY KEY "
+        " ((family, series, quantum(time, 15, 's')), family, series, time))",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family).">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+key_fields_must_exist_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "time TIMESTAMP NOT NULL, "
+        "PRIMARY KEY "
+        " ((family, series, quantum(time, 15, 's')), family, series, time))",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family, series).">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+key_fields_must_exist_3_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "family VARCHAR NOT NULL, "
+        "series VARCHAR NOT NULL, "
+        "PRIMARY KEY "
+        " ((family, series, quantum(time, 15, 's')), family, series, time))",
+    ?assertMatch(
+        {error, {0, riak_ql_parser, <<"Primary key fields do not exist (time).">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
