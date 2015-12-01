@@ -572,8 +572,23 @@ validate_ddl(DDL) ->
     ok = assert_unique_fields_in_pk(DDL),
     ok = assert_partition_key_length(DDL),
     ok = assert_primary_and_local_keys_match(DDL),
+    ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
     DDL.
+
+%%
+assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,
+                                           partition_key =
+                                               #key_v1{ ast = PK } }) ->
+    MissingFields =
+        [binary_to_list(N) || #param_v1{name = [N]} <- PK, lists:keyfind(N, 2, Fields) /= false],
+    case MissingFields of
+        [] ->
+            ok;
+        _ ->
+            return_error_flat("Primary key fields do not exist (~s)",
+                              [string:join(MissingFields, ", ")])
+    end.
 
 %% @doc Ensure DDL can haz keys
 assert_keys_present(#ddl_v1{local_key = LK, partition_key = PK})
