@@ -14,56 +14,35 @@ keywords_2_test_() ->
     ?_assertEqual([{select, <<"seLEct">>}], Got).
 
 keywords_3_test_() ->
-    Got = riak_ql_lexer:get_tokens("from LiMit Where anD oR delETe DROP Groupby MeRge InneR JOIn As"),
+    Got = riak_ql_lexer:get_tokens("from LiMit Where anD oR"),
     Expected = [
                 {from,    <<"from">>},
                 {limit,   <<"LiMit">>},
                 {where,   <<"Where">>},
                 {and_,    <<"anD">>},
-                {or_,     <<"oR">>},
-                {delete,  <<"delETe">>},
-                {drop,    <<"DROP">>},
-                {groupby, <<"Groupby">>},
-                {merge,   <<"MeRge">>},
-                {inner,   <<"InneR">>},
-                {join,    <<"JOIn">>},
-                {as,      <<"As">>}
+                {or_,     <<"oR">>}
                ],
     ?_assertEqual(Expected, Got).
 
 keywords_3a_test_() ->
-    Got = riak_ql_lexer:get_tokens("from limit where and or delete drop groupby merge inner join as"),
+    Got = riak_ql_lexer:get_tokens("from limit where and or"),
     Expected = [
                 {from,    <<"from">>},
                 {limit,   <<"limit">>},
                 {where,   <<"where">>},
                 {and_,    <<"and">>},
-                {or_,     <<"or">>},
-                {delete,  <<"delete">>},
-                {drop,    <<"drop">>},
-                {groupby, <<"groupby">>},
-                {merge,   <<"merge">>},
-                {inner,   <<"inner">>},
-                {join,    <<"join">>},
-                {as,      <<"as">>}
+                {or_,     <<"or">>}
                ],
     ?_assertEqual(Expected, Got).
 
 keywords_3b_test_() ->
-    Got = riak_ql_lexer:get_tokens("FROM LIMIT WHERE AND OR DELETE DROP GROUPBY MERGE INNER JOIN AS"),
+    Got = riak_ql_lexer:get_tokens("FROM LIMIT WHERE AND OR"),
     Expected = [
                 {from,    <<"FROM">>},
                 {limit,   <<"LIMIT">>},
                 {where,   <<"WHERE">>},
                 {and_,    <<"AND">>},
-                {or_,     <<"OR">>},
-                {delete,  <<"DELETE">>},
-                {drop,    <<"DROP">>},
-                {groupby, <<"GROUPBY">>},
-                {merge,   <<"MERGE">>},
-                {inner,   <<"INNER">>},
-                {join,    <<"JOIN">>},
-                {as,      <<"AS">>}
+                {or_,     <<"OR">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -72,12 +51,9 @@ keyword_general_test_() ->
        [
         {boolean, <<"boolean">>},
         {boolean, <<"BOOLEAN">>},
-        {boolean, <<"booLEan">>},
-        {any, <<"any">>},
-        {any, <<"ANY">>},
-        {any, <<"Any">>}
+        {boolean, <<"booLEan">>}
        ],
-       riak_ql_lexer:get_tokens("boolean BOOLEAN booLEan any ANY Any")
+       riak_ql_lexer:get_tokens("boolean BOOLEAN booLEan ")
       ).
 
 
