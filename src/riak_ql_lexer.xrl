@@ -46,7 +46,7 @@ VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
 WITH = (W|w)(I|i)(T|t)(H|h)
 
-LITERAL = ('([^\']|(\'\'))*')
+CHARACTER_LITERAL = ('([^\']|(\'\'))*')
 
 REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
@@ -148,7 +148,8 @@ Rules.
 {TIMES} : {token, {maybetimes, list_to_binary(TokenChars)}}.
 {DIV}   : {token, {div_,       list_to_binary(TokenChars)}}.
 
-{LITERAL} : {token, clean_up_literal(TokenChars)}.
+{CHARACTER_LITERAL} :
+  {token, {character_literal, clean_up_literal(TokenChars)}}.
 
 {QUOTED} : {token, {identifier, strip_quoted(TokenChars)}}.
 
@@ -201,7 +202,7 @@ clean_up_literal(Literal) ->
     DeDoubledInternalQuotes = re:replace(RemovedOutsideQuotes,
                                          "''", "'",
                                          [global, {return, list}]),
-    {character_literal, list_to_binary(DeDoubledInternalQuotes)}.
+    list_to_binary(DeDoubledInternalQuotes).
 
 strip_quoted(QuotedString) ->
     % if there are unicode characters in the string, throw an error
