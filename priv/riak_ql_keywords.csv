@@ -1,38 +1,20 @@
 and
-any
-as
-atom
 boolean
-create table
-delete
+create
 double
-drop
 false
-float
-float_sci
-float_type
 from
-global
-groupby
-inner
-sint64
-join
+key
 limit
-local
-merge
-not null
-of
-on commit
+not
+null
 or
-primary key
-preserve
-rows
+primary
+quantum
 select
-system versioning
-temporary
+sint64
+table
 timestamp
 true
 varchar
 where
-with
-quantum
