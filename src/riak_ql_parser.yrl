@@ -47,17 +47,20 @@ CreateTable
 PrimaryKey
 FunArg
 FunArgN
+OptOrdering
 .
 
 Terminals
 
 or_
 and_
+asc
 boolean
 character_literal
 closeb
 comma
 create
+desc
 div_
 double
 eq
@@ -229,11 +232,16 @@ KeyDefinition ->
 KeyDefinition ->
     PrimaryKey openb openb KeyFieldList closeb comma KeyFieldList closeb : make_partition_and_local_keys('$4', '$7').
 
-KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
-KeyFieldList -> KeyField : make_list({list, []}, '$1').
+KeyFieldList -> KeyField comma KeyFieldList : ['$1' | '$3'].
+KeyFieldList -> KeyField : ['$1'].
 
-KeyField -> quantum openb KeyFieldArgList closeb : make_modfun(quantum, '$3').
-KeyField -> Identifier : '$1'.
+KeyField -> quantum openb KeyFieldArgList closeb : element(2, make_modfun(quantum, '$3')).
+KeyField -> Identifier OptOrdering : #param_v1{name = [element(2, '$1')], ordering = '$2'}.
+
+OptOrdering -> '$empty' : ascending.
+OptOrdering -> asc : ascending.
+OptOrdering -> desc : descending.
+
 
 KeyFieldArgList ->
     KeyFieldArg comma KeyFieldArgList : make_list('$3', '$1').
@@ -516,16 +524,14 @@ make_column({identifier, FieldName}, {DataType, _}, not_null) ->
 
 %% if only the local key is defined
 %% use it as the partition key as well
-make_local_key(FieldList) ->
-    Key = #key_v1{ast = lists:reverse(extract_key_field_list(FieldList, []))},
+make_local_key(Fields) ->
+    Key = #key_v1{ast = Fields},
     [
      {partition_key, Key},
      {local_key,     Key}
     ].
 
-make_partition_and_local_keys(PFieldList, LFieldList) ->
-    PFields = lists:reverse(extract_key_field_list(PFieldList, [])),
-    LFields = lists:reverse(extract_key_field_list(LFieldList, [])),
+make_partition_and_local_keys(PFields, LFields) ->
     [
      {partition_key, #key_v1{ast = PFields}},
      {local_key,     #key_v1{ast = LFields}}
@@ -535,16 +541,6 @@ make_table_element_list(A, {table_element_list, B}) ->
     {table_element_list, [A] ++ lists:flatten(B)};
 make_table_element_list(A, B) ->
     {table_element_list, lists:flatten([A, B])}.
-
-extract_key_field_list({list, []}, Extracted) ->
-    Extracted;
-extract_key_field_list({list,
-                        [Modfun = #hash_fn_v1{} | Rest]},
-                       Extracted) ->
-    [Modfun | extract_key_field_list({list, Rest}, Extracted)];
-extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [#param_v1{name = [Field]} |
-     extract_key_field_list({list, Rest}, Extracted)].
 
 make_table_definition({identifier, Table}, Contents) ->
     validate_ddl(

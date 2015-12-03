@@ -38,7 +38,8 @@
 -type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
 
 -record(param_v1, {
-          name :: [binary()]
+          name :: [binary()],
+          ordering :: ascending | descending
          }).
 
 -record(hash_fn_v1, {

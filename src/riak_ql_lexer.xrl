@@ -6,8 +6,10 @@
 Definitions.
 
 AND = (A|a)(N|n)(D|d)
+ASC = (A|a)(S|s)(C|c)
 BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
 CREATE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)
+DESC = (D|d)(E|e)(S|s)(C|c)
 DOUBLE = (D|d)(O|o)(U|u)(B|b)(L|l)(E|e)
 FALSE = (F|f)(A|a)(L|l)(S|s)(E|e)
 FROM = (F|f)(R|r)(O|o)(M|m)
@@ -63,8 +65,10 @@ COMMA = (,)
 Rules.
 
 {AND} : {token, {and_, list_to_binary(TokenChars)}}.
+{ASC} : {token, {asc, list_to_binary(TokenChars)}}.
 {BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
 {CREATE} : {token, {create, list_to_binary(TokenChars)}}.
+{DESC} : {token, {desc, list_to_binary(TokenChars)}}.
 {DOUBLE} : {token, {double, list_to_binary(TokenChars)}}.
 {FALSE} : {token, {false, list_to_binary(TokenChars)}}.
 {FROM} : {token, {from, list_to_binary(TokenChars)}}.
