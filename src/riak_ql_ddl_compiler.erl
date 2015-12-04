@@ -385,10 +385,13 @@ expand_ast(AST, LineNo) when is_list(AST) ->
     Fields = [expand_a2(X, LineNo) || X <- AST],
     make_conses(lists:reverse(Fields), LineNo, {nil, LineNo}).
 
-expand_a2(#param_v1{name = Nm}, LineNo) ->
-    Bins = [make_binary(X, LineNo) || X <- Nm],
-    Conses = make_conses(Bins, LineNo, {nil, LineNo}),
-    make_tuple([make_atom(param_v1, LineNo) | [Conses]], LineNo);
+expand_a2(#param_v1{name = _Nm, ordering = _Ordering} = Param, _LineNo) ->
+    %% Bins = [make_binary(X, LineNo) || X <- Nm],
+    %% Conses = make_conses(Bins, LineNo, {nil, LineNo}),
+    %% make_tuple([make_atom(param_v1, LineNo),
+    %%             [Conses],
+    %%             make_atom(Ordering, LineNo)], LineNo);
+    erl_parse:abstract(Param);
 expand_a2(#hash_fn_v1{mod  = Mod,
 		      fn   = Fn,
 		      args = Args,

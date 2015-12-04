@@ -131,27 +131,27 @@ mk_k([#hash_fn_v1{mod = Md,
     A2 = extract(Args, Vals, []),
     V  = erlang:apply(Md, Fn, A2),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
-mk_k([#param_v1{name = [Nm]} | T1], Vals, Mod, Acc) ->
+mk_k([#param_v1{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
     {Nm, V} = lists:keyfind(Nm, 1, Vals),
     Ty = Mod:get_field_type([Nm]),
-    mk_k(T1, Vals, Mod, [{Ty, V} | Acc]).
+    mk_k(T1, Vals, Mod, [{Ty, apply_ordering(V, Ordering)} | Acc]).
 
 -spec extract(list(), [{any(), any()}], [any()]) -> any().
 extract([], _Vals, Acc) ->
     lists:reverse(Acc);
-extract([#param_v1{name = [Nm]} | T], Vals, Acc) ->
+extract([#param_v1{name = [Nm], ordering = Ordering} | T], Vals, Acc) ->
     {Nm, Val} = lists:keyfind(Nm, 1, Vals),
-    extract(T, Vals, [Val | Acc]);
+    extract(T, Vals, [apply_ordering(Val, Ordering) | Acc]);
 extract([Constant | T], Vals, Acc) ->
     extract(T, Vals, [Constant | Acc]).
 
 -spec build([#param_v1{}], tuple(), atom(), any()) -> list().
 build([], _Obj, _Mod, A) ->
     lists:reverse(A);
-build([#param_v1{name = Nm} | T], Obj, Mod, A) ->
+build([#param_v1{name = Nm, ordering = Ordering} | T], Obj, Mod, A) ->
     Val = Mod:extract(Obj, Nm),
     Type = Mod:get_field_type(Nm),
-    build(T, Obj, Mod, [{Type, Val} | A]);
+    build(T, Obj, Mod, [{Type, apply_ordering(Val, Ordering)} | A]);
 build([#hash_fn_v1{mod  = Md,
                    fn   = Fn,
                    args = Args,
@@ -168,6 +168,16 @@ convert([#param_v1{name = Nm} | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Val | Acc]);
 convert([Constant | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Constant | Acc]).
+
+apply_ordering(Val, descending) when is_integer(Val) ->
+    -Val;
+apply_ordering(Val, descending) when is_binary(Val) ->
+    flip_binary(Val);
+apply_ordering(Val, _) -> % ascending or undefined
+    Val.
+
+flip_binary(Val) ->
+    list_to_binary([bnot Byte || Byte <- binary_to_list(Val)]).
 
 %% Convert an error emmitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
