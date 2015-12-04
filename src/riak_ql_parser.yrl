@@ -16,9 +16,7 @@ Identifier
 CharacterLiteral
 Where
 Cond
-Conds
 Comp
-Logic
 Val
 Vals
 Funcall
@@ -36,6 +34,15 @@ KeyField
 KeyFieldArgList
 KeyFieldArg
 NotNull
+
+BooleanValueExpression
+BooleanTerm
+BooleanFactor
+BooleanTest
+TruthValue
+BooleanPrimary
+BooleanPredicand
+
 CreateTable
 PrimaryKey
 FunArg
@@ -95,7 +102,7 @@ Query -> Select           : '$1'.
 
 Select -> select Fields from Buckets Where : make_clause('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Buckets       : make_clause('$1', '$2', '$3', '$4').
-Where -> where Conds : make_where('$1', '$2').
+Where -> where BooleanValueExpression : make_where('$1', '$2').
 
 Fields -> Fields comma Field : make_list('$1', '$3').
 Fields -> Field              : make_list('$1').
@@ -123,11 +130,6 @@ Funcall -> Identifier openb     closeb    : make_funcall('$1').
 Funcall -> Identifier openb FunArg closeb : make_funcall('$1').
 Funcall -> Identifier openb FunArg FunArgN closeb : make_funcall('$1').
 
-Conds -> openb Conds closeb             : make_expr('$2').
-Conds -> Conds Logic Cond               : make_expr('$1', '$2', '$3').
-Conds -> Conds Logic openb Conds closeb : make_expr('$1', '$2', '$4').
-Conds -> Cond                           : '$1'.
-
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
 Vals -> Vals plus       Val : make_expr('$1', '$2', '$3').
@@ -144,11 +146,8 @@ Val -> integer       : '$1'.
 Val -> float     : '$1'.
 Val -> varchar   : '$1'.
 Val -> CharacterLiteral : '$1'.
-Val -> true : {boolean, true}.
-Val -> false : {boolean, false}.
+Val -> TruthValue : '$1'.
 
-Logic -> and_ : '$1'.
-Logic -> or_  : '$1'.
 
 %% Comp -> approx    : '$1'.
 Comp -> eq        : '$1'.
@@ -163,6 +162,36 @@ Comp -> nomatch   : '$1'.
 CreateTable -> create table : create_table.
 
 NotNull -> not_ null : '$1'.
+
+%% 6.35 BOOLEAN VALUE EXPRESSION
+
+BooleanValueExpression -> BooleanTerm : '$1'.
+BooleanValueExpression ->
+    BooleanValueExpression or_ BooleanTerm :
+        {conditional, {or_, '$1', '$3'}}.
+
+BooleanTerm -> BooleanFactor : '$1'.
+BooleanTerm ->
+    BooleanTerm and_ BooleanFactor :
+        {conditional, {and_, '$1', '$3'}}.
+
+BooleanFactor -> BooleanTest : '$1'.
+BooleanFactor -> not_ BooleanTest : {not_, '$1'}.
+
+BooleanTest -> BooleanPrimary : '$1'.
+%% i guess we don't have IS right now?
+%% BooleanTest -> BooleanPrimary is TruthValue : {'=', '$1', '$3'}.
+%% BooleanTest -> BooleanPrimary is not_ TruthValue : {'<>', '$1', '$4'}.
+
+TruthValue -> true : {boolean, true}.
+TruthValue -> false : {boolean, false}.
+
+BooleanPrimary -> BooleanPredicand : '$1'.
+
+BooleanPredicand ->
+    Cond : '$1'.
+BooleanPredicand ->
+    openb BooleanValueExpression closeb : '$2'.
 
 %% TABLE DEFINTITION
 
@@ -432,7 +461,7 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
     (A < B).
 
 remove_conditionals({conditional, A}) ->
-    A;
+    remove_conditionals(A);
 remove_conditionals({A, B, C}) ->
     {A, remove_conditionals(B), remove_conditionals(C)};
 remove_conditionals(A) ->
@@ -466,9 +495,6 @@ make_list(A)               -> {list, [A]}.
 
 make_list({list, A}, {_, B}) -> {list, A ++ [B]};
 make_list({_,    A}, {_, B}) -> {list, [A, B]}.
-
-make_expr(A) ->
-    {conditional, A}.
 
 make_column({identifier, FieldName}, {DataType, _}) ->
     #riak_field_v1{

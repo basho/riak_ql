@@ -256,6 +256,57 @@ select_where_single_quotes_test() ->
                                ]
                    }).
 
+select_where_ors_at_start_test() ->
+    ?sql_compilation_assert(
+       "select * FROM tsall2 WHERE "
+       "d3 = 1.0 OR d3 = 2.0 "
+       "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1",
+       #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                    'FROM' = <<"tsall2">>,
+                    'WHERE' = [
+                               {or_,
+                                {'=', <<"d3">>, {float, 1.0}},
+                                {and_,
+                                 {'<', <<"ts1nn">>, {integer, 1}},
+                                 {and_,
+                                  {'>', <<"ts1nn">>, {integer, 0}},
+                                  {and_,
+                                   {'!=', <<"vc2nn">>, {binary, <<"3">>}},
+                                   {and_,
+                                     {'!=', <<"vc1nn">>, {binary, <<"2">>}},
+                                     {'=', <<"d3">>, {float, 2.0}}
+                                     }}}}}
+                              ]
+                    }).
+
+select_where_ors_at_end_test() ->
+    ?sql_compilation_assert(
+       "select * FROM tsall2 WHERE "
+       "d3 = 1.0 OR d3 = 2.0 "
+       "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1 "
+       "OR d3 = 3.0 OR d3 = 4.0",
+       #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                    'FROM' = <<"tsall2">>,
+                    'WHERE' = [
+                               {or_,
+                                {'=',<<"d3">>,{float,4.0}},
+                                {or_,
+                                 {'=',<<"d3">>,{float,3.0}},
+                                 {or_,
+                                  {'=', <<"d3">>, {float, 1.0}},
+                                  {and_,
+                                   {'<', <<"ts1nn">>, {integer, 1}},
+                                   {and_,
+                                    {'>', <<"ts1nn">>, {integer, 0}},
+                                    {and_,
+                                     {'!=', <<"vc2nn">>, {binary, <<"3">>}},
+                                     {and_,
+                                      {'!=', <<"vc1nn">>, {binary, <<"2">>}},
+                                      {'=', <<"d3">>, {float, 2.0}}
+                                     }}}}}}}
+                              ]
+                    }).
+
 
 select_where_letters_nos_in_strings_1b_test() ->
     ?sql_compilation_assert("select * from events where user = 'user 1'",
