@@ -688,6 +688,33 @@ create_all_types_sql_test() ->
                  },
     ?assertEqual(Expected, Got).
 
+create_with_timestamp_nullable_key_test() ->
+    ?sql_compilation_fail("CREATE TABLE GeoCheckin ("
+                          " geohash varchar not null,"
+                          " user varchar not null,"
+                          " time timestamp,"
+                          " weather varchar not null,"
+                          " temperature varchar,"
+                          " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
+
+create_with_single_nullable_key_test() ->
+    ?sql_compilation_fail("CREATE TABLE GeoCheckin ("
+                          " geohash varchar not null,"
+                          " user varchar,"
+                          " time timestamp not null,"
+                          " weather varchar not null,"
+                          " temperature varchar,"
+                          " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
+
+create_with_all_nullable_key_test() ->
+    ?sql_compilation_fail("CREATE TABLE GeoCheckin ("
+                          " geohash varchar,"
+                          " user varchar,"
+                          " time timestamp,"
+                          " weather varchar not null,"
+                          " temperature varchar,"
+                          " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
+
 select_sql_case_insensitive_1_test() ->
     ?sql_compilation_assert_match("SELECT * from argle",
                                   #riak_sql_v1{'SELECT' = [[<<"*">>]]}).
