@@ -16,7 +16,6 @@ Identifier
 CharacterLiteral
 Where
 Cond
-Conds
 Comp
 Val
 Vals
@@ -103,7 +102,7 @@ Query -> Select           : '$1'.
 
 Select -> select Fields from Buckets Where : make_clause('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Buckets       : make_clause('$1', '$2', '$3', '$4').
-Where -> where Conds : make_where('$1', '$2').
+Where -> where BooleanValueExpression : make_where('$1', '$2').
 
 Fields -> Fields comma Field : make_list('$1', '$3').
 Fields -> Field              : make_list('$1').
@@ -130,9 +129,6 @@ FunArgN -> comma FunArg FunArgN : '$1'.
 Funcall -> Identifier openb     closeb    : make_funcall('$1').
 Funcall -> Identifier openb FunArg closeb : make_funcall('$1').
 Funcall -> Identifier openb FunArg FunArgN closeb : make_funcall('$1').
-
-Conds -> openb Conds closeb             : make_expr('$2').
-Conds -> BooleanValueExpression         : '$1'.
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
@@ -499,9 +495,6 @@ make_list(A)               -> {list, [A]}.
 
 make_list({list, A}, {_, B}) -> {list, A ++ [B]};
 make_list({_,    A}, {_, B}) -> {list, [A, B]}.
-
-make_expr(A) ->
-    {conditional, A}.
 
 make_column({identifier, FieldName}, {DataType, _}) ->
     #riak_field_v1{
