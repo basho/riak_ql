@@ -480,12 +480,13 @@ character_literal_to_binary({character_literal, CharacterLiteralBytes})
     {binary, CharacterLiteralBytes}.
 
 %%
-add_unit({Type, A}, {identifier, U}) ->
-    case riak_ql_quanta:unit_to_millis(U, A) of
+add_unit({Type, Value}, {identifier, Unit1}) ->
+    Unit2 = list_to_binary(string:to_lower(binary_to_list(Unit1))),
+    case riak_ql_quanta:unit_to_millis(Value, Unit2) of
         error ->
             return_error_flat(io_lib:format(
                 "Used ~s as a measure of time in ~p~s. Only s, m, h and d are allowed.",
-                [U, A, U]
+                [Unit2, Value, Unit2]
             ));
         Millis ->
             {Type, Millis}
