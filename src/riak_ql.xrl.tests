@@ -14,56 +14,35 @@ keywords_2_test_() ->
     ?_assertEqual([{select, <<"seLEct">>}], Got).
 
 keywords_3_test_() ->
-    Got = riak_ql_lexer:get_tokens("from LiMit Where anD oR delETe DROP Groupby MeRge InneR JOIn As"),
+    Got = riak_ql_lexer:get_tokens("from LiMit Where anD oR"),
     Expected = [
                 {from,    <<"from">>},
                 {limit,   <<"LiMit">>},
                 {where,   <<"Where">>},
                 {and_,    <<"anD">>},
-                {or_,     <<"oR">>},
-                {delete,  <<"delETe">>},
-                {drop,    <<"DROP">>},
-                {groupby, <<"Groupby">>},
-                {merge,   <<"MeRge">>},
-                {inner,   <<"InneR">>},
-                {join,    <<"JOIn">>},
-                {as,      <<"As">>}
+                {or_,     <<"oR">>}
                ],
     ?_assertEqual(Expected, Got).
 
 keywords_3a_test_() ->
-    Got = riak_ql_lexer:get_tokens("from limit where and or delete drop groupby merge inner join as"),
+    Got = riak_ql_lexer:get_tokens("from limit where and or"),
     Expected = [
                 {from,    <<"from">>},
                 {limit,   <<"limit">>},
                 {where,   <<"where">>},
                 {and_,    <<"and">>},
-                {or_,     <<"or">>},
-                {delete,  <<"delete">>},
-                {drop,    <<"drop">>},
-                {groupby, <<"groupby">>},
-                {merge,   <<"merge">>},
-                {inner,   <<"inner">>},
-                {join,    <<"join">>},
-                {as,      <<"as">>}
+                {or_,     <<"or">>}
                ],
     ?_assertEqual(Expected, Got).
 
 keywords_3b_test_() ->
-    Got = riak_ql_lexer:get_tokens("FROM LIMIT WHERE AND OR DELETE DROP GROUPBY MERGE INNER JOIN AS"),
+    Got = riak_ql_lexer:get_tokens("FROM LIMIT WHERE AND OR"),
     Expected = [
                 {from,    <<"FROM">>},
                 {limit,   <<"LIMIT">>},
                 {where,   <<"WHERE">>},
                 {and_,    <<"AND">>},
-                {or_,     <<"OR">>},
-                {delete,  <<"DELETE">>},
-                {drop,    <<"DROP">>},
-                {groupby, <<"GROUPBY">>},
-                {merge,   <<"MERGE">>},
-                {inner,   <<"INNER">>},
-                {join,    <<"JOIN">>},
-                {as,      <<"AS">>}
+                {or_,     <<"OR">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -72,12 +51,9 @@ keyword_general_test_() ->
        [
         {boolean, <<"boolean">>},
         {boolean, <<"BOOLEAN">>},
-        {boolean, <<"booLEan">>},
-        {any, <<"any">>},
-        {any, <<"ANY">>},
-        {any, <<"Any">>}
+        {boolean, <<"booLEan">>}
        ],
-       riak_ql_lexer:get_tokens("boolean BOOLEAN booLEan any ANY Any")
+       riak_ql_lexer:get_tokens("boolean BOOLEAN booLEan ")
       ).
 
 
@@ -241,35 +217,6 @@ keywords_in_words_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
-datetime_1a_test_() ->
-    Got = riak_ql_lexer:get_tokens("'23 April 1963 8:00 AM'"),
-    Expected = [
-                {datetime, {{1963, 4, 23}, {8, 0, 0}}}
-               ],
-    ?_assertEqual(Expected, Got).
-
-datetime_1b_test_() ->
-    Got = riak_ql_lexer:get_tokens("'  23   April 1963 8:00 AM  '"),
-    Expected = [
-                {datetime, {{1963, 4, 23}, {8, 0, 0}}}
-               ],
-    ?_assertEqual(Expected, Got).
-
-%% this test can never pass becuz the date parser substitutes the H:M:s from now() if there is not time in the string
-%% datetime_1c_test_() ->
-%%     Got = riak_ql_lexer:get_tokens("'2013-08-13'"),
-%%     Expected = [
-%%              {datetime, {{2013, 8, 13}, {0, 0, 0}}}
-%%             ],
-%%     ?_assertEqual(Expected, Got).
-
-datetime_1d_test_() ->
-    Got = riak_ql_lexer:get_tokens("'2013-08-12 23:32:01'"),
-    Expected = [
-                {datetime, {{2013, 8, 12}, {23, 32, 1}}}
-               ],
-    ?_assertEqual(Expected, Got).
-
 not_a_date_test_() ->
     Got = riak_ql_lexer:get_tokens("'ergle'"),
     Expected = [
@@ -358,7 +305,7 @@ general_test_() ->
                 {where, <<"where">>},
                 {identifier, <<"time">>},
                 {gt, <<">">>},
-                {datetime, {{63, 4, 23}, {1, 2, 3}}}
+                {character_literal, <<"23 April 63 1:2:3">>}
                ],
     io:format("Expected is ~p~n", [Expected]),
     io:format("Got is ~p~n", [Got]),

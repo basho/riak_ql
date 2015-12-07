@@ -190,8 +190,8 @@ select_where_1_sql_test() ->
                                          'FROM'   = <<"response_times">>,
                                          'WHERE'  = [
                                                      {and_,
-                                                      {'<', <<"time">>, {datetime, {{2013, 8, 13}, {12, 34, 56}}}},
-                                                      {'>', <<"time">>, {datetime, {{2013, 8, 12}, {23, 32, 1}}}}
+                                                      {'<', <<"time">>, {binary,<<"2013-08-13 12:34:56">>}},
+                                                      {'>', <<"time">>, {binary, <<"2013-08-12 23:32:01">>}}
                                                      }
                                                     ]
                                         }).
@@ -203,8 +203,8 @@ select_where_1_reverse_sql_test() ->
                                          'FROM'   = <<"response_times">>,
                                          'WHERE'  = [
                                                      {and_,
-                                                      {'<', <<"time">>, {datetime, {{2013, 8, 13}, {12, 34, 56}}}},
-                                                      {'>', <<"time">>, {datetime, {{2013, 8, 12}, {23, 32, 1}}}}
+                                                      {'<', <<"time">>, {binary,<<"2013-08-13 12:34:56">>}},
+                                                      {'>', <<"time">>, {binary, <<"2013-08-12 23:32:01">>}}
                                                      }
                                                     ]
                                         }).
@@ -347,6 +347,57 @@ select_where_single_quotes_test() ->
                                 }
                                ]
                    }).
+
+select_where_ors_at_start_test() ->
+    ?sql_compilation_assert(
+       "select * FROM tsall2 WHERE "
+       "d3 = 1.0 OR d3 = 2.0 "
+       "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1",
+       #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                    'FROM' = <<"tsall2">>,
+                    'WHERE' = [
+                               {or_,
+                                {'=', <<"d3">>, {float, 1.0}},
+                                {and_,
+                                 {'<', <<"ts1nn">>, {integer, 1}},
+                                 {and_,
+                                  {'>', <<"ts1nn">>, {integer, 0}},
+                                  {and_,
+                                   {'!=', <<"vc2nn">>, {binary, <<"3">>}},
+                                   {and_,
+                                     {'!=', <<"vc1nn">>, {binary, <<"2">>}},
+                                     {'=', <<"d3">>, {float, 2.0}}
+                                     }}}}}
+                              ]
+                    }).
+
+select_where_ors_at_end_test() ->
+    ?sql_compilation_assert(
+       "select * FROM tsall2 WHERE "
+       "d3 = 1.0 OR d3 = 2.0 "
+       "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1 "
+       "OR d3 = 3.0 OR d3 = 4.0",
+       #riak_sql_v1{'SELECT' = [[<<"*">>]],
+                    'FROM' = <<"tsall2">>,
+                    'WHERE' = [
+                               {or_,
+                                {'=',<<"d3">>,{float,4.0}},
+                                {or_,
+                                 {'=',<<"d3">>,{float,3.0}},
+                                 {or_,
+                                  {'=', <<"d3">>, {float, 1.0}},
+                                  {and_,
+                                   {'<', <<"ts1nn">>, {integer, 1}},
+                                   {and_,
+                                    {'>', <<"ts1nn">>, {integer, 0}},
+                                    {and_,
+                                     {'!=', <<"vc2nn">>, {binary, <<"3">>}},
+                                     {and_,
+                                      {'!=', <<"vc1nn">>, {binary, <<"2">>}},
+                                      {'=', <<"d3">>, {float, 2.0}}
+                                     }}}}}}}
+                              ]
+                    }).
 
 
 select_where_letters_nos_in_strings_1b_test() ->
@@ -779,6 +830,33 @@ create_all_types_sql_test() ->
                                ]}
                  },
     ?assertEqual(Expected, Got).
+
+create_with_timestamp_nullable_key_test() ->
+    ?sql_compilation_fail("CREATE TABLE GeoCheckin ("
+                          " geohash varchar not null,"
+                          " user varchar not null,"
+                          " time timestamp,"
+                          " weather varchar not null,"
+                          " temperature varchar,"
+                          " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
+
+create_with_single_nullable_key_test() ->
+    ?sql_compilation_fail("CREATE TABLE GeoCheckin ("
+                          " geohash varchar not null,"
+                          " user varchar,"
+                          " time timestamp not null,"
+                          " weather varchar not null,"
+                          " temperature varchar,"
+                          " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
+
+create_with_all_nullable_key_test() ->
+    ?sql_compilation_fail("CREATE TABLE GeoCheckin ("
+                          " geohash varchar,"
+                          " user varchar,"
+                          " time timestamp,"
+                          " weather varchar not null,"
+                          " temperature varchar,"
+                          " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
 
 select_sql_case_insensitive_1_test() ->
     ?sql_compilation_assert_match("SELECT * from argle",
