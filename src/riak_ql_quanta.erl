@@ -50,13 +50,17 @@ quanta(StartTime, EndTime, QuantaSize, Unit) ->
     Start = quantum(StartTime, QuantaSize, Unit),
     case Start of
 	{error, _} = E -> E;
-	_Other         -> End = quantum(EndTime, QuantaSize, Unit),
+	_Other         -> End = EndTime,
 			  Diff = End - Start,
 			  Slice = unit_to_ms(Unit) * QuantaSize,
-			  NSlices = Diff div Slice + 1,
+			  NSlices = accommodate(Diff, Slice),
 			  Quanta = gen_quanta(NSlices, Start, Slice, []),
 			  {NSlices, Quanta}
     end.
+
+%% compute ceil(Length / Unit)
+accommodate(Length, Unit) ->
+    Length div Unit + if Length rem Unit > 0 -> 1; el/=se -> 0 end.
 
 gen_quanta(1, _Start, _Slice, Acc) ->
     Acc;
