@@ -21,6 +21,7 @@ Comp
 Logic
 Val
 Vals
+ArithOp
 Funcall
 TableDefinition
 TableContentsSource
@@ -88,21 +89,29 @@ where
 Rootsymbol Statement.
 Endsymbol '$end'.
 
-Statement -> Query : convert('$1').
+Statement -> Query           : convert('$1').
 Statement -> TableDefinition : fix_up_keys('$1').
 
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
-Query -> Select           : '$1'.
+Query -> Select               : '$1'.
 
 Select -> select Fields from Buckets Where : make_clause('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Buckets       : make_clause('$1', '$2', '$3', '$4').
+
 Where -> where Conds : make_where('$1', '$2').
 
-Fields -> Fields comma Field : make_list('$1', '$3').
-Fields -> Field              : make_list('$1').
+ArithOp -> plus       : '$1'.
+ArithOp -> minus      : '$1'.
+ArithOp -> maybetimes : '$1'.
+ArithOp -> div_       : '$1'.
 
-Field -> Identifier                : '$1'.
-Field -> maybetimes          : '$1'.
+Fields -> Fields ArithOp Field : make_select('$1', '$3').
+Fields -> Fields comma   Field : make_select('$1', '$3').
+Fields -> Field                : '$1'.
+
+Field -> Identifier : make_select_type('$1').
+Field -> maybetimes : make_select_type('$1').
+Field -> Funcall    : make_select_type('$1').
 
 Buckets -> Buckets comma Bucket : make_list('$1', '$3').
 Buckets -> Bucket               : '$1'.
@@ -120,9 +129,9 @@ FunArg -> Funcall    : '$1'.
 FunArgN -> comma FunArg  : '$1'.
 FunArgN -> comma FunArg FunArgN : '$1'.
 
-Funcall -> Identifier openb     closeb    : make_funcall('$1').
-Funcall -> Identifier openb FunArg closeb : make_funcall('$1').
-Funcall -> Identifier openb FunArg FunArgN closeb : make_funcall('$1').
+Funcall -> Identifier openb                closeb : make_funcall('$1', []).
+Funcall -> Identifier openb FunArg         closeb : make_funcall('$1', ['$3']).
+Funcall -> Identifier openb FunArg FunArgN closeb : make_funcall('$1', ['$3', '$4']).
 
 Conds -> openb Conds closeb             : make_expr('$2').
 Conds -> Conds Logic Cond               : make_expr('$1', '$2', '$3').
@@ -131,14 +140,11 @@ Conds -> Cond                           : '$1'.
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
-Vals -> Vals plus       Val : make_expr('$1', '$2', '$3').
-Vals -> Vals minus      Val : make_expr('$1', '$2', '$3').
-Vals -> Vals maybetimes Val : make_expr('$1', '$2', '$3').
-Vals -> Vals div_       Val : make_expr('$1', '$2', '$3').
-Vals -> regex               : '$1'.
-Vals -> Val                 : '$1'.
-Vals -> Funcall             : '$1'.
-Vals -> Identifier          : '$1'.
+Vals -> Vals ArithOp Val : make_expr('$1', '$2', '$3').
+Vals -> regex            : '$1'.
+Vals -> Val              : '$1'.
+Vals -> Funcall          : '$1'.
+Vals -> Identifier       : '$1'.
 
 Val -> integer identifier : add_unit('$1', '$2').
 Val -> integer       : '$1'.
@@ -280,7 +286,7 @@ convert(#outputs{type = create} = O) ->
 make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, []}).
 
 make_clause({select, _SelectBytes},
-            {_FieldListType, B},
+            {SelectType, B},
             {from, _FromBytes},
             {Type, D},
             {_WhereType, E}) ->
@@ -289,8 +295,12 @@ make_clause({select, _SelectBytes},
                  list   -> {list, [X || X <- D]};
                  regex  -> {regex, D}
              end,
+    Fields = case SelectType of
+                 plain_row_select -> {plain_row_select, [[X] || X <- B]};
+                 _Other           -> {SelectType, B}
+             end,
     _O = #outputs{type    = select,
-                  fields  = [[X] || X <- B],
+                  fields  = Fields,
                   buckets = Bucket,
                   where   = E
                  }.
@@ -413,8 +423,8 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
                                          Op1 =:= or_  orelse
                                          Op1 =:= '>'  orelse
                                          Op1 =:= '<'  orelse
-                                         Op1 =:= '>='  orelse
-                                         Op1 =:= '<='  orelse
+                                         Op1 =:= '>=' orelse
+                                         Op1 =:= '<=' orelse
                                          Op1 =:= '='  orelse
                                          Op1 =:= '<>' orelse
                                          Op1 =:= '=~' orelse
@@ -425,8 +435,8 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
                                          Op2 =:= or_  orelse
                                          Op2 =:= '>'  orelse
                                          Op2 =:= '<'  orelse
-                                         Op2 =:= '>='  orelse
-                                         Op2 =:= '<='  orelse
+                                         Op2 =:= '>=' orelse
+                                         Op2 =:= '<=' orelse
                                          Op2 =:= '='  orelse
                                          Op2 =:= '<>' orelse
                                          Op2 =:= '=~' orelse
@@ -442,12 +452,30 @@ remove_conditionals(A) ->
     A.
 
 %% Functions are disabled so return an error.
-make_funcall({identifier, FuncName}) ->
-    return_error(0, iolist_to_binary(io_lib:format(
-        "Functions not supported but '~s' called as function.", [FuncName])));
-make_funcall(_) ->
+make_funcall({identifier, FuncName}, Args) ->
+    case get_func_type(FuncName) of
+        window_fn ->
+            Args2 = [#param_v1{name = X} || {identifier, X} <- Args],
+            {funcall, #sql_window_fn_v1{fn   = list_to_atom(string:to_lower(binary_to_list(FuncName))),
+                                        args = Args2}};
+        not_supported ->
+            Msg = io_lib:format("Function not supported - '~s'.", [FuncName]),
+            return_error(0, iolist_to_binary(Msg))
+    end;
+make_funcall(_, _) ->
     % make dialyzer stop erroring on no local return.
     error.
+
+get_func_type(FuncName) when is_binary(FuncName) ->
+    case string:to_lower(binary_to_list(FuncName)) of
+        "avg"   -> window_fn;
+        "sum"   -> window_fn;
+        "count" -> window_fn;
+        "min"   -> window_fn;
+        "max"   -> window_fn;
+        "stdev" -> window_fn;
+        _       -> not_supported
+    end.
 
 character_literal_to_binary({character_literal, CharacterLiteralBytes})
   when is_binary(CharacterLiteralBytes) ->
@@ -463,12 +491,32 @@ add_unit({_, A}, {identifier, U}) ->
         [U, A, U]
     )).
 
-make_list({maybetimes, A}) -> {list, [A]};
-make_list({identifier,       A}) -> {list, [A]};
-make_list(A)               -> {list, [A]}.
+%% log(Fn, Args) ->
+%%     io:format("calling ~p for ~p~n", [Fn, Args]),
+%%     exit(berk).
 
-make_list({list, A}, {_, B}) -> {list, A ++ [B]};
-make_list({_,    A}, {_, B}) -> {list, [A, B]}.
+make_select_type({identifier, A}) -> {plain_row_select, [A]};
+make_select_type({funcall   , A}) -> {window_select,    [A]};
+make_select_type({maybetimes, A}) -> {plain_row_select, [A]}.
+
+%% there are three different execution paths:
+%% * window_select
+%% * row_sel_with_arith
+%% * plain_row_select
+%% window_select subsumes row_select_with_arith subsumes plain_row_select
+make_select({Type1, A}, {Type2, B}) when Type1 =:= window_select orelse
+                                         Type2 =:= window_select ->
+    {window_select, A ++ B};
+make_select({Type1, A}, {Type2, B}) when Type1 =:= row_sel_with_arith orelse
+                                         Type2 =:= row_sel_with_arith ->
+    {row_sel_with_arith, A ++ B};
+make_select({Type, A}, {_, B}) ->
+    {Type, A ++ B}.
+
+make_list({list, A}, {_, B}) ->
+    {list, A ++ [B]};
+make_list({_T1, A}, {_T2, B}) -> 
+    {list, [A, B]}.
 
 make_expr(A) ->
     {conditional, A}.
