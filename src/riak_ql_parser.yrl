@@ -479,15 +479,18 @@ character_literal_to_binary({character_literal, CharacterLiteralBytes})
   when is_binary(CharacterLiteralBytes) ->
     {binary, CharacterLiteralBytes}.
 
-add_unit({Type, A}, {identifier, U}) when U =:= <<"s">> -> {Type, A};
-add_unit({Type, A}, {identifier, U}) when U =:= <<"m">> -> {Type, A*60};
-add_unit({Type, A}, {identifier, U}) when U =:= <<"h">> -> {Type, A*60*60};
-add_unit({Type, A}, {identifier, U}) when U =:= <<"d">> -> {Type, A*60*60*24};
-add_unit({_, A}, {identifier, U}) ->
-    return_error_flat(io_lib:format(
-        "Used ~s as a measure of time in ~p~s. Only s, m, h and d are allowed.",
-        [U, A, U]
-    )).
+%%
+add_unit({Type, Value}, {identifier, Unit1}) ->
+    Unit2 = list_to_binary(string:to_lower(binary_to_list(Unit1))),
+    case riak_ql_quanta:unit_to_millis(Value, Unit2) of
+        error ->
+            return_error_flat(io_lib:format(
+                "Used ~s as a measure of time in ~p~s. Only s, m, h and d are allowed.",
+                [Unit2, Value, Unit2]
+            ));
+        Millis ->
+            {Type, Millis}
+    end.
 
 make_list({maybetimes, A}) -> {list, [A]};
 make_list({identifier,       A}) -> {list, [A]};

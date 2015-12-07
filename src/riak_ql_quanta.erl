@@ -12,7 +12,8 @@
 	 quantum/3,
 	 quanta/4,
          timestamp_to_ms/1,
-         ms_to_timestamp/1
+         ms_to_timestamp/1,
+         unit_to_millis/2
 	]).
 
 -type time_ms() :: non_neg_integer().
@@ -76,6 +77,15 @@ quantum(Time, QuantaSize, Unit) when Unit == d;
     Time - Diff;
 quantum(_, _, Unit) ->
     {error, {invalid_unit, Unit}}.
+
+%% Convert an integer and a time unit in binary to millis, assumed from the unix
+%% epoch.
+-spec unit_to_millis(Value::integer(), Unit::binary()) -> integer() | error.
+unit_to_millis(Value, <<"s">>) -> Value*1000;
+unit_to_millis(Value, <<"m">>) -> Value*1000*60;
+unit_to_millis(Value, <<"h">>) -> Value*1000*60*60;
+unit_to_millis(Value, <<"d">>) -> Value*1000*60*60*24;
+unit_to_millis(Value, Unit) when is_integer(Value), is_binary(Unit) -> error.
 
 %% @doc Return the time in milliseconds since 00:00 GMT Jan 1, 1970 (Unix Epoch)
 -spec timestamp_to_ms(erlang:timestamp()) -> time_ms().
@@ -220,5 +230,7 @@ quantum_gen() ->
            {choose(1, 60), m}]).
 
 -endif.
+
+
 
 -endif.
