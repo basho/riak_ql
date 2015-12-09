@@ -132,7 +132,7 @@ FunArg -> Identifier : '$1'.
 FunArg -> Val        : '$1'.
 FunArg -> Funcall    : '$1'.
 
-FunArgN -> comma FunArg  : '$1'.
+FunArgN -> comma FunArg         : '$1'.
 FunArgN -> comma FunArg FunArgN : '$1'.
 
 Funcall -> Identifier openb                closeb : make_funcall('$1', []).
@@ -479,10 +479,11 @@ remove_conditionals(A) ->
 
 %% Functions are disabled so return an error.
 make_funcall({identifier, FuncName}, Args) ->
-    case get_func_type(FuncName) of
+    Fn = canonicalise_window_fn(FuncName),
+    case get_func_type(Fn) of
         window_fn ->
             Args2 = [#param_v1{name = X} || {identifier, X} <- Args],
-            {funcall, #sql_window_fn_v1{fn   = list_to_atom(string:to_lower(binary_to_list(FuncName))),
+            {funcall, #sql_window_fn_v1{fn   = Fn,
                                         args = Args2}};
         not_supported ->
             Msg = io_lib:format("Function not supported - '~s'.", [FuncName]),
@@ -492,16 +493,25 @@ make_funcall(_, _) ->
     % make dialyzer stop erroring on no local return.
     error.
 
-get_func_type(FuncName) when is_binary(FuncName) ->
-    case string:to_lower(binary_to_list(FuncName)) of
-        "avg"   -> window_fn;
-        "sum"   -> window_fn;
-        "count" -> window_fn;
-        "min"   -> window_fn;
-        "max"   -> window_fn;
-        "stdev" -> window_fn;
-        _       -> not_supported
-    end.
+get_func_type(FuncName) when FuncName =:= 'AVG'   orelse
+                             FuncName =:= 'SUM'   orelse
+                             FuncName =:= 'COUNT' orelse
+                             FuncName =:= 'MIN'   orelse
+                             FuncName =:= 'MAX'   orelse
+                             FuncName =:= 'STDEV' -> window_fn;
+get_func_type(FuncName) when is_atom(FuncName)    -> not_supported.
+
+%% TODO
+%% this list to atom needs to change to list to existing atom
+%% once the fns that actually execute the Windows Fns are written then the atoms
+%% will definetely be existing - but just not now
+%% also try/catch round it
+canonicalise_window_fn(Fn) when is_binary(Fn)->
+     case list_to_atom(string:to_upper(binary_to_list(Fn))) of
+         %% create an alias for MEAN becuz 'Muricans, amirite?
+        'MEAN'  -> 'AVG';
+         AtomFn -> AtomFn
+end.
 
 character_literal_to_binary({character_literal, CharacterLiteralBytes})
   when is_binary(CharacterLiteralBytes) ->

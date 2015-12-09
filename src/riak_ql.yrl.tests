@@ -11,9 +11,9 @@
         Got = canonicalise(Uncanonical),
         ?assertEqual(Expected, Got)).
 
-% assert match is useful for only matching part of the output, that
-% is being tested and not the whole state to prevent tests failing
-% on irrelevant changes.
+                                                % assert match is useful for only matching part of the output, that
+                                                % is being tested and not the whole state to prevent tests failing
+                                                % on irrelevant changes.
 -define(sql_compilation_assert_match(String, Expected),
         Toks = riak_ql_lexer:get_tokens(String),
         Got = parse(Toks),
@@ -42,76 +42,65 @@ fix(Other) ->
 
 window_fn_1_test() ->
     ?sql_compilation_assert("select avg(temperature) from details",
-                            #riak_sql_v1{'SELECT' = [[#sql_window_fn_v1{fn   = avg,
-                                                                        args = [#param_v1{name = <<"temperature">>}]}]],
-                                        'FROM'    = <<"details">>,
-                                        'WHERE'   = []
+                            #riak_sql_v1{'SELECT' = {window_select, 
+                                                     [#sql_window_fn_v1{fn   = 'AVG',
+                                                                        args = [#param_v1{name = <<"temperature">>}]}]},
+                                         'FROM'    = <<"details">>,
+                                         'WHERE'   = []
                                         }).
+
+window_fn_1a_test() ->
+    ?sql_compilation_assert("select mean(temperature) from details",
+                            #riak_sql_v1{'SELECT' = {window_select, 
+                                                     [#sql_window_fn_v1{fn   = 'AVG',
+                                                                        args = [#param_v1{name = <<"temperature">>}]}]},
+                                         'FROM'    = <<"details">>,
+                                         'WHERE'   = []
+                                        }).
+
 
 window_fn_2_test() ->
     ?sql_compilation_assert("select avg(temperature), sum(counts) from details",
-                            #riak_sql_v1{'SELECT' = [
-                                                     [#sql_window_fn_v1{fn   = avg,
-                                                                        args = [#param_v1{name = <<"temperature">>}]}],
-                                                     [#sql_window_fn_v1{fn   = sum,
-                                                                        args = [#param_v1{name = <<"counts">>}]}]
-                                                     ],
-                                        'FROM'    = <<"details">>,
-                                        'WHERE'   = []
-                                        }).
+                            #riak_sql_v1{'SELECT' = {window_select, 
+                                                     [
+                                                      #sql_window_fn_v1{fn   = 'AVG',
+                                                                        args = [#param_v1{name = <<"temperature">>}]},
+                                                      #sql_window_fn_v1{fn   = 'SUM',
+                                                                        args = [#param_v1{name = <<"counts">>}]}
+                                                    ]},
+                            'FROM'    = <<"details">>,
+                            'WHERE'   = []
+                           }).
 
 window_fn_capitalisation_test() ->
     ?sql_compilation_assert("select aVg(temperature) from details",
-                            #riak_sql_v1{'SELECT' = [[#sql_window_fn_v1{fn   = avg,
-                                                                        args = [#param_v1{name = <<"temperature">>}]}]],
-                                        'FROM'    = <<"details">>,
+                            #riak_sql_v1{'SELECT' = {window_select, 
+                                                     [#sql_window_fn_v1{fn   = 'AVG',
+                                                                         args = [#param_v1{name = <<"temperature">>}]}]},
+                                                     'FROM'    = <<"details">>,
                                         'WHERE'   = []
                                         }).
 
 window_fn_all_funs_test() ->
     ?sql_compilation_assert("select avg(temperature), sum(counts), count(counts), min(counts), max(counts), stdev(counts) from details",
-                            #riak_sql_v1{'SELECT' = [
-                                                     [#sql_window_fn_v1{fn   = avg,
-                                                                        args = [#param_v1{name = <<"temperature">>}]}],
-                                                     [#sql_window_fn_v1{fn   = sum,
-                                                                        args = [#param_v1{name = <<"counts">>}]}],
-                                                     [#sql_window_fn_v1{fn   = count,
-                                                                        args = [#param_v1{name = <<"counts">>}]}],
-                                                     [#sql_window_fn_v1{fn   = min,
-                                                                        args = [#param_v1{name = <<"counts">>}]}],
-                                                     [#sql_window_fn_v1{fn   = max,
-                                                                        args = [#param_v1{name = <<"counts">>}]}],
-                                                     [#sql_window_fn_v1{fn   = stdev,
-                                                                        args = [#param_v1{name = <<"counts">>}]}]
-                                                     ],
+                            #riak_sql_v1{'SELECT' = {window_select, 
+                                                     [
+                                                      #sql_window_fn_v1{fn   = 'AVG',
+                                                                         args = [#param_v1{name = <<"temperature">>}]},
+                                                      #sql_window_fn_v1{fn   = 'SUM',
+                                                                         args = [#param_v1{name = <<"counts">>}]},
+                                                      #sql_window_fn_v1{fn   = 'COUNT',
+                                                                         args = [#param_v1{name = <<"counts">>}]},
+                                                      #sql_window_fn_v1{fn   = 'MIN',
+                                                                         args = [#param_v1{name = <<"counts">>}]},
+                                                      #sql_window_fn_v1{fn   = 'MAX',
+                                                                         args = [#param_v1{name = <<"counts">>}]},
+                                                      #sql_window_fn_v1{fn   = 'STDEV',
+                                                                         args = [#param_v1{name = <<"counts">>}]}
+                                                     ]},
                                         'FROM'    = <<"details">>,
                                         'WHERE'   = []
                                         }).
-
-%% window_fn_arithmetic_1_test() ->
-%%     ?sql_compilation_assert("select aVg(temperature) + 1 - 2 * 3 / 4 from details",
-%%                             #riak_sql_v1{'SELECT' = [[#sql_window_fn_v1{fn   = avg,
-%%                                                                         args = [#param_v1{name = <<"temperature">>}]}]],
-%%                                         'FROM'    = <<"details">>,
-%%                                         'WHERE'   = []
-%%                                         }).
-
-%% window_fn_arithmetic_2_test() ->
-%%     ?sql_compilation_assert("select aVg(temperature) + count(temperature) from details",
-%%                             #riak_sql_v1{'SELECT' = [[#sql_window_fn_v1{fn   = avg,
-%%                                                                         args = [#param_v1{name = <<"temperature">>}]}]],
-%%                                         'FROM'    = <<"details">>,
-%%                                         'WHERE'   = []
-%%                                         }).
-
-%% plain_select_arithmetic_test() ->
-%%     ?sql_compilation_assert("select temperature + 1 from details",
-%%                             #riak_sql_v1{'SELECT' = [[#sql_window_fn_v1{fn   = avg,
-%%                                                                         args = [#param_v1{name = <<"temperature">>}]}]],
-%%                                         'FROM'    = <<"details">>,
-%%                                         'WHERE'   = []
-%%                                         }).
-    
 
 %%
 %% TS 1.1 fail tests
@@ -353,7 +342,7 @@ select_where_ors_at_start_test() ->
        "select * FROM tsall2 WHERE "
        "d3 = 1.0 OR d3 = 2.0 "
        "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1",
-       #riak_sql_v1{'SELECT' = [[<<"*">>]],
+       #riak_sql_v1{'SELECT' = {plain_row_select, [[<<"*">>]]},
                     'FROM' = <<"tsall2">>,
                     'WHERE' = [
                                {or_,
@@ -377,7 +366,7 @@ select_where_ors_at_end_test() ->
        "d3 = 1.0 OR d3 = 2.0 "
        "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1 "
        "OR d3 = 3.0 OR d3 = 4.0",
-       #riak_sql_v1{'SELECT' = [[<<"*">>]],
+       #riak_sql_v1{'SELECT' = {plain_row_select, [[<<"*">>]]},
                     'FROM' = <<"tsall2">>,
                     'WHERE' = [
                                {or_,
