@@ -200,7 +200,7 @@ is_query_valid(_, #ddl_v1{ table = T1 },
                #riak_sql_v1{ 'FROM' = T2 }) when T1 =/= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _,
-               #riak_sql_v1{'SELECT' = Selection,
+               #riak_sql_v1{'SELECT' = {plain_row_select, Selection},
                'WHERE'  = Where}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
     ValidFilters   = check_filters_valid(Mod, Where),
@@ -270,7 +270,7 @@ is_compatible_operator(_,_,_)                 -> true.
 
 are_selections_valid(_, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
-are_selections_valid(Mod, {plain_row_select, Selections}, _) ->
+are_selections_valid(Mod, Selections, _) ->
     CheckFn = fun(X, {Acc, Status}) ->
                       case Mod:is_field_valid(X) of
                           true  -> {Acc, Status};
@@ -655,7 +655,7 @@ make_functional_key_test() ->
 %%
 
 partial_wildcard_are_selections_valid_test() ->
-    Selections  = {plain_row_select, [[<<"*">>]]},
+    Selections  = [[<<"*">>]],
     DDL = make_ddl(<<"partial_wildcard_are_selections_valid_test">>,
                    [
                     #riak_field_v1{name     = <<"temperature">>,

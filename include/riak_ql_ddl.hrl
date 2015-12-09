@@ -71,10 +71,12 @@
 -type sorter()     :: term().
 -type combinator() :: [binary()].
 -type limit()      :: any().
+-type select_type() :: plain_row_select | row_sel_with_arith | window_select.
+
 
 -record(riak_sql_v1,
 	{
-	  'SELECT'      = []    :: [selection() | operator() | combinator()],
+	  'SELECT'      = []    :: {select_type(), [selection() | operator() | combinator()]},
 	  'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
 	  'WHERE'       = []    :: [filter()],
 	  'ORDER BY'    = []    :: [sorter()],
