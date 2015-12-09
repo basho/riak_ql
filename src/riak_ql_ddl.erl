@@ -270,7 +270,7 @@ is_compatible_operator(_,_,_)                 -> true.
 
 are_selections_valid(_, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
-are_selections_valid(Mod, {_, Selections}, _) ->
+are_selections_valid(Mod, {plain_row_select, Selections}, _) ->
     CheckFn = fun(X, {Acc, Status}) ->
                       case Mod:is_field_valid(X) of
                           true  -> {Acc, Status};
