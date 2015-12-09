@@ -325,10 +325,11 @@ add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
 
 make_expr({LiteralFlavor, Literal},
-          {ComparisonType, _ComparisonBytes},
-          {identifier, IdentifierName})
-  when LiteralFlavor /= identifier ->
-    FlippedComparison = flip_comparison(ComparisonType),
+          {Op, _},
+          {identifier, IdentifierName}) when LiteralFlavor /= identifier ->
+    % if the literal is on left hand side then rewrite the expression, putting
+    % on the right, this means flipping greater than to less than and vice versa
+    FlippedComparison = maybe_flip_op(Op),
     make_expr({identifier, IdentifierName},
               {FlippedComparison, <<"flipped">>},
               {LiteralFlavor, Literal});
@@ -364,10 +365,12 @@ make_where({where, A}, {conditional, B}) ->
     NewB = remove_conditionals(B),
     {A, [canonicalise(NewB)]}.
 
-flip_comparison(lt) -> gt;
-flip_comparison(gt) -> lt;
-flip_comparison(lte) -> gte;
-flip_comparison(gte) -> lte.
+%% flip greater than or less than ops, equals and not do not have to be flipped.
+maybe_flip_op(lt)  -> gt;
+maybe_flip_op(gt)  -> lt;
+maybe_flip_op(lte) -> gte;
+maybe_flip_op(gte) -> lte;
+maybe_flip_op(Op)  -> Op.
 
 %%
 %% rewrite the where clause to have a canonical form

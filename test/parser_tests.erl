@@ -250,3 +250,21 @@ time_unit_case_insensitive_test() ->
             "SELECT * FROM mytable WHERE time > 10S "
             "AND time < 20M AND time > 15H and time < 4D"))
     ).
+
+left_hand_side_literal_equals_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{'=', <<"age">>, {integer, 10}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE 10 = age"))
+    ).
+
+left_hand_side_literal_not_equals_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{'!=', <<"age">>, {integer, 10}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE 10 != age"))
+    ).
