@@ -483,8 +483,7 @@ make_funcall({identifier, FuncName}, Args) ->
     case get_func_type(Fn) of
         window_fn ->
             Args2 = [#param_v1{name = X} || {identifier, X} <- Args],
-            {funcall, #sql_window_fn_v1{fn   = Fn,
-                                        args = Args2}};
+            {funcall, {Fn, Args2}};
         not_supported ->
             Msg = io_lib:format("Function not supported - '~s'.", [FuncName]),
             return_error(0, iolist_to_binary(Msg))

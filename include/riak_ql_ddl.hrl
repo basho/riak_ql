@@ -48,11 +48,6 @@
 	  type      :: field_type()
 	 }).
 
--record(sql_window_fn_v1, {
-          fn        :: atom(),
-          args = [] :: [#param_v1{} | any()]
-         }).
-
 -record(key_v1, {
 	  ast = [] :: [#hash_fn_v1{} | #param_v1{}]
 	 }).
