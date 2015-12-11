@@ -192,7 +192,11 @@ syntax_error_to_msg2({unexpected_where_field, Field}) ->
      [Field]};
 syntax_error_to_msg2({unexpected_select_field, Field}) ->
     {"unexpected_select_field: unexpected field ~s in select clause.",
-     [Field]}.
+     [Field]};
+syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
+    {"subexpressions_not_supported: expressions in where clause operators"
+     " (~s ~s ...) are not supported.",
+     [Field, Op]}.
 
 -spec is_query_valid(module(), #ddl_v1{}, #riak_sql_v1{}) ->
         true | {false, [query_syntax_error()]}.
@@ -222,7 +226,7 @@ check_filters_valid(Mod, Where) ->
         _  -> {false, Errors}
     end.
 
-%%
+%% the terminal case of "a = 2"
 is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
     case Mod:is_field_valid([Field]) of
         true  ->
@@ -237,13 +241,52 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
             end;
         false ->
             [{unexpected_where_field, Field} | Acc1]
-    end.
+    end;
+%% the case where RHS is an expression on its own (LHS must still be a valid field)
+is_filters_field_valid(_Mod, {Op, Field, {_RHS_op, _RHS_lhs_bare_value, _RHS_rhs}}, Acc1) ->
+    [{subexpressions_not_supported, Field, Op} | Acc1].
+%% andreiz: The code below would check for type compatibility
+%% between field and expression, if subexpressions were
+%% supported. Currently (2015-12-03), the query rewrite code in
+%% riak_kv_qry_compiler cannot deal with subexpressions.  Uncomment
+%% and edit the following when it does.
+
+    %% case Mod:is_field_valid([Field]) of
+    %%     true  ->
+    %%         ExpectedType = Mod:get_field_type([Field]),
+    %%         %% the lexer happens to have no type attached to LHS, even
+    %%         %% when it's not a field but an rvalue; just assume it is
+    %%         %% the type of the field at the root of the expression
+    %%         RHS_lhs = maybe_assign_type(RHS_lhs_bare_value, ExpectedType),
+
+    %%         %% this is the case of "A = 3 + 2":
+    %%         %% * check that A is compatible with 3 and 2 on '='
+    %%         %% * check that A is compatible with 3 and 2 on '+'
+    %%         lists:append(
+    %%           [is_filters_field_valid(Mod, {Op,     Field, RHS_lhs}, []),
+    %%            is_filters_field_valid(Mod, {Op,     Field, RHS_rhs}, []),
+    %%            is_filters_field_valid(Mod, {RHS_op, Field, RHS_lhs}, []),
+    %%            is_filters_field_valid(Mod, {RHS_op, Field, RHS_rhs}, []) | Acc1]);
+    %%     false ->
+    %%         [{unexpected_where_field, Field} | Acc1]
+    %% end.
+%%
+%% maybe_assign_type({_Type, _Value} = AlreadyTyped, _AttributedType) ->
+%%     AlreadyTyped;
+%% maybe_assign_type(BareValue, FieldType) ->
+%%     {lexer_type_of(FieldType), BareValue}.
+%%
+%% lexer_type_of(timestamp) -> integer;
+%% lexer_type_of(boolean)   -> boolean;
+%% lexer_type_of(sint64)    -> integer;
+%% lexer_type_of(double)    -> float;
+%% lexer_type_of(varchar)   -> binary.
 
 normalise(Bin) when is_binary(Bin) ->
     string:to_lower(binary_to_list(Bin));
 normalise(X) -> X.
 
-%% Check if the column type and the value being being compared
+%% Check if the column type and the value being compared
 %% are comparable.
 -spec is_compatible_type(ColType::atom(), WhereType::atom(), any()) ->
         boolean().
@@ -1065,6 +1108,16 @@ is_query_valid_compatible_op_2_test() ->
             "SELECT * FROM mytab "
             "WHERE time > 1 AND time < 10 "
             "AND myfamily >= 'bob' ")
+    ).
+
+is_query_valid_no_subexpressions_1_test() ->
+    ?assertEqual(
+        {false, [
+            {subexpressions_not_supported, <<"time">>, '>'}]},
+        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "SELECT * FROM mytab "
+            "WHERE time > 1 + 2 AND time < 10 "
+            "AND myfamily = 'bob' ")
     ).
 
 fold_where_tree_test() ->

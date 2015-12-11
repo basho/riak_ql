@@ -207,15 +207,6 @@ select_where_3_sql_test() ->
                                                     ]
                                         }).
 
-select_where_4_sql_test() ->
-    ?sql_compilation_assert("select value from response_times where time > 1388534400s",
-                            #riak_sql_v1{'SELECT' = {plain_row_select, [[<<"value">>]]},
-                                         'FROM'   = <<"response_times">>,
-                                         'WHERE'  = [
-                                                     {'>', <<"time">>, {integer, 1388534400}}
-                                                    ]
-                                        }).
-
 select_where_5_sql_test() ->
     ?sql_compilation_assert("select * from events where time = 1400497861762723 "++
                                 "and sequence_number = 2321",
