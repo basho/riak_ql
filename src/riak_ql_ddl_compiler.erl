@@ -98,6 +98,39 @@ make_helper_mod(#ddl_v1{partition_key = none}, _, _) ->
 make_helper_mod(#ddl_v1{} = DDL, Dir, IsDebugOn) ->
     mk_helper_m2(DDL, Dir, IsDebugOn).
 
+-define(LINE_NO, 1).
+
+%%
+get_local_key_fn(#ddl_v1{ fields = Fields,
+                       local_key = #key_v1{ ast = Key_params } }) ->
+    Arity = 1,
+    Function_head = [get_local_key_fn_args(Fields, Key_params)],
+    Function_body = [{tuple, ?LINE_NO, get_local_key_fn_result(Key_params)}],
+    {function, ?LINE_NO, get_local_key, Arity,
+        [{clause, ?LINE_NO, Function_head, [], Function_body}]}.
+
+%%
+get_local_key_fn_args([], _) ->
+    {nil,?LINE_NO};
+get_local_key_fn_args([#riak_field_v1{ name = Name } | Tail], Key_params) ->
+    {cons, ?LINE_NO, 
+        {var, ?LINE_NO, get_local_key_fn_arg_name(Name, Key_params)}, 
+            get_local_key_fn_args(Tail, Key_params)}.
+
+%%
+get_local_key_fn_arg_name(Name, Key_params) ->
+    case lists:keyfind([Name], 2, Key_params) of
+        false        -> '_';
+        #param_v1{ } -> binary_to_atom(Name, utf8)
+    end.
+
+%%
+get_local_key_fn_result(Key_params) ->
+    [get_local_key_fn_result_var(Param) || Param <- Key_params].
+
+%%
+get_local_key_fn_result_var(#param_v1{ name = [Name] }) ->
+    {var, ?LINE_NO, binary_to_atom(Name, utf8)}.
 %%
 %% this entry point is used in the test suite
 %% when the query language is fully generalised these fns
@@ -230,16 +263,11 @@ compile(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
     AST = Attrs
         ++ VFns
 	++ ACFns
-        ++ [ExtractFn]
-        ++ [GetTypeFn]
-        ++ [IsValidFn]
-	++ [GetDDLFn]
-        ++ [{eof, LineNo7}],
-    if HasDebugOutput ->
+        ++ [ExtractFn, GetTypeFn, IsValidFn, get_local_key_fn(DDL)]
+	++ [GetDDLFn, {eof, LineNo7}],
+    if true ->
             ASTFileName = filename:join([OutputDir, ModName]) ++ ".ast",
-            write_file(ASTFileName, io_lib:format("~p", [AST]));
-       el/=se ->
-            ok
+            write_file(ASTFileName, io_lib:format("~p", [AST]))
     end,
     Lint = erl_lint:module(AST),
     case Lint of
@@ -277,9 +305,7 @@ write_src(AST, DDL, SrcFileName) ->
 
 write_file(FileName, Contents) ->
     ok = filelib:ensure_dir(FileName),
-    {ok, Fd} = file:open(FileName, [write]),
-    io:fwrite(Fd, "~s~n", [Contents]),
-    file:close(Fd).
+    file:write_file(FileName, io_lib:format("~s~n", [Contents])).
 
 filter_ast([], Acc) ->
     lists:reverse(Acc);
@@ -750,12 +776,13 @@ make_module_attr(ModName, LineNo) ->
 
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
+                                  {get_local_key,   1},
                                   {validate_obj,    1},
-				  {add_column_info, 1},
+                                  {add_column_info, 1},
                                   {get_field_type,  1},
                                   {is_field_valid,  1},
                                   {extract,         2},
-				  {get_ddl,         0}
+                                  {get_ddl,         0}
                                  ]}, LineNo + 1}.
 
 -ifdef(TEST).

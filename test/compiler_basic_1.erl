@@ -166,3 +166,48 @@
 
 ?ddl_roundtrip_assert(double_ddl_test,
                       ?GOOD_DDL_DOUBLE).
+
+helper_module_get_local_key_three_elems_1_test() ->
+    Table_def =
+        "CREATE table temperatures ("
+        "counter SINT64 NOT NULL, "
+        "time TIMESTAMP NOT NULL,"
+        "userid VARCHAR NOT NULL,"
+        "PRIMARY KEY ((userid, counter, QUANTUM(time, 1, 'm')), userid, counter, time))",
+    {ok, DDL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)),
+    {module, Mod} = riak_ql_ddl_compiler:mk_helper_m2(DDL, "/tmp"),
+    ?assertEqual(
+        {userid, counter, time},
+        Mod:get_local_key([counter, time, userid])
+    ).
+
+helper_module_get_local_key_three_elems_2_test() ->
+    Table_def =
+        "CREATE table helper_module_get_local_key_three_elems_2_test ("
+        "counter SINT64 NOT NULL, "
+        "userid VARCHAR NOT NULL,"
+        "time TIMESTAMP NOT NULL,"
+        "PRIMARY KEY ((counter, userid, QUANTUM(time, 1, 'm')), counter, userid, time))",
+    {ok, DDL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)),
+    {module, Mod} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
+    ?assertEqual(
+        {counter, userid, time},
+        Mod:get_local_key([counter, userid, time])
+    ).
+
+helper_module_get_local_key_five_elems_1_test() ->
+    Table_def =
+        "CREATE table helper_module_get_local_key_five_elems_1_test ("
+        "a SINT64 NOT NULL, "
+        "b VARCHAR NOT NULL,"
+        "c TIMESTAMP NOT NULL,"
+        "d DOUBLE NOT NULL, "
+        "e BOOLEAN NOT NULL, "
+        "PRIMARY KEY ((b, e, QUANTUM(c, 1, 'm')), b, e, c))",
+    {ok, DDL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)),
+    {module, Mod} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
+    ?assertEqual(
+        {b, e, c},
+        Mod:get_local_key([a,b,c,d,e])
+    ).
+
