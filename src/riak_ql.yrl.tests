@@ -37,20 +37,20 @@ fix(Other) ->
 %% Tests
 
 %%
-%% window fns in the select clause tests
+%% window_aggregate fns in the select clause tests
 %%
 
-window_fn_1_test() ->
+window_aggregate_fn_1_test() ->
     ?sql_comp_assert("select avg(temp) from details",
-                     #riak_sql_v1{'SELECT' = {window_select, 
+                     #riak_sql_v1{'SELECT' = {window_aggregate_sel, 
                                               [{'AVG', [#param_v1{name = <<"temp">>}]}]},
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
                                  }).
 
-window_fn_1a_test() ->
+window_aggregate_fn_1a_test() ->
     ?sql_comp_assert("select mean(temp) from details",
-                     #riak_sql_v1{'SELECT' = {window_select, 
+                     #riak_sql_v1{'SELECT' = {window_aggregate_sel, 
                                               [{'AVG',
                                                 [#param_v1{name = <<"temp">>}]
                                                }]
@@ -60,9 +60,9 @@ window_fn_1a_test() ->
                                  }).
 
 
-window_fn_2_test() ->
+window_aggregate_fn_2_test() ->
     ?sql_comp_assert("select avg(temp), sum(counts) from details",
-                     #riak_sql_v1{'SELECT' = {window_select, 
+                     #riak_sql_v1{'SELECT' = {window_aggregate_sel, 
                                               [
                                                {'AVG',
                                                 [#param_v1{name = <<"temp">>}]},
@@ -73,18 +73,18 @@ window_fn_2_test() ->
                                   'WHERE'   = []
                                  }).
 
-window_fn_capitalisation_test() ->
+window_aggregate_fn_capitalisation_test() ->
     ?sql_comp_assert("select aVg(temp) from details",
-                     #riak_sql_v1{'SELECT' = {window_select, 
+                     #riak_sql_v1{'SELECT' = {window_aggregate_sel, 
                                               [{'AVG',
                                                 [#param_v1{name = <<"temp">>}]}]},
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
                                  }).
 
-window_fn_all_funs_test() ->
+window_aggregate_fn_all_funs_test() ->
     ?sql_comp_assert("select avg(temp), sum(counts), count(counts), min(counts), max(counts), stdev(counts) from details",
-                     #riak_sql_v1{'SELECT' = {window_select, 
+                     #riak_sql_v1{'SELECT' = {window_aggregate_sel, 
                                               [
                                                {'AVG',
                                                 [#param_v1{name = <<"temp">>}]},
@@ -107,7 +107,7 @@ window_fn_all_funs_test() ->
 %% TS 1.1 fail tests
 %%
 
-window_fn_not_supported_test() ->
+window_aggregate_fn_not_supported_test() ->
     ?sql_comp_fail("select bingo(temp) from details").
 
 %%

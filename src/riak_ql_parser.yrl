@@ -479,9 +479,9 @@ remove_conditionals(A) ->
 
 %% Functions are disabled so return an error.
 make_funcall({identifier, FuncName}, Args) ->
-    Fn = canonicalise_window_fn(FuncName),
+    Fn = canonicalise_window_aggregate_fn(FuncName),
     case get_func_type(Fn) of
-        window_fn ->
+        window_aggregate_fn ->
             Args2 = [#param_v1{name = X} || {identifier, X} <- Args],
             {funcall, {Fn, Args2}};
         not_supported ->
@@ -497,15 +497,15 @@ get_func_type(FuncName) when FuncName =:= 'AVG'   orelse
                              FuncName =:= 'COUNT' orelse
                              FuncName =:= 'MIN'   orelse
                              FuncName =:= 'MAX'   orelse
-                             FuncName =:= 'STDEV' -> window_fn;
+                             FuncName =:= 'STDEV' -> window_aggregate_fn;
 get_func_type(FuncName) when is_atom(FuncName)    -> not_supported.
 
 %% TODO
 %% this list to atom needs to change to list to existing atom
-%% once the fns that actually execute the Windows Fns are written then the atoms
+%% once the fns that actually execute the Window_Aggregates Fns are written then the atoms
 %% will definetely be existing - but just not now
 %% also try/catch round it
-canonicalise_window_fn(Fn) when is_binary(Fn)->
+canonicalise_window_aggregate_fn(Fn) when is_binary(Fn)->
      case list_to_atom(string:to_upper(binary_to_list(Fn))) of
          %% create an alias for MEAN becuz 'Muricans, amirite?
         'MEAN'  -> 'AVG';
@@ -530,18 +530,18 @@ add_unit({_, A}, {identifier, U}) ->
 %%     io:format("calling ~p for ~p~n", [Fn, Args]),
 %%     exit(berk).
 
-make_select_type({identifier,    A}) -> {plain_row_select, [A]};
-make_select_type({funcall   ,    A}) -> {window_select,    [A]};
-make_select_type({maybeasterisk, A}) -> {plain_row_select, [A]}.
+make_select_type({identifier,    A}) -> {plain_row_select,     [A]};
+make_select_type({funcall   ,    A}) -> {window_aggregate_sel, [A]};
+make_select_type({maybeasterisk, A}) -> {plain_row_select,     [A]}.
 
 %% there are three different execution paths:
-%% * window_select
+%% * window_aggregate_select
 %% * row_sel_with_arith
 %% * plain_row_select
-%% window_select subsumes row_select_with_arith subsumes plain_row_select
-make_select({Type1, A}, {Type2, B}) when Type1 =:= window_select orelse
-                                         Type2 =:= window_select ->
-    {window_select, A ++ B};
+%% window_aggregate_select subsumes row_select_with_arith subsumes plain_row_select
+make_select({Type1, A}, {Type2, B}) when Type1 =:= window_aggregate_select orelse
+                                         Type2 =:= window_aggregate_select ->
+    {window_aggregate_select, A ++ B};
 make_select({Type1, A}, {Type2, B}) when Type1 =:= row_sel_with_arith orelse
                                          Type2 =:= row_sel_with_arith ->
     {row_sel_with_arith, A ++ B};
