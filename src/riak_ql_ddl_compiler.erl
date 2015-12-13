@@ -102,11 +102,19 @@ make_helper_mod(#ddl_v1{} = DDL, Dir, IsDebugOn) ->
 
 %%
 get_local_key_fn(#ddl_v1{ fields = Fields,
-                       local_key = #key_v1{ ast = Key_params } }) ->
+                          local_key = #key_v1{ ast = Key_params } }) ->
     Arity = 1,
     Function_head = [get_local_key_fn_args(Fields, Key_params)],
     Function_body = [{tuple, ?LINE_NO, get_local_key_fn_result(Key_params)}],
     {function, ?LINE_NO, get_local_key, Arity,
+        [{clause, ?LINE_NO, Function_head, [], Function_body}]}.
+
+get_partition_key_fn(#ddl_v1{ fields = Fields,
+                              partition_key = #key_v1{ ast = Key_params } }) ->
+    Arity = 1,
+    Function_head = [get_local_key_fn_args(Fields, Key_params)],
+    Function_body = [{tuple, ?LINE_NO, get_local_key_fn_result(Key_params)}],
+    {function, ?LINE_NO, get_partition_key, Arity,
         [{clause, ?LINE_NO, Function_head, [], Function_body}]}.
 
 %%
@@ -119,18 +127,36 @@ get_local_key_fn_args([#riak_field_v1{ name = Name } | Tail], Key_params) ->
 
 %%
 get_local_key_fn_arg_name(Name, Key_params) ->
-    case lists:keyfind([Name], 2, Key_params) of
-        false        -> '_';
-        #param_v1{ } -> binary_to_atom(Name, utf8)
+    case is_name_in_fields(Name, Key_params) of
+        false -> '_';
+        true  -> binary_to_atom(Name, utf8)
     end.
 
 %%
 get_local_key_fn_result(Key_params) ->
-    [get_local_key_fn_result_var(Param) || Param <- Key_params].
+    lists:foldr(fun get_local_key_fn_result_var/2, [], Key_params).
 
 %%
-get_local_key_fn_result_var(#param_v1{ name = [Name] }) ->
-    {var, ?LINE_NO, binary_to_atom(Name, utf8)}.
+get_local_key_fn_result_var(E, Acc) ->
+    case E of
+        #param_v1{ name = [Name] } ->
+            [{var, ?LINE_NO, binary_to_atom(Name, utf8)} | Acc];
+        #hash_fn_v1{ fn = quantum, args = [#param_v1{ name = [Name] }|_] } ->
+            [{var, ?LINE_NO, binary_to_atom(Name, utf8)} | Acc];
+        _ ->
+            Acc
+    end.
+
+%%
+is_name_in_fields(_, []) ->
+    false;
+is_name_in_fields(Name, [#param_v1{ name = [Name] } | _]) ->
+    true;
+is_name_in_fields(Name, [#hash_fn_v1{ args = [#param_v1{ name = [Name] } | _] } | _]) ->
+    true;
+is_name_in_fields(Name, [_ | Tail]) ->
+    is_name_in_fields(Name, Tail).
+
 %%
 %% this entry point is used in the test suite
 %% when the query language is fully generalised these fns
@@ -263,7 +289,7 @@ compile(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
     AST = Attrs
         ++ VFns
 	++ ACFns
-        ++ [ExtractFn, GetTypeFn, IsValidFn, get_local_key_fn(DDL)]
+        ++ [ExtractFn, GetTypeFn, IsValidFn, get_local_key_fn(DDL), get_partition_key_fn(DDL)]
 	++ [GetDDLFn, {eof, LineNo7}],
     if true ->
             ASTFileName = filename:join([OutputDir, ModName]) ++ ".ast",
@@ -777,6 +803,7 @@ make_module_attr(ModName, LineNo) ->
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
                                   {get_local_key,   1},
+                                  {get_partition_key, 1},
                                   {validate_obj,    1},
                                   {add_column_info, 1},
                                   {get_field_type,  1},
