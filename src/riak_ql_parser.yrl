@@ -56,35 +56,35 @@ or_
 and_
 boolean
 character_literal
-closeb
 comma
 create
-div_
 double
-eq
+equals_operator
 false
 float
 from
-gt
+greater_than_operator
 gte
 identifier
 integer
 key
 limit
-lt
+left_paren
+less_than_operator
 lte
-maybetimes
-minus
+maybeasterisk
+minus_sign
 nomatch
 not_
 null
-openb
-plus
+plus_sign
 primary
 quantum
 regex
+right_paren
 select
 sint64
+solidus
 table
 timestamp
 true
@@ -106,18 +106,18 @@ Select -> select Fields from Buckets       : make_clause('$1', '$2', '$3', '$4')
 
 Where -> where BooleanValueExpression : make_where('$1', '$2').
 
-ArithOp -> plus       : '$1'.
-ArithOp -> minus      : '$1'.
-ArithOp -> maybetimes : '$1'.
-ArithOp -> div_       : '$1'.
+ArithOp -> plus_sign     : '$1'.
+ArithOp -> minus_sign    : '$1'.
+ArithOp -> maybeasterisk : '$1'.
+ArithOp -> solidus       : '$1'.
 
 Fields -> Fields ArithOp Field : make_select('$1', '$3').
 Fields -> Fields comma   Field : make_select('$1', '$3').
 Fields -> Field                : '$1'.
 
-Field -> Identifier : make_select_type('$1').
-Field -> maybetimes : make_select_type('$1').
-Field -> Funcall    : make_select_type('$1').
+Field -> Identifier    : make_select_type('$1').
+Field -> maybeasterisk : make_select_type('$1').
+Field -> Funcall       : make_select_type('$1').
 
 Buckets -> Buckets comma Bucket : make_list('$1', '$3').
 Buckets -> Bucket               : '$1'.
@@ -135,9 +135,9 @@ FunArg -> Funcall    : '$1'.
 FunArgN -> comma FunArg         : '$1'.
 FunArgN -> comma FunArg FunArgN : '$1'.
 
-Funcall -> Identifier openb                closeb : make_funcall('$1', []).
-Funcall -> Identifier openb FunArg         closeb : make_funcall('$1', ['$3']).
-Funcall -> Identifier openb FunArg FunArgN closeb : make_funcall('$1', ['$3', '$4']).
+Funcall -> Identifier left_paren                right_paren : make_funcall('$1', []).
+Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1', ['$3']).
+Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3', '$4']).
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
@@ -156,14 +156,14 @@ Val -> TruthValue : '$1'.
 
 
 %% Comp -> approx    : '$1'.
-Comp -> eq        : '$1'.
-Comp -> gt        : '$1'.
-Comp -> lt        : '$1'.
-Comp -> gte       : '$1'.
-Comp -> lte       : '$1'.
-%% Comp -> ne        : '$1'.
-Comp -> nomatch   : '$1'.
-%% Comp -> notapprox : '$1'.
+Comp -> equals_operator        : '$1'.
+Comp -> greater_than_operator  : '$1'.
+Comp -> less_than_operator     : '$1'.
+Comp -> gte                    : '$1'.
+Comp -> lte                    : '$1'.
+%% Comp -> ne                  : '$1'.
+Comp -> nomatch                : '$1'.
+%% Comp -> notapprox           : '$1'.
 
 CreateTable -> create table : create_table.
 
@@ -197,7 +197,7 @@ BooleanPrimary -> BooleanPredicand : '$1'.
 BooleanPredicand ->
     Cond : '$1'.
 BooleanPredicand ->
-    openb BooleanValueExpression closeb : '$2'.
+    left_paren BooleanValueExpression right_paren : '$2'.
 
 %% TABLE DEFINTITION
 
@@ -206,7 +206,7 @@ TableDefinition ->
         make_table_definition('$2', '$3').
 
 TableContentsSource -> TableElementList : '$1'.
-TableElementList -> openb TableElements closeb : '$2'.
+TableElementList -> left_paren TableElements right_paren : '$2'.
 
 TableElements ->
     TableElement comma TableElements : make_table_element_list('$1', '$3').
@@ -231,14 +231,14 @@ DataType -> boolean   : '$1'.
 PrimaryKey -> primary key : primary_key.
 
 KeyDefinition ->
-    PrimaryKey openb KeyFieldList closeb : make_local_key('$3').
+    PrimaryKey left_paren KeyFieldList right_paren : make_local_key('$3').
 KeyDefinition ->
-    PrimaryKey openb openb KeyFieldList closeb comma KeyFieldList closeb : make_partition_and_local_keys('$4', '$7').
+    PrimaryKey left_paren left_paren KeyFieldList right_paren comma KeyFieldList right_paren : make_partition_and_local_keys('$4', '$7').
 
 KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
 KeyFieldList -> KeyField : make_list({list, []}, '$1').
 
-KeyField -> quantum openb KeyFieldArgList closeb : make_modfun(quantum, '$3').
+KeyField -> quantum left_paren KeyFieldArgList right_paren : make_modfun(quantum, '$3').
 KeyField -> Identifier : '$1'.
 
 KeyFieldArgList ->
@@ -250,7 +250,7 @@ KeyFieldArg -> integer : '$1'.
 KeyFieldArg -> float   : '$1'.
 KeyFieldArg -> CharacterLiteral    : '$1'.
 KeyFieldArg -> Identifier : '$1'.
-%% KeyFieldArg -> atom openb Word closeb : make_atom('$3').
+%% KeyFieldArg -> atom left_paren Word right_paren : make_atom('$3').
 
 Erlang code.
 
@@ -348,21 +348,21 @@ make_expr({identifier, _LeftIdentifier},
     return_error(0, <<"Comparing or otherwise operating on two fields is not supported">>);
 make_expr({_, A}, {B, _}, {Type, C}) ->
     B1 = case B of
-             and_      -> and_;
-             or_       -> or_;
-             plus      -> '+';
-             minus     -> '-';
-             maybetime -> '*';
-             div_      -> '/';
-             gt        -> '>';
-             lt        -> '<';
-             gte       -> '>=';
-             lte       -> '<=';
-             eq        -> '=';
-             ne        -> '<>';
-             approx    -> '=~';
-             notapprox -> '!~';
-             nomatch   -> '!='
+             and_                   -> and_;
+             or_                    -> or_;
+             plus_sign              -> '+';
+             minus_sign             -> '-';
+             maybeasterisk          -> '*';
+             solidus                -> '/';
+             greater_than_operator  -> '>';
+             less_than_operator     -> '<';
+             gte                    -> '>=';
+             lte                    -> '<=';
+             equals_operator        -> '=';
+             ne                     -> '<>';
+             approx                 -> '=~';
+             notapprox              -> '!~';
+             nomatch                -> '!='
          end,
     C2 = case Type of
              conditional -> C;
@@ -374,10 +374,10 @@ make_where({where, A}, {conditional, B}) ->
     NewB = remove_conditionals(B),
     {A, [canonicalise(NewB)]}.
 
-flip_comparison(lt) -> gt;
-flip_comparison(gt) -> lt;
-flip_comparison(lte) -> gte;
-flip_comparison(gte) -> lte.
+flip_comparison(less_than_operator)    -> greater_than_operator;
+flip_comparison(greater_than_operator) -> less_than_operator;
+flip_comparison(lte)                   -> gte;
+flip_comparison(gte)                   -> lte.
 
 %%
 %% rewrite the where clause to have a canonical form
@@ -530,9 +530,9 @@ add_unit({_, A}, {identifier, U}) ->
 %%     io:format("calling ~p for ~p~n", [Fn, Args]),
 %%     exit(berk).
 
-make_select_type({identifier, A}) -> {plain_row_select, [A]};
-make_select_type({funcall   , A}) -> {window_select,    [A]};
-make_select_type({maybetimes, A}) -> {plain_row_select, [A]}.
+make_select_type({identifier,    A}) -> {plain_row_select, [A]};
+make_select_type({funcall   ,    A}) -> {window_select,    [A]};
+make_select_type({maybeasterisk, A}) -> {plain_row_select, [A]}.
 
 %% there are three different execution paths:
 %% * window_select
