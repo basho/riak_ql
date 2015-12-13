@@ -335,10 +335,11 @@ add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
 
 make_expr({LiteralFlavor, Literal},
-          {ComparisonType, _ComparisonBytes},
-          {identifier, IdentifierName})
-  when LiteralFlavor /= identifier ->
-    FlippedComparison = flip_comparison(ComparisonType),
+          {Op, _},
+          {identifier, IdentifierName}) when LiteralFlavor /= identifier ->
+    % if the literal is on left hand side then rewrite the expression, putting
+    % on the right, this means flipping greater than to less than and vice versa
+    FlippedComparison = maybe_flip_op(Op),
     make_expr({identifier, IdentifierName},
               {FlippedComparison, <<"flipped">>},
               {LiteralFlavor, Literal});
@@ -374,10 +375,11 @@ make_where({where, A}, {conditional, B}) ->
     NewB = remove_conditionals(B),
     {A, [canonicalise(NewB)]}.
 
-flip_comparison(less_than_operator)    -> greater_than_operator;
-flip_comparison(greater_than_operator) -> less_than_operator;
-flip_comparison(lte)                   -> gte;
-flip_comparison(gte)                   -> lte.
+maybe_flip_op(less_than_operator)    -> greater_than_operator;
+maybe_flip_op(greater_than_operator) -> less_than_operator;
+maybe_flip_op(lte)                   -> gte;
+maybe_flip_op(gte)                   -> lte;
+maybe_flip_op(Op)                    -> Op.
 
 %%
 %% rewrite the where clause to have a canonical form
@@ -516,15 +518,18 @@ character_literal_to_binary({character_literal, CharacterLiteralBytes})
   when is_binary(CharacterLiteralBytes) ->
     {binary, CharacterLiteralBytes}.
 
-add_unit({Type, A}, {identifier, U}) when U =:= <<"s">> -> {Type, A};
-add_unit({Type, A}, {identifier, U}) when U =:= <<"m">> -> {Type, A*60};
-add_unit({Type, A}, {identifier, U}) when U =:= <<"h">> -> {Type, A*60*60};
-add_unit({Type, A}, {identifier, U}) when U =:= <<"d">> -> {Type, A*60*60*24};
-add_unit({_, A}, {identifier, U}) ->
-    return_error_flat(io_lib:format(
-        "Used ~s as a measure of time in ~p~s. Only s, m, h and d are allowed.",
-        [U, A, U]
-    )).
+%%
+add_unit({Type, Value}, {identifier, Unit1}) ->
+    Unit2 = list_to_binary(string:to_lower(binary_to_list(Unit1))),
+    case riak_ql_quanta:unit_to_millis(Value, Unit2) of
+        error ->
+            return_error_flat(io_lib:format(
+                "Used ~s as a measure of time in ~p~s. Only s, m, h and d are allowed.",
+                [Unit2, Value, Unit2]
+            ));
+        Millis ->
+            {Type, Millis}
+    end.
 
 %% log(Fn, Args) ->
 %%     io:format("calling ~p for ~p~n", [Fn, Args]),

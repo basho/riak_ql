@@ -162,3 +162,109 @@ key_fields_must_exist_3_test() ->
         {error, {0, riak_ql_parser, <<"Primary key fields do not exist (time).">>}},
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
     ).
+
+time_unit_seconds_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{and_,
+                {'<',<<"time">>,{integer,20 * 1000}},
+                {'>',<<"time">>,{integer,10 * 1000}}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE time > 10s AND time < 20s"))
+    ).
+
+time_unit_minutes_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{and_,
+                {'<',<<"time">>,{integer,20 * 60 * 1000}},
+                {'>',<<"time">>,{integer,10 * 60 * 1000}}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE time > 10m AND time < 20m"))
+    ).
+
+time_unit_seconds_and_minutes_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{and_,
+                {'<',<<"time">>,{integer,20 * 60 * 1000}},
+                {'>',<<"time">>,{integer,10 * 1000}}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE time > 10s AND time < 20m"))
+    ).
+
+time_unit_hours_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{and_,
+                {'<',<<"time">>,{integer,20 * 60 * 60 * 1000}},
+                {'>',<<"time">>,{integer,10 * 60 * 60 * 1000}}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE time > 10h AND time < 20h"))
+    ).
+
+time_unit_days_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{and_,
+                {'<',<<"time">>,{integer,20 * 60 * 60 * 24 * 1000}},
+                {'>',<<"time">>,{integer,10 * 60 * 60 * 24 * 1000}}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE time > 10d AND time < 20d"))
+    ).
+
+time_unit_invalid_1_test() ->
+    ?assertMatch(
+        {error, {0, riak_ql_parser, <<_/binary>>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE time > 10y AND time < 20y"))
+    ).
+
+time_unit_invalid_2_test() ->
+    ?assertMatch(
+        {error, {0, riak_ql_parser, <<_/binary>>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE time > 10mo AND time < 20mo"))
+    ).
+
+time_unit_whitespace_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{and_,
+                {'<',<<"time">>,{integer,20 * 60 * 60 * 24 * 1000}},
+                {'>',<<"time">>,{integer,10 * 60 * 60 * 24 * 1000}}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE time > 10   d AND time < 20\td"))
+    ).
+
+time_unit_case_insensitive_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{ }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE time > 10S "
+            "AND time < 20M AND time > 15H and time < 4D"))
+    ).
+
+left_hand_side_literal_equals_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{'=', <<"age">>, {integer, 10}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE 10 = age"))
+    ).
+
+left_hand_side_literal_not_equals_test() ->
+    ?assertMatch(
+        {ok, #riak_sql_v1{
+            'WHERE' = [{'!=', <<"age">>, {integer, 10}}]
+        }},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytable WHERE 10 != age"))
+    ).
