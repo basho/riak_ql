@@ -20,32 +20,24 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+
 -module(riak_ql_ddl).
 
 -include("riak_ql_ddl.hrl").
 
 %% this function can be used to work out which Module to use
--export([
-         make_module_name/1, make_module_name/2
-        ]).
-
--type ddl() :: #ddl_v1{}.
--export_type([ddl/0]).
-
-
-%% a helper function for destructuring data objects
-%% and testing the validity of field names
-%% the generated helper functions cannot contain
-%% record definitions because of the build cycle
-%% so this function can be called out to to pick
-%% apart the DDL records
-
--export([get_local_key/2, get_local_key/3]).
--export([get_partition_key/2, get_partition_key/3]).
 -export([is_query_valid/3]).
 -export([make_key/3]).
+-export([make_module_name/1, make_module_name/2]).
 -export([syntax_error_to_msg/1]).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+%% for debugging only
+-export([make_ddl/2]).
+-endif.
+
+-type ddl() :: #ddl_v1{}.
 -type query_syntax_error() ::
         {bucket_type_mismatch, DDL_bucket::binary(), Query_bucket::binary()} |
         {incompatible_type, Field::binary(), simple_field_type(), atom()} |
@@ -53,13 +45,8 @@
         {unexpected_where_field, Field::binary()} |
         {unexpected_select_field, Field::binary()}.
 
+-export_type([ddl/0]).
 -export_type([query_syntax_error/0]).
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-%% for debugging only
--export([make_ddl/2]).
--endif.
 
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
@@ -88,31 +75,6 @@ maybe_mangle_char(C) when (C >= $a andalso C =< $z);
     <<C>>;
 maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
-
-
--spec get_partition_key(#ddl_v1{}, tuple(), module()) -> term().
-get_partition_key(#ddl_v1{partition_key = PK}, Obj, Mod)
-  when is_tuple(Obj) ->
-    #key_v1{ast = Params} = PK,
-    _Key = build(Params, Obj, Mod, []).
-
--spec get_partition_key(#ddl_v1{}, tuple()) -> term().
-get_partition_key(#ddl_v1{table = T}=DDL, Obj)
-  when is_tuple(Obj) ->
-    Mod = make_module_name(T),
-    get_partition_key(DDL, Obj, Mod).
-
--spec get_local_key(#ddl_v1{}, tuple(), module()) -> term().
-get_local_key(#ddl_v1{local_key = LK}, Obj, Mod)
-  when is_tuple(Obj) ->
-    #key_v1{ast = Params} = LK,
-    _Key = build(Params, Obj, Mod, []).
-
--spec get_local_key(#ddl_v1{}, tuple()) -> term().
-get_local_key(#ddl_v1{table = T}=DDL, Obj)
-  when is_tuple(Obj) ->
-    Mod = make_module_name(T),
-    get_local_key(DDL, Obj, Mod).
 
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
 make_key(_Mod, none, _Vals) -> [];
@@ -144,30 +106,6 @@ extract([#param_v1{name = [Nm]} | T], Vals, Acc) ->
     extract(T, Vals, [Val | Acc]);
 extract([Constant | T], Vals, Acc) ->
     extract(T, Vals, [Constant | Acc]).
-
--spec build([#param_v1{}], tuple(), atom(), any()) -> list().
-build([], _Obj, _Mod, A) ->
-    lists:reverse(A);
-build([#param_v1{name = Nm} | T], Obj, Mod, A) ->
-    Val = Mod:extract(Obj, Nm),
-    Type = Mod:get_field_type(Nm),
-    build(T, Obj, Mod, [{Type, Val} | A]);
-build([#hash_fn_v1{mod  = Md,
-                   fn   = Fn,
-                   args = Args,
-                   type = Ty} | T], Obj, Mod, A) ->
-    A2 = convert(Args, Obj, Mod, []),
-    Val = erlang:apply(Md, Fn, A2),
-    build(T, Obj, Mod, [{Ty, Val} | A]).
-
--spec convert([#param_v1{}], tuple(), atom(), [any()]) -> any().
-convert([], _Obj, _Mod, Acc) ->
-    lists:reverse(Acc);
-convert([#param_v1{name = Nm} | T], Obj, Mod, Acc) ->
-    Val = Mod:extract(Obj, Nm),
-    convert(T, Obj, Mod, [Val | Acc]);
-convert([Constant | T], Obj, Mod, Acc) ->
-    convert(T, Obj, Mod, [Constant | Acc]).
 
 %% Convert an error emmitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
@@ -371,182 +309,6 @@ make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
             partition_key = PK,
             local_key     = LK}.
 
-%%
-%% get partition_key tests
-%%
-
-simplest_partition_key_test() ->
-    Name = <<"yando">>,
-    PK = #key_v1{ast = [
-                        #param_v1{name = [Name]}
-                       ]},
-    DDL = make_ddl(<<"simplest_partition_key_test">>,
-                   [
-                    #riak_field_v1{name     = Name,
-                                   position = 1,
-                                   type     = varchar}
-                   ],
-                   PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Obj = {Name},
-    Result = (catch get_partition_key(DDL, Obj)),
-    ?assertEqual([{varchar, Name}], Result).
-
-simple_partition_key_test() ->
-    Name1 = <<"yando">>,
-    Name2 = <<"buckle">>,
-    PK = #key_v1{ast = [
-                        #param_v1{name = [Name1]},
-                        #param_v1{name = [Name2]}
-                       ]},
-    DDL = make_ddl(<<"simple_partition_key_test">>,
-                   [
-                    #riak_field_v1{name     = Name2,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"sherk">>,
-                                   position = 2,
-                                   type     = varchar},
-                    #riak_field_v1{name     = Name1,
-                                   position = 3,
-                                   type     = varchar}
-                   ],
-                   PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Obj = {<<"one">>, <<"two">>, <<"three">>},
-    Result = (catch get_partition_key(DDL, Obj)),
-    ?assertEqual([{varchar, <<"three">>}, {varchar, <<"one">>}], Result).
-
-function_partition_key_test() ->
-    Name1 = <<"yando">>,
-    Name2 = <<"buckle">>,
-    PK = #key_v1{ast = [
-                        #param_v1{name = [Name1]},
-                        #hash_fn_v1{mod  = ?MODULE,
-                                    fn   = mock_partition_fn,
-                                    args = [
-                                            #param_v1{name = [Name2]},
-                                            15,
-                                            m
-                                           ],
-                                    type = timestamp
-                                   }
-                       ]},
-    DDL = make_ddl(<<"function_partition_key_test">>,
-                   [
-                    #riak_field_v1{name     = Name2,
-                                   position = 1,
-                                   type     = timestamp},
-                    #riak_field_v1{name     = <<"sherk">>,
-                                   position = 2,
-                                   type     = varchar},
-                    #riak_field_v1{name     = Name1,
-                                   position = 3,
-                                   type     = varchar}
-                   ],
-                   PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Obj = {1234567890, <<"two">>, <<"three">>},
-    Result = (catch get_partition_key(DDL, Obj)),
-    %% Yes the mock partition function is actually computed
-    %% read the actual code, lol
-    Expected = [{varchar, <<"three">>}, {timestamp, mock_result}],
-    ?assertEqual(Expected, Result).
-
-complex_partition_key_test() ->
-    Name0 = <<"yerp">>,
-    Name1 = <<"yando">>,
-    Name2 = <<"buckle">>,
-    Name3 = <<"doodle">>,
-    PK = #key_v1{ast = [
-                        #param_v1{name = [Name0, Name1]},
-                        #hash_fn_v1{mod  = ?MODULE,
-                                    fn   = mock_partition_fn,
-                                    args = [
-                                            #param_v1{name = [
-                                                              Name0,
-                                                              Name2,
-                                                              Name3
-                                                             ]},
-                                            "something",
-                                            pong
-                                           ],
-                                    type = poodle
-                                   },
-                        #hash_fn_v1{mod  = ?MODULE,
-                                    fn   = mock_partition_fn,
-                                    args = [
-                                            #param_v1{name = [
-                                                              Name0,
-                                                              Name1
-                                                             ]},
-                                            #param_v1{name = [
-                                                              Name0,
-                                                              Name2,
-                                                              Name3
-                                                             ]},
-                                            pang
-                                           ],
-                                    type = wombat
-                                   }
-                       ]},
-    Map3 = {map, [
-                  #riak_field_v1{name     = <<"in_Map_2">>,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map2 = {map, [
-                  #riak_field_v1{name     = Name3,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map1 = {map, [
-                  #riak_field_v1{name     = Name1,
-                                 position = 1,
-                                 type     = sint64},
-                  #riak_field_v1{name     = Name2,
-                                 position = 2,
-                                 type     = Map2},
-                  #riak_field_v1{name     = <<"Level_1_map2">>,
-                                 position = 3,
-                                 type     = Map3}
-                 ]},
-    DDL = make_ddl(<<"complex_partition_key_test">>,
-                   [
-                    #riak_field_v1{name     = Name0,
-                                   position = 1,
-                                   type     = Map1}
-                   ],
-                   PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Obj = {{2, {3}, {4}}},
-    Result = (catch get_partition_key(DDL, Obj)),
-    Expected = [{sint64, 2}, {poodle, mock_result}, {wombat, mock_result}],
-    ?assertEqual(Expected, Result).
-
-%%
-%% get local_key tests
-%%
-
-local_key_test() ->
-    Name = <<"yando">>,
-    PK = #key_v1{ast = [
-                        #param_v1{name = [Name]}
-                       ]},
-    LK = #key_v1{ast = [
-                        #param_v1{name = [Name]}
-                       ]},
-    DDL = make_ddl(<<"simplest_key_key_test">>,
-                   [
-                    #riak_field_v1{name     = Name,
-                                   position = 1,
-                                   type     = varchar}
-                   ],
-                   PK, LK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Obj = {Name},
-    Result = (catch get_local_key(DDL, Obj)),
-    ?assertEqual([{varchar, Name}], Result).
 
 %%
 %% Maps
@@ -658,41 +420,6 @@ make_plain_key_test() ->
     Got = make_key(Mod, Key, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, Time}],
     ?assertEqual(Expected, Got).
-
-make_functional_key_test() ->
-    Key = #key_v1{ast = [
-                         #param_v1{name = [<<"user">>]},
-                         #hash_fn_v1{mod  = ?MODULE,
-                                     fn   = mock_partition_fn,
-                                     args = [
-                                             #param_v1{name = [<<"time">>]},
-                                             15,
-                                             m
-                                            ],
-                                     type = timestamp
-                                    }
-                        ]},
-    DDL = make_ddl(<<"make_plain_key_test">>,
-                   [
-                    #riak_field_v1{name     = <<"user">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"time">>,
-                                   position = 2,
-                                   type     = timestamp}
-                   ],
-                   Key, %% use the same key for both
-                   Key),
-    Time = 12345,
-    Vals = [
-            {<<"user">>, <<"user_1">>},
-            {<<"time">>, Time}
-           ],
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
-    Got = make_key(Mod, Key, Vals),
-    Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
-    ?assertEqual(Expected, Got).
-
 
 %%
 %% Validate Query Tests

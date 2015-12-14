@@ -43,8 +43,8 @@
                case riak_ql_ddl_compiler:mk_helper_m2(DDL, "/tmp") of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
-                       GotPK = riak_ql_ddl:get_partition_key(DDL, Val),
-                       GotLK = riak_ql_ddl:get_local_key(DDL, Val),
+                       GotPK = Module:get_partition_key(Val),
+                       GotLK = Module:get_local_key(Val),
                        Expected = {?VALID, ExpectedPK, ExpectedLK},
                        Got = {Result, GotPK, GotLK},
                        ?assertEqual(Expected, Got);
@@ -137,11 +137,20 @@
         " user_id varchar not null,"
         " primary key ((user_id, bouble, quantum(time, 1, 'm')), user_id, bouble, time))").
 
-?passing_test(round_trip_test,
-              ?GOOD_DDL,
-              {12345, <<"beeees">>, <<"boooos">>},
-              [{varchar, <<"beeees">>}, {varchar, <<"boooos">>}, {timestamp, 0}],
-              [{varchar, <<"beeees">>}, {varchar, <<"boooos">>}, {timestamp, 12345}]).
+% round_trip_test() ->
+%     {ok, DDL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(?GOOD_DDL)),
+%     {module, Module} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
+%     Result = Module:validate_obj([12345, <<"beeees">>, <<"boooos">>]),
+%     Expected = {?VALID, ExpectedPK, ExpectedLK},
+%     Got = {Result, GotPK, GotLK},
+%     ?assertEqual(
+%         ExpectedLK,
+%         Module:get_local_key(Val)
+%     ),
+%     ?assertEqual(
+%         ExpectedPK,
+%         Module:get_partition_key(Val)
+%     ).
 
 ?passing_short_test(sint64_type_test,
                     ?GOOD_DDL_INT,
@@ -223,6 +232,9 @@ helper_module_get_partition_key_five_elems_1_test() ->
     {ok, DDL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)),
     {module, Mod} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
     ?assertEqual(
-        {b, e, c},
-        Mod:get_partition_key([a,b,c,d,e])
+        {b, e, riak_ql_quanta:quantum(10, 1, m)},
+        Mod:get_partition_key([a,b,10,d,e])
     ).
+
+% TODO write test to assert that functions in the key get called
+

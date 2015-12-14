@@ -63,9 +63,6 @@
          mk_helper_m2/1
         ]).
 
--import(riak_ql_parser, [parse/1]).
--import(riak_ql_lexer, [get_tokens/1]).
-
 -define(NODEBUGOUTPUT, false).
 -define(DEBUGOUTPUT,   true).
 -define(IGNORE,        true).
@@ -100,52 +97,67 @@ make_helper_mod(#ddl_v1{} = DDL, Dir, IsDebugOn) ->
 
 -define(LINE_NO, 1).
 
+%% Generate a function in the helper module that takes the decoded riak object
+%% row cells and returns the local key values in a tuple.
 %%
+%% `get_local_key([A,B,C,D,E]) -> {A,C,D}.'
 get_local_key_fn(#ddl_v1{ fields = Fields,
                           local_key = #key_v1{ ast = Key_params } }) ->
-    Arity = 1,
-    Function_head = [get_local_key_fn_args(Fields, Key_params)],
-    Function_body = [{tuple, ?LINE_NO, get_local_key_fn_result(Key_params)}],
-    {function, ?LINE_NO, get_local_key, Arity,
-        [{clause, ?LINE_NO, Function_head, [], Function_body}]}.
+    make_get_key_fn(get_local_key, Fields, Key_params).
 
+%% Generate a function in the helper module that takes the decoded riak object
+%% row cells and returns the partition key values in a tuple.
+%%
+%% `get_partition_key([A,B,C,D,E]) -> {A,C,D}.'
 get_partition_key_fn(#ddl_v1{ fields = Fields,
                               partition_key = #key_v1{ ast = Key_params } }) ->
+    make_get_key_fn(get_partition_key, Fields, Key_params).
+
+%%
+make_get_key_fn(Function_name, Fields, Key_params) ->
     Arity = 1,
-    Function_head = [get_local_key_fn_args(Fields, Key_params)],
-    Function_body = [{tuple, ?LINE_NO, get_local_key_fn_result(Key_params)}],
-    {function, ?LINE_NO, get_partition_key, Arity,
+    Function_head = [get_key_fn_args(Fields, Key_params)],
+    Function_body = [{tuple, ?LINE_NO, get_key_fn_result(Key_params)}],
+    % io:format("FUNCTION BODY ~p~n", [Function_body]),
+    {function, ?LINE_NO, Function_name, Arity,
         [{clause, ?LINE_NO, Function_head, [], Function_body}]}.
 
 %%
-get_local_key_fn_args([], _) ->
+get_key_fn_args([], _) ->
     {nil,?LINE_NO};
-get_local_key_fn_args([#riak_field_v1{ name = Name } | Tail], Key_params) ->
+get_key_fn_args([#riak_field_v1{ name = Name } | Tail], Key_params) ->
     {cons, ?LINE_NO, 
-        {var, ?LINE_NO, get_local_key_fn_arg_name(Name, Key_params)}, 
-            get_local_key_fn_args(Tail, Key_params)}.
+        {var, ?LINE_NO, get_key_fn_arg_name(Name, Key_params)}, 
+            get_key_fn_args(Tail, Key_params)}.
 
 %%
-get_local_key_fn_arg_name(Name, Key_params) ->
+get_key_fn_arg_name(Name, Key_params) ->
     case is_name_in_fields(Name, Key_params) of
         false -> '_';
         true  -> binary_to_atom(Name, utf8)
     end.
 
 %%
-get_local_key_fn_result(Key_params) ->
-    lists:foldr(fun get_local_key_fn_result_var/2, [], Key_params).
+get_key_fn_result(Key_params) ->
+    lists:foldr(fun get_key_fn_result_var/2, [], Key_params).
 
 %%
-get_local_key_fn_result_var(E, Acc) ->
+get_key_fn_result_var(E, Acc) ->
     case E of
         #param_v1{ name = [Name] } ->
             [{var, ?LINE_NO, binary_to_atom(Name, utf8)} | Acc];
-        #hash_fn_v1{ fn = quantum, args = [#param_v1{ name = [Name] }|_] } ->
-            [{var, ?LINE_NO, binary_to_atom(Name, utf8)} | Acc];
+        #hash_fn_v1{ mod = Mod, fn = Fn, args = Args } ->
+            Arg_ast = [expand_args2(X, ?LINE_NO) || X <- Args],
+            Function_call = make_remote_function_call(Mod, Fn, Arg_ast),
+            [Function_call | Acc];
         _ ->
             Acc
     end.
+
+%%
+make_remote_function_call(Module_name, Function_name, Arg_ast) ->
+    {call,?LINE_NO,
+        {remote,?LINE_NO, {atom,?LINE_NO,Module_name},{atom,?LINE_NO,Function_name}}, Arg_ast}.
 
 %%
 is_name_in_fields(_, []) ->
@@ -292,7 +304,7 @@ compile(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
         ++ [ExtractFn, GetTypeFn, IsValidFn, get_local_key_fn(DDL), get_partition_key_fn(DDL)]
 	++ [GetDDLFn, {eof, LineNo7}],
     if true ->
-            ASTFileName = filename:join([OutputDir, ModName]) ++ ".ast",
+            ASTFileName = iolist_to_binary([filename:join([OutputDir, ModName]), ".ast"]),
             write_file(ASTFileName, io_lib:format("~p", [AST]))
     end,
     Lint = erl_lint:module(AST),
