@@ -11,6 +11,7 @@ Select
 Bucket
 Buckets
 Field
+FieldElem
 Fields
 Identifier
 CharacterLiteral
@@ -101,8 +102,8 @@ Statement -> TableDefinition : fix_up_keys('$1').
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
-Select -> select Fields from Buckets Where : make_clause('$1', '$2', '$3', '$4', '$5').
-Select -> select Fields from Buckets       : make_clause('$1', '$2', '$3', '$4').
+Select -> select Fields from Buckets Where : make_select('$1', '$2', '$3', '$4', '$5').
+Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4').
 
 Where -> where BooleanValueExpression : make_where('$1', '$2').
 
@@ -111,13 +112,17 @@ ArithOp -> minus_sign    : '$1'.
 ArithOp -> maybeasterisk : '$1'.
 ArithOp -> solidus       : '$1'.
 
-Fields -> Fields ArithOp Field : make_select('$1', '$3').
-Fields -> Fields comma   Field : make_select('$1', '$3').
-Fields -> Field                : '$1'.
+Fields -> left_paren Fields  right_paren : handle_brackets('$2').
+Fields -> Fields     ArithOp FieldElem   : make_expr('$1', '$2', '$3').
+Fields -> Fields     comma   FieldElem   : concat_select('$1', '$3').
+Fields -> FieldElem                      : '$1'.
 
-Field -> Identifier    : make_select_type('$1').
-Field -> maybeasterisk : make_select_type('$1').
-Field -> Funcall       : make_select_type('$1').
+FieldElem -> Field : '$1'.
+FieldElem -> Val   : '$1'.
+
+Field -> Identifier    : canonicalise_col('$1').
+Field -> maybeasterisk : make_wildcard('$1').
+Field -> Funcall       : '$1'.
 
 Buckets -> Buckets comma Bucket : make_list('$1', '$3').
 Buckets -> Bucket               : '$1'.
@@ -137,6 +142,7 @@ FunArgN -> comma FunArg FunArgN : '$1'.
 
 Funcall -> Identifier left_paren                right_paren : make_funcall('$1', []).
 Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1', ['$3']).
+Funcall -> Identifier left_paren maybeasterisk  right_paren : make_funcall('$1', ['$3']).
 Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3', '$4']).
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
@@ -148,12 +154,11 @@ Vals -> Funcall          : '$1'.
 Vals -> Identifier       : '$1'.
 
 Val -> integer identifier : add_unit('$1', '$2').
-Val -> integer       : '$1'.
-Val -> float     : '$1'.
-Val -> varchar   : '$1'.
-Val -> CharacterLiteral : '$1'.
-Val -> TruthValue : '$1'.
-
+Val -> integer            : '$1'.
+Val -> float              : '$1'.
+Val -> varchar            : '$1'.
+Val -> CharacterLiteral   : '$1'.
+Val -> TruthValue         : '$1'.
 
 %% Comp -> approx    : '$1'.
 Comp -> equals_operator        : '$1'.
@@ -174,12 +179,12 @@ NotNull -> not_ null : '$1'.
 BooleanValueExpression -> BooleanTerm : '$1'.
 BooleanValueExpression ->
     BooleanValueExpression or_ BooleanTerm :
-        {conditional, {or_, '$1', '$3'}}.
+        {expr, {or_, '$1', '$3'}}.
 
 BooleanTerm -> BooleanFactor : '$1'.
 BooleanTerm ->
     BooleanTerm and_ BooleanFactor :
-        {conditional, {and_, '$1', '$3'}}.
+        {expr, {and_, '$1', '$3'}}.
 
 BooleanFactor -> BooleanTest : '$1'.
 BooleanFactor -> not_ BooleanTest : {not_, '$1'}.
@@ -309,10 +314,10 @@ convert(#outputs{type = create} = O) ->
 %% make_atom({binary, SomeWord}) ->
 %%     {atom, binary_to_atom(SomeWord, utf8)}.
 
-make_clause(A, B, C, D) -> make_clause(A, B, C, D, {where, []}).
+make_select(A, B, C, D) -> make_select(A, B, C, D, {where, []}).
 
-make_clause({select, _SelectBytes},
-            {SelectType, B},
+make_select({select, _SelectBytes},
+            Select,
             {from, _FromBytes},
             {Type, D},
             {_WhereType, E}) ->
@@ -321,12 +326,13 @@ make_clause({select, _SelectBytes},
                  list   -> {list, [X || X <- D]};
                  regex  -> {regex, D}
              end,
-    Fields = case SelectType of
-                 plain_row_select -> {plain_row_select, [[X] || X <- B]};
-                 _Other           -> {SelectType, B}
-             end,
+    S2 = case is_list(Select) of
+                                true  -> Select;
+                                false -> [Select]
+                            end,
+    S3 = [remove_exprs(X) || X <- S2],
     _O = #outputs{type    = select,
-                  fields  = Fields,
+                  fields  = S3,
                   buckets = Bucket,
                   where   = E
                  }.
@@ -347,7 +353,7 @@ make_expr({identifier, _LeftIdentifier},
           {_ComparisonType, _ComparisonBin},
           {identifier, _RightIdentifier}) ->
     return_error(0, <<"Comparing or otherwise operating on two fields is not supported">>);
-make_expr({_, A}, {B, _}, {Type, C}) ->
+make_expr({TypeA, A}, {B, _}, {Type, C}) ->
     B1 = case B of
              and_                   -> and_;
              or_                    -> or_;
@@ -366,14 +372,16 @@ make_expr({_, A}, {B, _}, {Type, C}) ->
              nomatch                -> '!='
          end,
     C2 = case Type of
-             conditional -> C;
-             _           -> {Type, C}
+             expr -> C;
+             _    -> {Type, C}
          end,
-    {conditional, {B1, A, C2}}.
+    {expr, {B1, {TypeA, A}, C2}}.
 
-make_where({where, A}, {conditional, B}) ->
-    NewB = remove_conditionals(B),
-    {A, [canonicalise(NewB)]}.
+make_wildcard({maybeasterisk, <<"*">>}) -> {identifier, [<<"*">>]}.
+
+make_where({where, A}, {expr, B}) ->
+    NewB = remove_exprs(B),
+    {A, [canonicalise_where(NewB)]}.
 
 maybe_flip_op(less_than_operator)    -> greater_than_operator;
 maybe_flip_op(greater_than_operator) -> less_than_operator;
@@ -385,7 +393,7 @@ maybe_flip_op(Op)                    -> Op.
 %% rewrite the where clause to have a canonical form
 %% makes query rewriting easier
 %%
-canonicalise(WhereClause) ->
+canonicalise_where(WhereClause) ->
     Canonical = canon2(WhereClause),
     _NewWhere = hoist(Canonical).
 
@@ -401,8 +409,13 @@ canon2({Cond, A, B}) when Cond =:= and_ orelse
         true  -> {Cond, A1, B1};
         false -> {Cond, B1, A1}
     end;
+canon2({Op, A, B}) ->
+    {Op, strip(A), strip(B)};
 canon2(A) ->
     A.
+
+strip({identifier, A}) -> A;
+strip(A)               -> A.
 
 -spec canonicalize_condition_order({atom(), any(), binary()}) -> {atom(), binary(), any()}.
 canonicalize_condition_order({'>', Reference, Column}) ->
@@ -472,11 +485,11 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
                                          Op2 =:= '!=') ->
     (A < B).
 
-remove_conditionals({conditional, A}) ->
-    remove_conditionals(A);
-remove_conditionals({A, B, C}) ->
-    {A, remove_conditionals(B), remove_conditionals(C)};
-remove_conditionals(A) ->
+remove_exprs({expr, A}) ->
+    remove_exprs(A);
+remove_exprs({A, B, C}) ->
+    {A, remove_exprs(B), remove_exprs(C)};
+remove_exprs(A) ->
     A.
 
 %% Functions are disabled so return an error.
@@ -484,11 +497,20 @@ make_funcall({identifier, FuncName}, Args) ->
     Fn = canonicalise_window_aggregate_fn(FuncName),
     case get_func_type(Fn) of
         window_aggregate_fn ->
-            Args2 = [#param_v1{name = X} || {identifier, X} <- Args],
-            {funcall, {Fn, Args2}};
+            {Fn2, Args2} = case {Fn, Args} of
+                               {'COUNT', [{maybeasterisk, _Asterisk}]} ->
+                                  {'ROWCOUNT', []};
+                        {_, [{maybeasterisk, _Asterisk}]} ->
+                            Msg1 = io_lib:format("Function '~s' does not support " ++
+                                                     "wild cards args.", [Fn]),
+                            return_error(0, iolist_to_binary(Msg1));
+                        _ ->
+                            {Fn, Args}
+                    end,
+            {funcall, {Fn2, Args2}};
         not_supported ->
-            Msg = io_lib:format("Function not supported - '~s'.", [FuncName]),
-            return_error(0, iolist_to_binary(Msg))
+            Msg2 = io_lib:format("Function not supported - '~s'.", [FuncName]),
+            return_error(0, iolist_to_binary(Msg2))
     end;
 make_funcall(_, _) ->
     % make dialyzer stop erroring on no local return.
@@ -514,6 +536,9 @@ canonicalise_window_aggregate_fn(Fn) when is_binary(Fn)->
          AtomFn -> AtomFn
 end.
 
+canonicalise_col({identifier, X}) -> {identifier, [X]};
+canonicalise_col(X)               -> X.
+
 character_literal_to_binary({character_literal, CharacterLiteralBytes})
   when is_binary(CharacterLiteralBytes) ->
     {binary, CharacterLiteralBytes}.
@@ -531,31 +556,20 @@ add_unit({Type, Value}, {identifier, Unit1}) ->
             {Type, Millis}
     end.
 
-%% log(Fn, Args) ->
-%%     io:format("calling ~p for ~p~n", [Fn, Args]),
-%%     exit(berk).
+handle_brackets(X) ->
+    {evaluate, X}.
 
-make_select_type({identifier,    A}) -> {plain_row_select,     [A]};
-make_select_type({funcall   ,    A}) -> {window_aggregate_sel, [A]};
-make_select_type({maybeasterisk, A}) -> {plain_row_select,     [A]}.
-
-%% there are three different execution paths:
-%% * window_aggregate_select
-%% * row_sel_with_arith
-%% * plain_row_select
-%% window_aggregate_select subsumes row_select_with_arith subsumes plain_row_select
-make_select({Type1, A}, {Type2, B}) when Type1 =:= window_aggregate_select orelse
-                                         Type2 =:= window_aggregate_select ->
-    {window_aggregate_select, A ++ B};
-make_select({Type1, A}, {Type2, B}) when Type1 =:= row_sel_with_arith orelse
-                                         Type2 =:= row_sel_with_arith ->
-    {row_sel_with_arith, A ++ B};
-make_select({Type, A}, {_, B}) ->
-    {Type, A ++ B}.
+concat_select(L1, L2) when is_list(L1) andalso
+                           is_list(L2) ->
+    L1 ++ L2;
+concat_select(L1, El2) when is_list(L1) ->
+    L1 ++ [El2];
+concat_select(El1, El2) ->
+    [El1, El2].
 
 make_list({list, A}, {_, B}) ->
     {list, A ++ [B]};
-make_list({_T1, A}, {_T2, B}) -> 
+make_list({_T1, A}, {_T2, B}) ->
     {list, [A, B]}.
 
 make_column({identifier, FieldName}, {DataType, _}) ->
@@ -724,8 +738,6 @@ assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
                      [binary_to_list(F) || F <- Fields])),
                  ", ")])
     end.
-
-
 
 %% Ensure that all fields in the primary key exist in the table definition.
 assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,

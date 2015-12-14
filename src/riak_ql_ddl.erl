@@ -51,7 +51,8 @@
         {incompatible_type, Field::binary(), simple_field_type(), atom()} |
         {incompatible_operator, Field::binary(), simple_field_type(), relational_op()}  |
         {unexpected_where_field, Field::binary()} |
-        {unexpected_select_field, Field::binary()}.
+        {unexpected_select_field, Field::binary()} |
+        {selections_cant_be_blank, []}.
 
 -export_type([query_syntax_error/0]).
 
@@ -204,17 +205,17 @@ is_query_valid(_, #ddl_v1{ table = T1 },
                #riak_sql_v1{ 'FROM' = T2 }) when T1 =/= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _,
-               #riak_sql_v1{'SELECT' = {plain_row_select, Selection},
+               #riak_sql_v1{'SELECT' = Selection,
                'WHERE'  = Where}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
 
 %%
-is_query_valid_result(true,       true)        -> true;
-is_query_valid_result(true,       {false, L})  -> {false, L};
-is_query_valid_result({false,L},  true)        -> {false, L};
-is_query_valid_result({false,L1}, {false, L2}) -> {false, L1++L2}.
+is_query_valid_result(true,        true)        -> true;
+is_query_valid_result(true,        {false, L})  -> {false, L};
+is_query_valid_result({false, L},  true)        -> {false, L};
+is_query_valid_result({false, L1}, {false, L2}) -> {false, L1 ++ L2}.
 
 check_filters_valid(Mod, Where) ->
     Errors = fold_where_tree(Where, [],
@@ -314,7 +315,7 @@ is_compatible_operator(_,_,_)                 -> true.
 are_selections_valid(_, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
 are_selections_valid(Mod, Selections, _) ->
-    CheckFn = fun(X, {Acc, Status}) ->
+    CheckFn = fun({identifier, X}, {Acc, Status}) ->
                       case Mod:is_field_valid(X) of
                           true  -> {Acc, Status};
                           false -> Msg = {unexpected_select_field, hd(X)},
@@ -692,13 +693,12 @@ make_functional_key_test() ->
     Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
     ?assertEqual(Expected, Got).
 
-
 %%
 %% Validate Query Tests
 %%
 
 partial_wildcard_are_selections_valid_test() ->
-    Selections  = [[<<"*">>]],
+    Selections  = [{identifier, [<<"*">>]}],
     DDL = make_ddl(<<"partial_wildcard_are_selections_valid_test">>,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -738,7 +738,7 @@ partial_are_selections_valid_fail_test() ->
 
 simple_is_query_valid_test() ->
     Bucket = <<"simple_is_query_valid_test">>,
-    Selections  = {plain_row_select, [[<<"temperature">>], [<<"geohash">>]]},
+    Selections  = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
                          'SELECT' = Selections},
     DDL = make_ddl(Bucket,
@@ -761,7 +761,8 @@ simple_is_query_valid_map_test() ->
     Name0 = <<"name">>,
     Name1 = <<"temp">>,
     Name2 = <<"geo">>,
-    Selections  = {plain_row_select, [[<<"temp">>, <<"geo">>], [<<"name">>]]},
+    Selections  = [{identifier, [<<"temp">>, <<"geo">>]}, 
+                                      {identifier, [<<"name">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
                          'SELECT' = Selections},
     Map = {map, [
@@ -789,7 +790,7 @@ simple_is_query_valid_map_wildcard_test() ->
     Name0 = <<"name">>,
     Name1 = <<"temp">>,
     Name2 = <<"geo">>,
-    Selections  = {plain_row_select, [[<<"temp">>, <<"*">>], [<<"name">>]]},
+    Selections  = [{identifier, [<<"temp">>, <<"*">>]}, {identifier, [<<"name">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
                          'SELECT' = Selections},
     Map = {map, [
@@ -817,7 +818,7 @@ simple_is_query_valid_map_wildcard_test() ->
 %%
 simple_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
-    Selections = {plain_row_select, [[<<"temperature">>], [<<"geohash">>]]},
+    Selections = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
     Where = [
              {and_,
               {'>', <<"temperature">>, {integer, 1}},
@@ -842,7 +843,7 @@ simple_filter_query_test() ->
 
 full_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
-    Selections = {plain_row_select, [[<<"temperature">>]]},
+    Selections = [{identifier, [<<"temperature">>]}],
     Where = [
              {and_,
               {'>', <<"temperature">>, {integer, 1}},
@@ -879,7 +880,7 @@ full_filter_query_test() ->
 
 timeseries_filter_test() ->
     Bucket = <<"timeseries_filter_test">>,
-    Selections = {plain_row_select, [[<<"weather">>]]},
+    Selections = [{identifier, [<<"weather">>]}],
     Where = [
              {and_,
               {and_,

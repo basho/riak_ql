@@ -60,18 +60,16 @@
          }).
 
 %% TODO these types will be improved over the duration of the time series project
--type selection()  :: [binary()].
+-type selection()  :: {identifier, [binary()]}.
 -type filter()     :: term().
 -type operator()   :: [binary()].
 -type sorter()     :: term().
 -type combinator() :: [binary()].
 -type limit()      :: any().
--type select_type() :: plain_row_select | row_sel_with_arith | window_select.
-
 
 -record(riak_sql_v1,
 	{
-	  'SELECT'      = []    :: {select_type(), [selection() | operator() | combinator()]},
+	  'SELECT'      = []    :: [selection() | operator() | combinator()],
 	  'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
 	  'WHERE'       = []    :: [filter()],
 	  'ORDER BY'    = []    :: [sorter()],
