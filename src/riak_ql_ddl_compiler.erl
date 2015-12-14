@@ -116,40 +116,39 @@ get_partition_key_fn(#ddl_v1{ fields = Fields,
 %%
 make_get_key_fn(Function_name, Fields, Key_params) ->
     Arity = 1,
-    Function_head = [get_key_fn_args(Fields, Key_params)],
-    Function_body = [{tuple, ?LINE_NO, get_key_fn_result(Key_params)}],
-    % io:format("FUNCTION BODY ~p~n", [Function_body]),
+    {Used_vars, Result_tuple_elems} = get_key_fn_result(Key_params),
+    Function_head = [{tuple, ?LINE_NO, get_key_fn_args(Fields, Used_vars)}],
+    Function_body = [{tuple, ?LINE_NO, Result_tuple_elems}],
     {function, ?LINE_NO, Function_name, Arity,
         [{clause, ?LINE_NO, Function_head, [], Function_body}]}.
 
 %%
-get_key_fn_args([], _) ->
-    {nil,?LINE_NO};
-get_key_fn_args([#riak_field_v1{ name = Name } | Tail], Key_params) ->
-    {cons, ?LINE_NO, 
-        {var, ?LINE_NO, get_key_fn_arg_name(Name, Key_params)}, 
-            get_key_fn_args(Tail, Key_params)}.
+get_key_fn_args(Fields, Used_vars) ->
+    [get_key_fn_arg_var(Field, Used_vars) || Field <- Fields].
 
 %%
-get_key_fn_arg_name(Name, Key_params) ->
-    case is_name_in_fields(Name, Key_params) of
-        false -> '_';
-        true  -> binary_to_atom(Name, utf8)
-    end.
+get_key_fn_arg_var(#riak_field_v1{ name = Name }, Key_params) ->
+    case lists:member(Name, Key_params) of
+        false -> Var = '_';
+        true  -> Var = binary_to_atom(Name, utf8)
+    end,
+    {var, ?LINE_NO, Var}.
 
 %%
 get_key_fn_result(Key_params) ->
-    lists:foldr(fun get_key_fn_result_var/2, [], Key_params).
+    lists:foldr(fun get_key_fn_result_var/2, {[], []}, Key_params).
 
-%%
-get_key_fn_result_var(E, Acc) ->
+%% Returns a tuple of parameters that have been used and the tuple elements.
+get_key_fn_result_var(E, {Args_acc, Result_acc} = Acc) ->
     case E of
         #param_v1{ name = [Name] } ->
-            [{var, ?LINE_NO, binary_to_atom(Name, utf8)} | Acc];
+            Var = {var, ?LINE_NO, binary_to_atom(Name, utf8)},
+            {[Name | Args_acc], [Var | Result_acc]};
         #hash_fn_v1{ mod = Mod, fn = Fn, args = Args } ->
-            Arg_ast = [expand_args2(X, ?LINE_NO) || X <- Args],
+            Arg_ast = [get_key_expand_args(X) || X <- Args],
+            Arg_names = [Arg_name || #param_v1{ name = [Arg_name] } <- Args],
             Function_call = make_remote_function_call(Mod, Fn, Arg_ast),
-            [Function_call | Acc];
+            {Args_acc ++ Arg_names, [Function_call | Result_acc]};
         _ ->
             Acc
     end.
@@ -160,14 +159,10 @@ make_remote_function_call(Module_name, Function_name, Arg_ast) ->
         {remote,?LINE_NO, {atom,?LINE_NO,Module_name},{atom,?LINE_NO,Function_name}}, Arg_ast}.
 
 %%
-is_name_in_fields(_, []) ->
-    false;
-is_name_in_fields(Name, [#param_v1{ name = [Name] } | _]) ->
-    true;
-is_name_in_fields(Name, [#hash_fn_v1{ args = [#param_v1{ name = [Name] } | _] } | _]) ->
-    true;
-is_name_in_fields(Name, [_ | Tail]) ->
-    is_name_in_fields(Name, Tail).
+get_key_expand_args(#param_v1{ name = [Name] }) ->
+    {var, ?LINE_NO, binary_to_atom(Name, utf8)};
+get_key_expand_args(Arg) ->
+    expand_args2(Arg, ?LINE_NO).
 
 %%
 %% this entry point is used in the test suite

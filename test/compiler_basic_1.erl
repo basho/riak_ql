@@ -187,7 +187,7 @@ helper_module_get_local_key_three_elems_1_test() ->
     {module, Mod} = riak_ql_ddl_compiler:mk_helper_m2(DDL, "/tmp"),
     ?assertEqual(
         {userid, counter, time},
-        Mod:get_local_key([counter, time, userid])
+        Mod:get_local_key({counter, time, userid})
     ).
 
 helper_module_get_local_key_three_elems_2_test() ->
@@ -201,7 +201,7 @@ helper_module_get_local_key_three_elems_2_test() ->
     {module, Mod} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
     ?assertEqual(
         {counter, userid, time},
-        Mod:get_local_key([counter, userid, time])
+        Mod:get_local_key({counter, userid, time})
     ).
 
 helper_module_get_local_key_five_elems_1_test() ->
@@ -217,7 +217,7 @@ helper_module_get_local_key_five_elems_1_test() ->
     {module, Mod} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
     ?assertEqual(
         {b, e, c},
-        Mod:get_local_key([a,b,c,d,e])
+        Mod:get_local_key({a,b,c,d,e})
     ).
 
 helper_module_get_partition_key_five_elems_1_test() ->
@@ -233,8 +233,5 @@ helper_module_get_partition_key_five_elems_1_test() ->
     {module, Mod} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
     ?assertEqual(
         {b, e, riak_ql_quanta:quantum(10, 1, m)},
-        Mod:get_partition_key([a,b,10,d,e])
+        Mod:get_partition_key({a,b,10,d,e})
     ).
-
-% TODO write test to assert that functions in the key get called
-
