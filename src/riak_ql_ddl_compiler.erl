@@ -755,7 +755,7 @@ make_export_attr(LineNo) ->
                                   {get_field_type,  1},
                                   {is_field_valid,  1},
                                   {extract,         2},
-				  {get_ddl,         0}
+                                  {get_ddl,         0}
                                  ]}, LineNo + 1}.
 
 -ifdef(TEST).

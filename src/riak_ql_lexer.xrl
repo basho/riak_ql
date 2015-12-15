@@ -90,23 +90,23 @@ Rules.
 {FLOATDEC} : {token, {float, TokenChars}}.
 {FLOATSCI} : {token, {float_sci, TokenChars}}.
 
-{EQ}          : {token, {eq,     list_to_binary(TokenChars)}}.
+{EQ}          : {token, {equals_operator,     list_to_binary(TokenChars)}}.
 {APPROXMATCH} : {token, {approx, list_to_binary(TokenChars)}}.
-{GT}          : {token, {gt,        list_to_binary(TokenChars)}}.
-{LT}          : {token, {lt,        list_to_binary(TokenChars)}}.
+{GT}          : {token, {greater_than_operator, list_to_binary(TokenChars)}}.
+{LT}          : {token, {less_than_operator,    list_to_binary(TokenChars)}}.
 {GTE}         : {token, {gte,       list_to_binary(TokenChars)}}.
 {LTE}         : {token, {lte,       list_to_binary(TokenChars)}}.
 {NE}          : {token, {ne,        list_to_binary(TokenChars)}}.
 {NOMATCH}     : {token, {nomatch,   list_to_binary(TokenChars)}}.
 {NOTAPPROX}   : {token, {notapprox, list_to_binary(TokenChars)}}.
 
-{OPEN}  :  {token, {openb,  list_to_binary(TokenChars)}}.
-{CLOSE} :  {token, {closeb, list_to_binary(TokenChars)}}.
+{OPEN}  :  {token, {left_paren,  list_to_binary(TokenChars)}}.
+{CLOSE} :  {token, {right_paren, list_to_binary(TokenChars)}}.
 
-{PLUS}  : {token, {plus,       list_to_binary(TokenChars)}}.
-{MINUS} : {token, {minus,      list_to_binary(TokenChars)}}.
-{TIMES} : {token, {maybetimes, list_to_binary(TokenChars)}}.
-{DIV}   : {token, {div_,       list_to_binary(TokenChars)}}.
+{PLUS}  : {token, {plus_sign,     list_to_binary(TokenChars)}}.
+{MINUS} : {token, {minus_sign,    list_to_binary(TokenChars)}}.
+{TIMES} : {token, {maybeasterisk, list_to_binary(TokenChars)}}.
+{DIV}   : {token, {solidus,       list_to_binary(TokenChars)}}.
 
 {CHARACTER_LITERAL} :
   {token, {character_literal, clean_up_literal(TokenChars)}}.
