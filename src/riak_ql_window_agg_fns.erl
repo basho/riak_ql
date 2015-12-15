@@ -29,8 +29,9 @@
          '+'/2,
          '-'/2,
          '/'/2,
-         '*'/2
-         ].
+         '*'/2,
+         'AVG'/3
+         ]).
 
 get_type_sig('+')   -> [
                         {sint64, sint64},
@@ -53,25 +54,28 @@ get_type_sig('AVG') -> [
                         {double, double}
                        ].
 
+'+'(A, B) -> A + B.
+
+'-'(A, B) -> A - B.
+
+'/'(A, B ) -> A / B.
+
+'*'(A, B) -> A * B.
+
 get_starting_acc('AVG') -> {0, 0}.
 
 finalise('AVG', {Total, No}) -> Total/No.
 
-'AVG'(RObjBins, Expr, Acc) when is_list(Robjs) ->
-    FoldFun = fun(X, {Total, No}) when is_binary(X)->
-                      case eval(Expr, X) of
-                          deleted -> {Total, No};
-                          V       -> {Total + V, No + 1}
+'AVG'(RObjs, Expr, Acc) when is_list(RObjs) ->
+    FoldFun = fun(Rec, {Total, No}) when is_list(Rec) ->
+                      V = eval(Expr, Rec),
+                      {Total + V, No + 1}
               end,
     lists:foldl(FoldFun, Acc, RObjs).
 
-eval({identifier, ColName}, RObjBin) ->
-    RObj = riak_object:from_binary(<<>>, <<>>, RObjBin),
-    case riak_object:get_value(Robj) of
-        <<>>    -> deleted;
-        FullRec -> {ColName, V} = lists:keyfind(ColName, 1, FullRec),
-                   V
-    end;
-eval(Expr, RObjBin) ->
+eval({identifier, ColName}, Rec) ->
+    {ColName, V} = lists:keyfind(ColName, 1, Rec),
+    V;
+eval(Expr, RObj) ->
     io:format("Expr is ~p~n RObj is ~p~n", [Expr, RObj]),
     12345.
