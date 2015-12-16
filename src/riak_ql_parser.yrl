@@ -37,6 +37,14 @@ KeyFieldArgList
 KeyFieldArg
 NotNull
 
+ValueExpression
+CommonValueExpression
+
+NumericValueExpression
+Term
+Factor
+NumericPrimary
+
 BooleanValueExpression
 BooleanTerm
 BooleanFactor
@@ -73,7 +81,7 @@ limit
 left_paren
 less_than_operator
 lte
-maybeasterisk
+asterisk
 minus_sign
 nomatch
 not_
@@ -109,7 +117,7 @@ Where -> where BooleanValueExpression : make_where('$1', '$2').
 
 ArithOp -> plus_sign     : '$1'.
 ArithOp -> minus_sign    : '$1'.
-ArithOp -> maybeasterisk : '$1'.
+ArithOp -> asterisk : '$1'.
 ArithOp -> solidus       : '$1'.
 
 Fields -> left_paren Fields  right_paren : handle_brackets('$2').
@@ -121,7 +129,7 @@ FieldElem -> Field : '$1'.
 FieldElem -> Val   : '$1'.
 
 Field -> Identifier    : canonicalise_col('$1').
-Field -> maybeasterisk : make_wildcard('$1').
+Field -> asterisk : make_wildcard('$1').
 Field -> Funcall       : '$1'.
 
 Buckets -> Buckets comma Bucket : make_list('$1', '$3').
@@ -142,7 +150,7 @@ FunArgN -> comma FunArg FunArgN : '$1'.
 
 Funcall -> Identifier left_paren                right_paren : make_funcall('$1', []).
 Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1', ['$3']).
-Funcall -> Identifier left_paren maybeasterisk  right_paren : make_funcall('$1', ['$3']).
+Funcall -> Identifier left_paren asterisk  right_paren : make_funcall('$1', ['$3']).
 Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3', '$4']).
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
@@ -173,6 +181,42 @@ Comp -> nomatch                : '$1'.
 CreateTable -> create table : create_table.
 
 NotNull -> not_ null : '$1'.
+
+%% 6.26 VALUE EXPRESSION
+
+ValueExpression -> CommonValueExpression : '$1'.
+ValueExpression -> BooleanValueExpression : '$1'.
+
+CommonValueExpression ->
+    NumericValueExpression : '$1'.
+% todo: 6.29 string value expression
+CommonValueExpression ->
+    character_literal : '$1'.
+
+%% 6.27 NUMERIC VALUE EXPRESSION
+
+NumericValueExpression -> Term : '$1'.
+NumericValueExpression ->
+    NumericValueExpression plus_sign Term :
+        make_expr('$1', '$2', '$3').
+NumericValueExpression ->
+    NumericValueExpression minus_sign Term :
+        make_expr('$1', '$2', '$3').
+
+Term -> Factor : '$1'.
+Term ->
+    Term asterisk Factor :
+        make_expr('$1', '$2', '$3').
+Term ->
+    Term solidus Factor :
+        make_expr('$1', '$2', '$3').
+
+Factor -> plus_sign NumericPrimary : '$2'.
+Factor -> minus_sign NumericPrimary : {negate, '$2'}.
+
+NumericPrimary -> Val : '$1'.
+NumericPrimary -> Identifier : '$1'.
+% NumericPrimary -> NumericValueFunction : '$1'.
 
 %% 6.35 BOOLEAN VALUE EXPRESSION
 
@@ -359,7 +403,7 @@ make_expr({TypeA, A}, {B, _}, {Type, C}) ->
              or_                    -> or_;
              plus_sign              -> '+';
              minus_sign             -> '-';
-             maybeasterisk          -> '*';
+             asterisk          -> '*';
              solidus                -> '/';
              greater_than_operator  -> '>';
              less_than_operator     -> '<';
@@ -377,7 +421,7 @@ make_expr({TypeA, A}, {B, _}, {Type, C}) ->
          end,
     {expr, {B1, {TypeA, A}, C2}}.
 
-make_wildcard({maybeasterisk, <<"*">>}) -> {identifier, [<<"*">>]}.
+make_wildcard({asterisk, <<"*">>}) -> {identifier, [<<"*">>]}.
 
 make_where({where, A}, {expr, B}) ->
     NewB = remove_exprs(B),
@@ -498,9 +542,9 @@ make_funcall({identifier, FuncName}, Args) ->
     case get_func_type(Fn) of
         window_aggregate_fn ->
             {Fn2, Args2} = case {Fn, Args} of
-                               {'COUNT', [{maybeasterisk, _Asterisk}]} ->
+                               {'COUNT', [{asterisk, _Asterisk}]} ->
                                   {'ROWCOUNT', []};
-                        {_, [{maybeasterisk, _Asterisk}]} ->
+                        {_, [{asterisk, _Asterisk}]} ->
                             Msg1 = io_lib:format("Function '~s' does not support " ++
                                                      "wild cards args.", [Fn]),
                             return_error(0, iolist_to_binary(Msg1));
