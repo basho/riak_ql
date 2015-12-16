@@ -133,7 +133,7 @@ simple_select_arith_test() ->
 
 simple_select_avg_1_test() ->
     Data = [?MATRIX1],
-    SQL = "select avg(mysint64), avg(mydouble), avg(mystimestamp) from blah",
+    SQL = "select avg(mysint64), avg(mydouble), avg(mytimestamp) from blah",
     Expected = [
                 [3.0, 3.0, 10000013.0]
                ],
@@ -150,19 +150,19 @@ select_count_with_wildcards_test() ->
 simple_select_all_fns_1_test() ->
     Data = [?MATRIX1],
     SQL = "select " ++
-        "avg(mysint64),   avg(mydouble),   avg(mystimestamp), " ++ 
-        "mean(mysint64),  mean(mydouble),  mean(mystimestamp), " ++ 
-        "count(mysint64), count(mydouble), count(mystimestamp), " ++ 
-        "max(mysint64),   max(mydouble),   max(mystimestamp), " ++ 
-        "min(mysint64),   min(mydouble),   min(mystimestamp), " ++ 
+        "avg(mysint64),   avg(mydouble),   avg(mytimestamp), " ++ 
+        "mean(mysint64),  mean(mydouble),  mean(mytimestamp), " ++ 
+        "count(mysint64), count(mydouble), count(mytimestamp), " ++ 
+        "max(mysint64),   max(mydouble),   max(mytimestamp), " ++ 
+        "min(mysint64),   min(mydouble),   min(mytimestamp), " ++ 
         "from blah",
     Expected = [
                 [
                  3.0, 3.0, 10000013.0, %% avg
                  3.0, 3.0, 10000013.0, %% mean
-                 5, 5, 5,              %% count
-                 5, 5.0, 10000015,     %% max
-                 1, 1.0, 10000015      %% min
+                 5,   5,   5,          %% count
+                 5,   5.0, 10000015,   %% max
+                 1,   1.0, 10000015    %% min
                 ]
                ],
     select(Data, SQL, Expected).
@@ -178,19 +178,19 @@ complex_select_avg_1_test() ->
 chunked_select_all_fns_1_test() ->
     Data = [?MATRIX1 ++ ?MATRIX2],
     SQL = "select " ++
-        "avg(mysint64),   avg(mydouble),   avg(mystimestamp), " ++ 
-        "mean(mysint64),  mean(mydouble),  mean(mystimestamp), " ++ 
-        "count(mysint64), count(mydouble), count(mystimestamp), " ++ 
-        "max(mysint64),   max(mydouble),   max(mystimestamp), " ++ 
-        "min(mysint64),   min(mydouble),   min(mystimestamp), " ++ 
+        "avg(mysint64),   avg(mydouble),   avg(mytimestamp), " ++ 
+        "mean(mysint64),  mean(mydouble),  mean(mytimestamp), " ++ 
+        "count(mysint64), count(mydouble), count(mytimestamp), " ++ 
+        "max(mysint64),   max(mydouble),   max(mytimestamp), " ++ 
+        "min(mysint64),   min(mydouble),   min(mytimestamp), " ++ 
         "from blah",
     Expected = [
                 [
                  5.0, 5.0, 10000015.0, %% avg
                  5.0, 5.0, 10000015.0, %% mean
-                 9, 9, 9,              %% count
-                 9, 9.0, 10000019,     %% max
-                 1, 1.0, 10000015      %% min
+                 9,   9,   9,          %% count
+                 9,   9.0, 10000019,   %% max
+                 1,   1.0, 10000015    %% min
                 ]
                ],
     select(Data, SQL, Expected).
