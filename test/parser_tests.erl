@@ -106,14 +106,14 @@ function_val_and_identifier_mix_3_test() ->
 
 function_call_error_message_test() ->
     ?assertMatch(
-        {error, {0, riak_ql_parser, <<"Functions not supported but 'myfun' called as function.">>}},
+        {error, {0, riak_ql_parser, <<"Function not supported - 'myfun'.">>}},
         riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a') = a"))
     ).
 
 function_as_arg_test() ->
     ?assertMatch(
         {error, {0, riak_ql_parser,
-            <<"Functions not supported but 'herfun' called as function.">>}},
+            <<"Function not supported - 'herfun'.">>}},
         riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun(hisfun(herfun(a))) = 'a'"))
     ).
 

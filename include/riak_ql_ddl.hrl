@@ -60,7 +60,7 @@
          }).
 
 %% TODO these types will be improved over the duration of the time series project
--type selection()  :: [binary()].
+-type selection()  :: {identifier, [binary()]}.
 -type filter()     :: term().
 -type operator()   :: [binary()].
 -type sorter()     :: term().

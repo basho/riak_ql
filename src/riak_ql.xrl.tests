@@ -158,21 +158,21 @@ negative_sci_floats_in_character_literals_test_() ->
 ops_test_() ->
     Got = riak_ql_lexer:get_tokens("> < <> != !~ = =~"),
     Expected = [
-                {gt,        <<">">>},
-                {lt,        <<"<">>},
-                {ne,        <<"<>">>},
-                {nomatch,   <<"!=">>},
-                {notapprox, <<"!~">>},
-                {eq,        <<"=">>},
-                {approx,    <<"=~">>}
+                {greater_than_operator, <<">">>},
+                {less_than_operator,    <<"<">>},
+                {ne,                    <<"<>">>},
+                {nomatch,               <<"!=">>},
+                {notapprox,             <<"!~">>},
+                {equals_operator,       <<"=">>},
+                {approx,                <<"=~">>}
                ],
     ?_assertEqual(Expected, Got).
 
 brackets_test_() ->
     Got = riak_ql_lexer:get_tokens(" ( )"),
     Expected = [
-                {openb,  <<"(">>},
-                {closeb, <<")">>}
+                {left_paren,  <<"(">>},
+                {right_paren, <<")">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -288,10 +288,10 @@ chars_test_() ->
 arithmatic_test_() ->
     Got = riak_ql_lexer:get_tokens(" + - * / "),
     Expected = [
-                {plus,       <<"+">>},
-                {minus,      <<"-">>},
-                {maybetimes, <<"*">>},
-                {div_,       <<"/">>}
+                {plus_sign,     <<"+">>},
+                {minus_sign,    <<"-">>},
+                {maybeasterisk, <<"*">>},
+                {solidus,       <<"/">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -304,7 +304,7 @@ general_test_() ->
                 {identifier, <<"r_t">>},
                 {where, <<"where">>},
                 {identifier, <<"time">>},
-                {gt, <<">">>},
+                {greater_than_operator, <<">">>},
                 {character_literal, <<"23 April 63 1:2:3">>}
                ],
     io:format("Expected is ~p~n", [Expected]),
@@ -323,7 +323,7 @@ timeseries_test_() ->
                 {create, <<"CREATE">>},
                 {table, <<"TABLE">>},
                 {identifier,<<"Geo">>},
-                {openb, <<"(">>},
+                {left_paren, <<"(">>},
                 {identifier,<<"geohash">>},
                 {varchar, <<"varchar">>},
                 {identifier,<<"not_null">>},
@@ -346,23 +346,23 @@ timeseries_test_() ->
                 {comma, <<",">>},
                 {primary, <<"PRIMARY">>},
                 {key, <<"KEY">>},
-                {openb, <<"(">>},
-                {openb, <<"(">>},
+                {left_paren, <<"(">>},
+                {left_paren, <<"(">>},
                 {identifier,<<"geohash">>},
                 {comma, <<",">>},
                 {quantum, <<"quantum">>},
-                {openb, <<"(">>},
+                {left_paren, <<"(">>},
                 {identifier,<<"time">>},
                 {comma, <<",">>},
                 {integer,15},
                 {comma, <<",">>},
                 {identifier,<<"m">>},
-                {closeb, <<")">>},
+                {right_paren, <<")">>},
                 {comma, <<",">>},
                 {identifier,<<"time">>},
                 {comma, <<",">>},
                 {identifier,<<"user">>},
-                {closeb, <<")">>}
+                {right_paren, <<")">>}
                ],
     ?_assertEqual(Expected, Got).
 
