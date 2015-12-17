@@ -290,7 +290,7 @@ arithmatic_test_() ->
     Expected = [
                 {plus_sign,     <<"+">>},
                 {minus_sign,    <<"-">>},
-                {maybeasterisk, <<"*">>},
+                {asterisk, <<"*">>},
                 {solidus,       <<"/">>}
                ],
     ?_assertEqual(Expected, Got).
