@@ -37,8 +37,8 @@ KeyFieldArgList
 KeyFieldArg
 NotNull
 
-ValueExpression
-CommonValueExpression
+%% ValueExpression
+%% CommonValueExpression
 
 NumericValueExpression
 Term
@@ -155,7 +155,7 @@ Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1',
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
-Vals -> Vals ArithOp Val : make_expr('$1', '$2', '$3').
+Vals -> NumericValueExpression : '$1'.
 Vals -> regex            : '$1'.
 Vals -> Val              : '$1'.
 Vals -> Funcall          : '$1'.
@@ -182,16 +182,16 @@ CreateTable -> create table : create_table.
 
 NotNull -> not_ null : '$1'.
 
-%% 6.26 VALUE EXPRESSION
+%% %% 6.26 VALUE EXPRESSION
 
-ValueExpression -> CommonValueExpression : '$1'.
-ValueExpression -> BooleanValueExpression : '$1'.
+%% ValueExpression -> CommonValueExpression : '$1'.
+%% ValueExpression -> BooleanValueExpression : '$1'.
 
-CommonValueExpression ->
-    NumericValueExpression : '$1'.
-% todo: 6.29 string value expression
-CommonValueExpression ->
-    character_literal : '$1'.
+%% CommonValueExpression ->
+%%     NumericValueExpression : '$1'.
+%% % todo: 6.29 string value expression
+%% CommonValueExpression ->
+%%     character_literal : '$1'.
 
 %% 6.27 NUMERIC VALUE EXPRESSION
 
