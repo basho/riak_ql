@@ -65,9 +65,9 @@ select_from_lists_sql_test() ->
 select_fields_from_lists_sql_test() ->
     ?sql_comp_assert("select hip, hop, dont, stop from events",
                      #riak_sql_v1{'SELECT' = [
-                                              {identifier, [<<"hip">>]}, 
-                                              {identifier, [<<"hop">>]}, 
-                                              {identifier, [<<"dont">>]}, 
+                                              {identifier, [<<"hip">>]},
+                                              {identifier, [<<"hop">>]},
+                                              {identifier, [<<"dont">>]},
                                               {identifier, [<<"stop">>]}
                                              ],
                                   'FROM'   = <<"events">>
@@ -404,8 +404,8 @@ select_field_to_field_forbidden_test() ->
 select_arithmetic_test() ->
     ?sql_comp_assert("select temperature + 1 from details",
                      #riak_sql_v1{'SELECT' = [
-                                              {'+', 
-                                               {identifier, [<<"temperature">>]}, 
+                                              {'+',
+                                               {identifier, [<<"temperature">>]},
                                                {integer, 1}
                                               }
                                              ],
@@ -420,7 +420,7 @@ select_arithmetic_test() ->
 window_aggregate_fn_1_test() ->
     ?sql_comp_assert("select avg(temp) from details",
                      #riak_sql_v1{'SELECT' = [
-                                              {funcall, {'AVG', 
+                                              {funcall, {'AVG',
                                                          [{identifier, <<"temp">>}]
                                                         }}
                                              ],
@@ -509,13 +509,26 @@ window_aggregate_fn_arithmetic_1_test() ->
                                   'WHERE'   = []
                                  }).
 
+arithmetic_precedence_test() ->
+    ?sql_comp_assert("select 1 * 2 + 3 / 4 - 5 * 6 from dual",
+                     #riak_sql_v1{'SELECT' = [{'-',
+                                               {'+',
+                                                {'/', {integer,3}, {integer,4}},
+                                                {'*', {integer,1}, {integer,2}}
+                                               },
+                                               {'*', {integer,5}, {integer,6}}
+                                               }],
+                                  'FROM' = <<"dual">>,
+                                  'WHERE' = []
+                                 }).
+
 window_aggregate_fn_arithmetic_2_test() ->
     ?sql_comp_assert("select aVg(temperature) + count(temperature) from details",
                      #riak_sql_v1{'SELECT' = [
                                               {'+',
                                                {funcall,{'AVG',[{identifier,
                                                                  <<"temperature">>}]}},
-                                               {funcall,{'COUNT',[{identifier, 
+                                               {funcall,{'COUNT',[{identifier,
                                                                    <<"temperature">>}]}}}
                                              ],
                                   'FROM'    = <<"details">>,
@@ -525,7 +538,7 @@ window_aggregate_fn_arithmetic_2_test() ->
 %% window_aggregate_fn_arithmetic_3_test() ->
 %%     ?sql_comp_assert("select aVg(temperature + 1) + count(temperature / distance) from details",
 %%                      #riak_sql_v1{'SELECT' = [
-%%                                               {funcall, {'AVG', 
+%%                                               {funcall, {'AVG',
 %%                                                          [{identifier, <<"temperature">>}]}}
 %%                                              ],
 %%                                   'FROM'    = <<"details">>,
@@ -540,7 +553,6 @@ window_aggregate_fn_not_supported_test() ->
 
 window_aggregate_fn_wildcard_fail_test() ->
     ?sql_comp_fail("select avg(*) from details").
-
 
 
 %%
