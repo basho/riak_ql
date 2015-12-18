@@ -5,6 +5,7 @@
         Exp2 = fix(Expected),
         Toks = riak_ql_lexer:get_tokens(String),
         Got = parse(Toks),
+%% io:format(standard_error, "~p~n~p~n", [Exp2, Got]),
         ?assertEqual({ok, Exp2}, Got)).
 
 -define(where_test(Uncanonical, Expected),
@@ -405,7 +406,7 @@ select_arithmetic_test() ->
     ?sql_comp_assert("select temperature + 1 from details",
                      #riak_sql_v1{'SELECT' = [
                                               {'+',
-                                               {identifier, [<<"temperature">>]},
+                                               {identifier, <<"temperature">>},
                                                {integer, 1}
                                               }
                                              ],
@@ -493,18 +494,20 @@ window_aggregate_fn_all_funs_test() ->
 
 window_aggregate_fn_arithmetic_1_test() ->
     ?sql_comp_assert("select aVg(temperature) + 1 - 2 * 3 / 4 from details",
-                     #riak_sql_v1{'SELECT' = [
-                                              {'/',
-                                               {'*',
-                                                {'-',
-                                                 {'+',
-                                                  {funcall,{'AVG',[{identifier,
-                                                                    <<"temperature">>}]}},
-                                                  {integer,1}},
-                                                 {integer,2}},
-                                                {integer,3}},
-                                               {integer,4}}
-                                             ],
+                     #riak_sql_v1{'SELECT' =
+                                      [
+                                       {'-',
+                                        {'+',
+                                         {funcall,
+                                          {'AVG',[
+                                                  {identifier,<<"temperature">>}
+                                                 ]}},
+                                         {integer,1}},
+                                        {'/',
+                                         {'*',
+                                          {integer,2},{integer,3}},
+                                         {integer,4}}}
+                                      ],
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
                                  }).
