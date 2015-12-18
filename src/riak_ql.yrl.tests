@@ -513,8 +513,8 @@ arithmetic_precedence_test() ->
     ?sql_comp_assert("select 1 * 2 + 3 / 4 - 5 * 6 from dual",
                      #riak_sql_v1{'SELECT' = [{'-',
                                                {'+',
-                                                {'/', {integer,3}, {integer,4}},
-                                                {'*', {integer,1}, {integer,2}}
+                                                {'*', {integer,1}, {integer,2}},
+                                                {'/', {integer,3}, {integer,4}}
                                                },
                                                {'*', {integer,5}, {integer,6}}
                                                }],

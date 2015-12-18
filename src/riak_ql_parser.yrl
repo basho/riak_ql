@@ -134,9 +134,9 @@ Identifier -> identifier : '$1'.
 
 CharacterLiteral -> character_literal : character_literal_to_binary('$1').
 
-FunArg -> Identifier : '$1'.
+FunArg -> NumericValueExpression : '$1'.
 FunArg -> Val        : '$1'.
-FunArg -> Funcall    : '$1'.
+%% FunArg -> Funcall    : '$1'.
 
 FunArgN -> comma FunArg         : '$1'.
 FunArgN -> comma FunArg FunArgN : '$1'.
