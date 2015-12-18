@@ -315,17 +315,27 @@ is_compatible_operator(_,_,_)                 -> true.
 are_selections_valid(_, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
 are_selections_valid(Mod, Selections, _) ->
-    CheckFn = fun({identifier, X}, {Acc, Status}) ->
-                      case Mod:is_field_valid(X) of
-                          true  -> {Acc, Status};
-                          false -> Msg = {unexpected_select_field, hd(X)},
-                                   {[Msg | Acc], false}
-                      end
-              end,
+    CheckFn =
+        fun(E, Acc) ->
+            is_selection_column_valid(Mod, E, Acc)
+        end,
     case lists:foldl(CheckFn, {[], true}, Selections) of
         {[],   true}  -> true;
         {Msgs, false} -> {false, lists:reverse(Msgs)}
     end.
+
+%%
+is_selection_column_valid(Mod, {identifier, X}, {Acc, Status}) ->
+    case Mod:is_field_valid(X) of
+        true  ->
+            {Acc, Status};
+        false -> 
+            Msg = {unexpected_select_field, hd(X)},
+            {[Msg | Acc], false}
+    end;
+is_selection_column_valid(_, _, Acc) ->
+    % if the field is not an identifier, it should already be validated
+    Acc.
 
 %% Fold over the syntax tree for a where clause.
 fold_where_tree([], Acc, _) ->

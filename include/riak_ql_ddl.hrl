@@ -67,6 +67,10 @@
 -type combinator() :: [binary()].
 -type limit()      :: any().
 
+% the result type of a query, rows means to return all mataching rows, aggregate
+% returns one row calculated from the result set for the query.
+-type query_result_type() :: rows | aggregate.
+
 -record(riak_sql_v1,
 	{
 	  'SELECT'      = []    :: [selection() | operator() | combinator()],
@@ -75,7 +79,10 @@
 	  'ORDER BY'    = []    :: [sorter()],
 	  'LIMIT'       = []    :: [limit()],
 	  helper_mod            :: atom(),
+	  % will include groups when we get that far
+	  result_type    = rows  :: query_result_type(),
 	  partition_key = none  :: none | #key_v1{},
+	  % indicates whether this query has already been compiled to a sub query
 	  is_executable = false :: boolean(),
 	  type          = sql   :: sql | timeseries,
 	  local_key                                  % prolly a mistake to put this here - should be in DDL

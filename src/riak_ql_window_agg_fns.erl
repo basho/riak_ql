@@ -22,72 +22,41 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_window_agg_fns).
 
--export([
-         get_type_sig/1,
-         get_starting_state/2,
-         finalise/2,
-         'COUNT'/2, 'SUM'/2, 'AVG'/2, 'MIN'/2, 'MAX'/2, 'STDEV'/2, 'MODE'/2, 'MEDIAN'/2
-        ]).
+
+-export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MIN'/2, 'MAX'/2, 'STDEV'/2, 'MODE'/2, 'MEDIAN'/2]).
+-export([finalise/2]).
+-export([start_state/1]).
+-export([get_type_sig/1]).
+        
 
 -type group_function() :: 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX' | 'STDEV' |
-                          %% and a few more involving more than a simple traversal
                           'MODE' | 'MEDIAN'.
 
 -include("riak_ql_ddl.hrl").
 -include_lib("riak_pb/include/riak_pb_kv_codec.hrl").  %% for UINT_MAX etc
 
 %% functions used in expression type validation
-%% get_type_sig('+')   -> [
-%%                         {sint64, sint64},
-%%                         {double, double}
-%%                        ];
-%% get_type_sig('-')   -> [
-%%                         {sint64, sint64},
-%%                         {double, double}
-%%                        ];
-%% get_type_sig('/')   -> [
-%%                         {sint64, sint64},
-%%                         {double, double}
-%%                        ];
-%% get_type_sig('*')   -> [
-%%                         {sint64, sint64},
-%%                         {double, double}
-%%                        ];
-get_type_sig('COUNT' ) -> [{sint64, sint64}, {double, sint64}];
-get_type_sig('SUM'   ) -> [{sint64, sint64}, {double, double}];
-get_type_sig('MIN'   ) -> [{sint64, sint64}, {double, double}];
-get_type_sig('MAX'   ) -> [{sint64, sint64}, {double, double}];
-get_type_sig('MODE'  ) -> [{sint64, sint64}, {double, double}];
+get_type_sig('AVG')    -> [{sint64, double}, {double, double}];  %% double promotion
+get_type_sig('COUNT')  -> [{sint64, sint64}, {double, sint64}];
+get_type_sig('MAX')    -> [{sint64, sint64}, {double, double}];
 get_type_sig('MEDIAN') -> [{sint64, sint64}, {double, double}];
-get_type_sig('AVG'   ) -> [{sint64, double}, {double, double}];  %% double promotion
-get_type_sig('STDEV' ) -> [{sint64, double}, {double, double}].  %% ditto
+get_type_sig('MIN')    -> [{sint64, sint64}, {double, double}];
+get_type_sig('MODE')   -> [{sint64, sint64}, {double, double}];
+get_type_sig('STDEV')  -> [{sint64, double}, {double, double}];  %% ditto
+get_type_sig('SUM')    -> [{sint64, sint64}, {double, double}].
 
-%% '+'(A, B) -> A + B.
-%% '-'(A, B) -> A - B.
-%% '/'(A, B ) -> A / B.
-%% '*'(A, B) -> A * B.
 
--spec get_starting_state(field_type(), group_function()) ->
-                                tuple() | number().
-get_starting_state(_, 'COUNT') ->
-    0;
-get_starting_state(Type, Fun)
-  when Fun == 'SUM';
-       Fun == 'AVG';
-       Fun == 'MODE';
-       Fun == 'MEDIAN' ->
-    zero_of_type_with_counter(Type);
-get_starting_state(_Type, Fun)
-  when Fun == 'AVG' ->
-    zero_of_type_with_counter(double);
-get_starting_state(_, Fun)
-  when Fun == 'MIN';
-       Fun == 'MAX' ->
-    not_a_value;
-get_starting_state(_, 'STDEV') ->
-    {0, 0.0, 0.0}.
-zero_of_type_with_counter(sint64) -> {0, 0};
-zero_of_type_with_counter(double) -> {0, 0.0}.
+-spec start_state(group_function()) ->
+    any().
+start_state('AVG') -> 0;
+start_state('COUNT') -> 0;
+start_state('MAX') -> not_a_value;
+start_state('MEDIAN') -> 0;
+start_state('MIN') -> not_a_value;
+start_state('MODE') -> 0;
+start_state('STDEV') -> {0, 0.0, 0.0};
+start_state('SUM') -> 0;
+start_state(_) -> stateless.
 
 
 %% Group functions (avg, mean etc). These can only appear as top-level
@@ -98,7 +67,7 @@ zero_of_type_with_counter(double) -> {0, 0.0}.
 %% Incrementally operates on chunks, needs to carry state.
 
 
-'COUNT'(_Arg, _State = N) ->
+'COUNT'(_, N) when is_integer(N) ->
     N + 1.
 
 'SUM'  (Arg, _State = Total) ->
@@ -125,7 +94,7 @@ zero_of_type_with_counter(double) -> {0, 0.0}.
             Max
     end.
 
-'MODE'  (_Arg, _State) ->
+'MODE' (_Arg, _State) ->
     %% stub
     _State.
 
