@@ -124,7 +124,6 @@ FieldElem -> Val   : '$1'.
 Field -> NumericValueExpression : '$1'.
 %Field -> Identifier    : canonicalise_col('$1').
 Field -> asterisk : make_wildcard('$1').
-Field -> Funcall       : '$1'.
 
 Buckets -> Buckets comma Bucket : make_list('$1', '$3').
 Buckets -> Bucket               : '$1'.
@@ -152,7 +151,6 @@ Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 Vals -> NumericValueExpression : '$1'.
 Vals -> regex            : '$1'.
 Vals -> Val              : '$1'.
-Vals -> Funcall          : '$1'.
 
 Val -> varchar            : '$1'.
 Val -> CharacterLiteral   : '$1'.
@@ -209,6 +207,7 @@ NumericPrimary -> integer identifier : add_unit('$1', '$2').
 NumericPrimary -> integer : '$1'.
 NumericPrimary -> float : '$1'.
 NumericPrimary -> Identifier : '$1'.
+NumericPrimary -> Funcall : '$1'.
 % NumericPrimary -> NumericValueFunction : '$1'.
 
 %% 6.35 BOOLEAN VALUE EXPRESSION
