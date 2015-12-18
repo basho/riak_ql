@@ -367,11 +367,17 @@ make_select({select, _SelectBytes},
                                 false -> [Select]
                             end,
     S3 = [remove_exprs(X) || X <- S2],
+    S4 = [wrap_identifier(X) || X <- S3],
     _O = #outputs{type    = select,
-                  fields  = S3,
+                  fields  = S4,
                   buckets = Bucket,
                   where   = E
                  }.
+
+wrap_identifier({identifier, IdentifierName})
+  when is_binary(IdentifierName) ->
+    {identifier, [IdentifierName]};
+wrap_identifier(Default) -> Default.
 
 add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
