@@ -42,15 +42,15 @@
          }).
 
 -record(hash_fn_v1, {
-	  mod       :: atom(),
-	  fn        :: atom(),
-	  args = [] :: [#param_v1{} | any()],
-	  type      :: field_type()
+          mod       :: atom(),
+          fn        :: atom(),
+          args = [] :: [#param_v1{} | any()],
+          type      :: field_type()
 	 }).
 
 -record(key_v1, {
-	  ast = [] :: [#hash_fn_v1{} | #param_v1{}]
-	 }).
+          ast = [] :: [#hash_fn_v1{} | #param_v1{}]
+         }).
 
 -record(ddl_v1, {
           table              :: binary(),
@@ -68,17 +68,18 @@
 -type limit()      :: any().
 
 -record(riak_sql_v1,
-	{
-	  'SELECT'      = []    :: [selection() | operator() | combinator()],
-	  'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
-	  'WHERE'       = []    :: [filter()],
-	  'ORDER BY'    = []    :: [sorter()],
-	  'LIMIT'       = []    :: [limit()],
-	  helper_mod            :: atom(),
-	  partition_key = none  :: none | #key_v1{},
-	  is_executable = false :: boolean(),
-	  type          = sql   :: sql | timeseries,
-	  local_key                                  % prolly a mistake to put this here - should be in DDL
-	}).
+        {
+          'SELECT'      = []    :: [selection() | operator() | combinator()],
+          'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
+          'WHERE'       = []    :: [filter()],
+          'ORDER BY'    = []    :: [sorter()],
+          'LIMIT'       = []    :: [limit()],
+          helper_mod            :: atom(),
+          partition_key = none  :: none | #key_v1{},
+          is_executable = false :: boolean(),
+          type          = sql   :: sql | timeseries,
+          cover_context = undefined :: term(), %% for parallel queries
+          local_key                                  % prolly a mistake to put this here - should be in DDL
+        }).
 
 -endif.
