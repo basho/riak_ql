@@ -33,7 +33,6 @@
                           'MODE' | 'MEDIAN'.
 
 -include("riak_ql_ddl.hrl").
--include_lib("riak_pb/include/riak_pb_kv_codec.hrl").  %% for UINT_MAX etc
 
 %% functions used in expression type validation
 get_type_sig('AVG')    -> [{sint64, double}, {double, double}];  %% double promotion
