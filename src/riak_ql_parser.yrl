@@ -714,6 +714,7 @@ validate_ddl(DDL) ->
     ok = assert_primary_and_local_keys_match(DDL),
     ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
+    ok = assert_field_order_matches_key_order(DDL),
     DDL.
 
 %% @doc Ensure DDL can haz keys
@@ -793,6 +794,18 @@ assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,
         _ ->
             return_error_flat("Primary key fields do not exist (~s).",
                               [string:join(MissingFields, ", ")])
+    end.
+
+%% Ensure the keys appearing in the key follow the order in which they are defined
+assert_field_order_matches_key_order(#ddl_v1{fields = Fields,
+                                             local_key = #key_v1{ast = LK}}) ->
+    KeyFieldsInOrder = [N || #param_v1{name = [N]} <- LK],
+    OnlyKeyFields = [F || #riak_field_v1{name = F} <- Fields, lists:member(F, KeyFieldsInOrder)],
+    case KeyFieldsInOrder == OnlyKeyFields of
+        true ->
+            ok;
+        false ->
+            return_error_flat("Keys must have fields in the order they appear in the table definition")
     end.
 
 %% Check that the field name exists in the list of fields.
