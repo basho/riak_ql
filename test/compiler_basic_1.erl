@@ -120,36 +120,36 @@
 
 -define(GOOD_DDL,
         "create table temperatures ("
-        " time timestamp not null,"
         " user_id varchar not null,"
         " user_di varchar not null,"
+        " time timestamp not null,"
         " primary key ((user_id, user_di, quantum(time, 1, 'm')), user_id, user_di, time))").
 -define(GOOD_DDL_INT,
         "create table temperatures ("
+        " user_id varchar not null,"
         " counter sint64 not null, "
         " time timestamp not null,"
-        " user_id varchar not null,"
         " primary key ((user_id, counter, quantum(time, 1, 'm')), user_id, counter, time))").
 -define(GOOD_DDL_DOUBLE,
         "create table temperatures ("
+        " user_id varchar not null,"
         " bouble double not null, "
         " time timestamp not null,"
-        " user_id varchar not null,"
         " primary key ((user_id, bouble, quantum(time, 1, 'm')), user_id, bouble, time))").
 
 ?passing_test(round_trip_test,
               ?GOOD_DDL,
-              {12345, <<"beeees">>, <<"boooos">>},
+              {<<"beeees">>, <<"boooos">>, 12345},
               [{varchar, <<"beeees">>}, {varchar, <<"boooos">>}, {timestamp, 0}],
               [{varchar, <<"beeees">>}, {varchar, <<"boooos">>}, {timestamp, 12345}]).
 
 ?passing_short_test(sint64_type_test,
                     ?GOOD_DDL_INT,
-                    {12345, 222222222, <<"boooos">>}).
+                    { <<"boooos">>, 12345, 222222222}).
 
 ?passing_short_test(double_type_test,
                     ?GOOD_DDL_DOUBLE,
-                    {12345.6, 222222222, <<"boooos">>}).
+                    { <<"boooos">>, 12345.6, 222222222}).
 
 ?failing_test(round_trip_fail_test,
               ?GOOD_DDL,

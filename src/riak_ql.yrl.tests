@@ -790,8 +790,8 @@ create_timeseries_sql_test() ->
 create_all_types_sql_test() ->
     String =
         "CREATE TABLE GeoCheckin ("
-        " geohash varchar not null,"
         " user varchar not null,"
+        " geohash varchar not null,"
         " time timestamp not null,"
         " isweather boolean not null,"
         " temp double not null,"
@@ -812,12 +812,12 @@ create_all_types_sql_test() ->
                   table = <<"GeoCheckin">>,
                   fields = [
                             #riak_field_v1{
-                               name = <<"geohash">>,
+                               name = <<"user">>,
                                position = 1,
                                type = varchar,
                                optional = false},
                             #riak_field_v1{
-                               name = <<"user">>,
+                               name = <<"geohash">>,
                                position = 2,
                                type = varchar,
                                optional = false},
