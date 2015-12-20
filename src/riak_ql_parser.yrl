@@ -143,7 +143,7 @@ FunArgN -> comma FunArg FunArgN : '$1'.
 
 Funcall -> Identifier left_paren                right_paren : make_funcall('$1', []).
 Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1', ['$3']).
-Funcall -> Identifier left_paren asterisk  right_paren : make_funcall('$1', ['$3']).
+Funcall -> Identifier left_paren asterisk       right_paren : make_funcall('$1', ['$3']).
 Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3', '$4']).
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
@@ -401,7 +401,7 @@ make_expr({TypeA, A}, {B, _}, {Type, C}) ->
              or_                    -> or_;
              plus_sign              -> '+';
              minus_sign             -> '-';
-             asterisk          -> '*';
+             asterisk               -> '*';
              solidus                -> '/';
              greater_than_operator  -> '>';
              less_than_operator     -> '<';
