@@ -53,10 +53,10 @@ NOTAPPROX   = (!\~)
 OPEN        = \(
 CLOSE       =\)
 
-PLUS  = (\+)
-MINUS = (\-)
-TIMES = (\*)
-DIV   = (/)
+PLUS     = (\+)
+MINUS    = (\-)
+ASTERISK = (\*)
+SOLIDUS  = (/)
 
 COMMA = (,)
 
@@ -103,10 +103,10 @@ Rules.
 {OPEN}  :  {token, {left_paren,  list_to_binary(TokenChars)}}.
 {CLOSE} :  {token, {right_paren, list_to_binary(TokenChars)}}.
 
-{PLUS}  : {token, {plus_sign,     list_to_binary(TokenChars)}}.
-{MINUS} : {token, {minus_sign,    list_to_binary(TokenChars)}}.
-{TIMES} : {token, {maybeasterisk, list_to_binary(TokenChars)}}.
-{DIV}   : {token, {solidus,       list_to_binary(TokenChars)}}.
+{PLUS}     : {token, {plus_sign,  list_to_binary(TokenChars)}}.
+{MINUS}    : {token, {minus_sign, list_to_binary(TokenChars)}}.
+{ASTERISK} : {token, {asterisk,   list_to_binary(TokenChars)}}.
+{SOLIDUS}  : {token, {solidus,    list_to_binary(TokenChars)}}.
 
 {CHARACTER_LITERAL} :
   {token, {character_literal, clean_up_literal(TokenChars)}}.
