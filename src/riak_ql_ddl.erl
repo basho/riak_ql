@@ -761,7 +761,7 @@ simple_is_query_valid_map_test() ->
     Name0 = <<"name">>,
     Name1 = <<"temp">>,
     Name2 = <<"geo">>,
-    Selections  = [{identifier, [<<"temp">>, <<"geo">>]}, 
+    Selections  = [{identifier, [<<"temp">>, <<"geo">>]},
                                       {identifier, [<<"name">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
                          'SELECT' = Selections},
