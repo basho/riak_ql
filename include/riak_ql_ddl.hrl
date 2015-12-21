@@ -81,4 +81,9 @@
 	  local_key                                  % prolly a mistake to put this here - should be in DDL
 	}).
 
+-record(riak_sql_describe_v1,
+        {
+          'DESCRIBE' = <<>>  :: binary()
+        }).
+
 -endif.

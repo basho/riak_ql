@@ -8,6 +8,7 @@ Nonterminals
 Statement
 Query
 Select
+Describe
 Bucket
 Buckets
 Field
@@ -66,6 +67,7 @@ boolean
 character_literal
 comma
 create
+describe
 double
 equals_operator
 false
@@ -108,9 +110,12 @@ Statement -> TableDefinition : fix_up_keys('$1').
 
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
+Query -> Describe             : '$1'.
 
 Select -> select Fields from Buckets Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4').
+
+Describe -> describe Bucket : make_describe('$2').
 
 Where -> where BooleanValueExpression : make_where('$1', '$2').
 
@@ -297,7 +302,7 @@ Erlang code.
 
 -record(outputs,
         {
-          type :: select | create,
+          type :: select | create | describe,
           buckets = [],
           fields  = [],
           limit   = [],
@@ -344,6 +349,10 @@ convert(#outputs{type    = select,
                              helper_mod = riak_ql_ddl:make_module_name(B)}
         end,
     Q;
+convert(#outputs{type = describe,
+                 buckets = [B]
+                }) ->
+    #riak_sql_describe_v1{'DESCRIBE' = B};
 convert(#outputs{type = create} = O) ->
     O.
 
@@ -378,6 +387,10 @@ wrap_identifier({identifier, IdentifierName})
   when is_binary(IdentifierName) ->
     {identifier, [IdentifierName]};
 wrap_identifier(Default) -> Default.
+
+make_describe({identifier, D}) ->
+    #outputs{type = describe,
+             buckets = [D]}.
 
 add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
