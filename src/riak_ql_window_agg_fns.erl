@@ -59,6 +59,8 @@ finalise('AVG', {N, Acc}) ->
 finalise('STDEV', {N, SumOfSquares, Mean}) ->
     %% TODO: rework using special formulae to prevent overflows
     math:sqrt(SumOfSquares / (N - Mean * Mean));
+finalise(_, not_a_value) ->
+    0;
 finalise(_, Acc) ->
     Acc.
 
