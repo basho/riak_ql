@@ -88,11 +88,11 @@ finalise(_, Acc) ->
 'MAX'(Arg, Acc) when Arg > Acc -> Arg;
 'MAX'(Arg, _)                  -> Arg.
 
-'STDEV'(Arg, _State = {N_, A_, Q_}) ->
+'STDEV'(Arg, _State = {N_old, A_old, Q_old}) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
-    N = N_ + 1,
-    A = A_ + (Arg - A_) / N,
-    Q = Q_ + (Arg - A_) * (Arg - A),
+    N = N_old + 1,
+    A = A_old + (Arg - A_old) / N,
+    Q = Q_old + (Arg - A_old) * (Arg - A),
     {N, A, Q}.
 
 
@@ -104,7 +104,12 @@ stdev_test() ->
     Data = [1.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 4.0, 4.0, 3.0, 2.0, 3.0, 2.0, 1.0, 1.0],
     %% numpy.std(Data) computes it to:
     Expected = 1.0832051206181281,
-    State9 = lists:foldl(fun(X, State) -> 'STDEV'(X, State) end, State0, Data),
+    %% There is a possibility of Erlang computing it differently, on
+    %% fairy 16-bit architectures or some such. If this happens, we
+    %% need to run python on that arch to figure out what Expected
+    %% value can be then.  Or, introduce an epsilon and check that the
+    %% delta is small enough.
+    State9 = lists:foldl(fun 'STDEV'/2, State0, Data),
     Got = finalise('STDEV', State9),
     ?assertEqual(Expected, Got).
 
