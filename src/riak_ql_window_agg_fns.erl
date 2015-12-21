@@ -27,7 +27,7 @@
 -export([finalise/2]).
 -export([start_state/1]).
 -export([get_type_sig/1]).
-        
+
 
 -type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX' | 'STDEV'.
 
@@ -56,9 +56,8 @@ start_state(_) -> stateless.
 -spec finalise(aggregate_function(), any()) -> any().
 finalise('AVG', {N, Acc}) ->
     Acc / N;
-finalise('STDEV', {N, SumOfSquares, Mean}) ->
-    %% TODO: rework using special formulae to prevent overflows
-    math:sqrt(SumOfSquares / (N - Mean * Mean));
+finalise('STDEV', {N, _A, Q}) ->
+    math:sqrt(Q / N);
 finalise(_, not_a_value) ->
     0;
 finalise(_, Acc) ->
@@ -89,5 +88,24 @@ finalise(_, Acc) ->
 'MAX'(Arg, Acc) when Arg > Acc -> Arg;
 'MAX'(Arg, _)                  -> Arg.
 
-'STDEV'(Arg, _State = {N, SumOfSquares, Mean}) ->
-    {N + 1, SumOfSquares + Arg * Arg, Mean + (Mean - Arg) / (N+1)}.
+'STDEV'(Arg, _State = {N_, A_, Q_}) ->
+    %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
+    N = N_ + 1,
+    A = A_ + (Arg - A_) / N,
+    Q = Q_ + (Arg - A_) * (Arg - A),
+    {N, A, Q}.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+stdev_test() ->
+    State0 = start_state('STDEV'),
+    Data = [1.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 4.0, 4.0, 3.0, 2.0, 3.0, 2.0, 1.0, 1.0],
+    %% numpy.std(Data) computes it to:
+    Expected = 1.0832051206181281,
+    State9 = lists:foldl(fun(X, State) -> 'STDEV'(X, State) end, State0, Data),
+    Got = finalise('STDEV', State9),
+    ?assertEqual(Expected, Got).
+
+-endif.
