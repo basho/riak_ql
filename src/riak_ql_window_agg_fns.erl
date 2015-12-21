@@ -23,14 +23,13 @@
 -module(riak_ql_window_agg_fns).
 
 
--export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MIN'/2, 'MAX'/2, 'STDEV'/2, 'MODE'/2, 'MEDIAN'/2]).
+-export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MIN'/2, 'MAX'/2, 'STDEV'/2]).
 -export([finalise/2]).
 -export([start_state/1]).
 -export([get_type_sig/1]).
         
 
--type group_function() :: 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX' | 'STDEV' |
-                          'MODE' | 'MEDIAN'.
+-type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX' | 'STDEV'.
 
 -include("riak_ql_ddl.hrl").
 
@@ -38,25 +37,30 @@
 get_type_sig('AVG')    -> [{sint64, double}, {double, double}];  %% double promotion
 get_type_sig('COUNT')  -> [{sint64, sint64}, {double, sint64}];
 get_type_sig('MAX')    -> [{sint64, sint64}, {double, double}];
-get_type_sig('MEDIAN') -> [{sint64, sint64}, {double, double}];
 get_type_sig('MIN')    -> [{sint64, sint64}, {double, double}];
-get_type_sig('MODE')   -> [{sint64, sint64}, {double, double}];
 get_type_sig('STDEV')  -> [{sint64, double}, {double, double}];  %% ditto
 get_type_sig('SUM')    -> [{sint64, sint64}, {double, double}].
 
-
--spec start_state(group_function()) ->
+%% Get the initial accumulator state for the aggregation.
+-spec start_state(aggregate_function()) ->
     any().
 start_state('AVG') -> 0;
 start_state('COUNT') -> 0;
 start_state('MAX') -> not_a_value;
-start_state('MEDIAN') -> 0;
 start_state('MIN') -> not_a_value;
-start_state('MODE') -> 0;
 start_state('STDEV') -> {0, 0.0, 0.0};
 start_state('SUM') -> 0;
 start_state(_) -> stateless.
 
+%% Calculate the final results using the accumulated result.
+-spec finalise(aggregate_function(), any()) -> any().
+finalise('AVG', {N, Acc}) ->
+    Acc / N;
+finalise('STDEV', {N, SumOfSquares, Mean}) ->
+    %% TODO: rework using special formulae to prevent overflows
+    math:sqrt(SumOfSquares / (N - Mean * Mean));
+finalise(_, Acc) ->
+    Acc.
 
 %% Group functions (avg, mean etc). These can only appear as top-level
 %% expressions in SELECT part, and there can be only one in a query.
@@ -69,13 +73,13 @@ start_state(_) -> stateless.
 'COUNT'(_, N) when is_integer(N) ->
     N + 1.
 
-'SUM'  (Arg, _State = Total) ->
+'SUM'(Arg, _State = Total) ->
     Arg + Total.
 
-'AVG'  (Arg, _State = {N, Acc}) ->
+'AVG'(Arg, _State = {N, Acc}) ->
     {N + 1, Acc + Arg}.
 
-'MIN'  (Arg, _State = Min) ->
+'MIN'(Arg, _State = Min) ->
     if Min == not_a_value ->
             Min;
        Arg < Min ->
@@ -84,7 +88,7 @@ start_state(_) -> stateless.
             Min
     end.
 
-'MAX'  (Arg, _State = Max) ->
+'MAX'(Arg, _State = Max) ->
     if Max == not_a_value ->
             Max;
        Arg > Max ->
@@ -93,32 +97,5 @@ start_state(_) -> stateless.
             Max
     end.
 
-'MODE' (_Arg, _State) ->
-    %% stub
-    _State.
-
-'MEDIAN'(_Arg, _State) ->
-    %% stub
-    _State.
-
 'STDEV'(Arg, _State = {N, SumOfSquares, Mean}) ->
     {N + 1, SumOfSquares + Arg * Arg, Mean + (Mean - Arg) / (N+1)}.
-
-
-finalise('COUNT', N) ->
-    N;
-finalise('SUM', Sum) ->
-    Sum;
-finalise('AVG', {N, Acc}) ->
-    Acc / N;
-finalise('MIN', Acc) ->
-    Acc;
-finalise('MAX', Acc) ->
-    Acc;
-finalise('MODE', Acc) ->
-    Acc;
-finalise('MEDIAN', Acc) ->
-    Acc;
-finalise('STDEV', {N, SumOfSquares, Mean}) ->
-    %% TODO: rework using special formulae to prevent overflows
-    math:sqrt(SumOfSquares / (N - Mean * Mean)).
