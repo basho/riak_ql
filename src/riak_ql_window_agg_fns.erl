@@ -81,23 +81,13 @@ finalise(_, Acc) ->
 'AVG'(Arg, _State = {N, Acc}) ->
     {N + 1, Acc + Arg}.
 
-'MIN'(Arg, _State = Min) ->
-    if Min == not_a_value ->
-            Min;
-       Arg < Min ->
-            Arg;
-       el/=se ->
-            Min
-    end.
+'MIN'(Arg, not_a_value)        -> Arg;
+'MIN'(Arg, Acc) when Arg < Acc -> Arg;
+'MIN'(Arg, _)                  -> Arg.
 
-'MAX'(Arg, _State = Max) ->
-    if Max == not_a_value ->
-            Max;
-       Arg > Max ->
-            Arg;
-       el/=se ->
-            Max
-    end.
+'MAX'(Arg, not_a_value)        -> Arg;
+'MAX'(Arg, Acc) when Arg > Acc -> Arg;
+'MAX'(Arg, _)                  -> Arg.
 
 'STDEV'(Arg, _State = {N, SumOfSquares, Mean}) ->
     {N + 1, SumOfSquares + Arg * Arg, Mean + (Mean - Arg) / (N+1)}.
