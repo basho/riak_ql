@@ -33,9 +33,9 @@
 -include("riak_ql_ddl.hrl").
 
 %% functions used in expression type validation
+get_arity_and_type_sig('COUNT')  -> {1, [{sint64, sint64}, {double, sint64}, {boolean, sint64}, {varchar, sint64}, {timestamp, sint64}]};
 get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  %% double promotion
 get_arity_and_type_sig('MEAN')   -> {1, [{sint64, double}, {double, double}]};  %% double promotion
-get_arity_and_type_sig('COUNT')  -> {1, [{sint64, sint64}, {double, sint64}]};
 get_arity_and_type_sig('MAX')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('STDEV')  -> {1, [{sint64, double}, {double, double}]};  %% ditto

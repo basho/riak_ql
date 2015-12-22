@@ -345,7 +345,7 @@ is_selection_column_valid(Mod, {{window_agg_fn, Fn}, Args}, {Acc, Status}) ->
         Arity -> ExprTypes = type(Args, Mod, []),
                  case do_types_match(FnTypeSig, ExprTypes) of
                      true  -> {Acc, Status};
-                     false -> Msg1 = {type_check_fail, Fn, Arity, ExprTypes},
+                     false -> Msg1 = {type_check_failed, Fn, Arity, ExprTypes},
                               {[Msg1 | Acc], false}
                  end;
         N     -> Msg2 = {fn_called_with_wrong_arity, Fn, Arity, N},
