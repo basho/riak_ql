@@ -28,7 +28,6 @@
 -export([start_state/1]).
 -export([get_arity_and_type_sig/1]).
 
-
 -type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDEV'.
 
 -include("riak_ql_ddl.hrl").
@@ -60,9 +59,8 @@ finalise('MEAN', {N, Acc}) ->
     finalise('AVG', {N, Acc});
 finalise('AVG', {N, Acc}) ->
     Acc / N;
-finalise('STDEV', {N, SumOfSquares, Mean}) ->
-    %% TODO: rework using special formulae to prevent overflows
-    math:sqrt(SumOfSquares / (N - Mean * Mean));
+finalise('STDEV', {N, _A, Q}) ->
+    math:sqrt(Q / N);
 finalise(_, not_a_value) ->
     0;
 finalise(_, Acc) ->
@@ -96,5 +94,29 @@ finalise(_, Acc) ->
 'MAX'(Arg, Acc) when Arg > Acc -> Arg;
 'MAX'(Arg, _)                  -> Arg.
 
-'STDEV'(Arg, _State = {N, SumOfSquares, Mean}) ->
-    {N + 1, SumOfSquares + Arg * Arg, Mean + (Mean - Arg) / (N+1)}.
+'STDEV'(Arg, _State = {N_old, A_old, Q_old}) ->
+    %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
+    N = N_old + 1,
+    A = A_old + (Arg - A_old) / N,
+    Q = Q_old + (Arg - A_old) * (Arg - A),
+    {N, A, Q}.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+stdev_test() ->
+    State0 = start_state('STDEV'),
+    Data = [1.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 4.0, 4.0, 3.0, 2.0, 3.0, 2.0, 1.0, 1.0],
+    %% numpy.std(Data) computes it to:
+    Expected = 1.0832051206181281,
+    %% There is a possibility of Erlang computing it differently, on
+    %% fairy 16-bit architectures or some such. If this happens, we
+    %% need to run python on that arch to figure out what Expected
+    %% value can be then.  Or, introduce an epsilon and check that the
+    %% delta is small enough.
+    State9 = lists:foldl(fun 'STDEV'/2, State0, Data),
+    Got = finalise('STDEV', State9),
+    ?assertEqual(Expected, Got).
+
+-endif.
