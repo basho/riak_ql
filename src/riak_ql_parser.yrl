@@ -137,13 +137,13 @@ FunArg -> Identifier : '$1'.
 FunArg -> Val        : '$1'.
 FunArg -> Funcall    : '$1'.
 
-FunArgN -> comma FunArg         : '$1'.
-FunArgN -> comma FunArg FunArgN : '$1'.
+FunArgN -> comma FunArg         : ['$2'].
+FunArgN -> comma FunArg FunArgN : ['$2' , '$3'].
 
 Funcall -> Identifier left_paren                right_paren : make_funcall('$1', []).
 Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1', ['$3']).
 Funcall -> Identifier left_paren maybeasterisk  right_paren : make_funcall('$1', ['$3']).
-Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3', '$4']).
+Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3'] ++ '$4').
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
@@ -507,7 +507,8 @@ make_funcall({identifier, FuncName}, Args) ->
                         _ ->
                             {Fn, Args}
                     end,
-            {funcall, {Fn2, Args2}};
+            Args3 = [canonicalise_expr(X) || X <- Args2],
+            {{window_agg_fn, Fn2}, Args3};
         not_supported ->
             Msg2 = io_lib:format("Function not supported - '~s'.", [FuncName]),
             return_error(0, iolist_to_binary(Msg2))
@@ -516,7 +517,11 @@ make_funcall(_, _) ->
     % make dialyzer stop erroring on no local return.
     error.
 
+canonicalise_expr({identifier, X}) ->
+    {identifier, [X]}.
+
 get_func_type(FuncName) when FuncName =:= 'AVG'   orelse
+                             FuncName =:= 'MEAN'  orelse
                              FuncName =:= 'SUM'   orelse
                              FuncName =:= 'COUNT' orelse
                              FuncName =:= 'MIN'   orelse
@@ -530,11 +535,7 @@ get_func_type(FuncName) when is_atom(FuncName)    -> not_supported.
 %% will definetely be existing - but just not now
 %% also try/catch round it
 canonicalise_window_aggregate_fn(Fn) when is_binary(Fn)->
-     case list_to_atom(string:to_upper(binary_to_list(Fn))) of
-         %% create an alias for MEAN becuz 'Muricans, amirite?
-        'MEAN'  -> 'AVG';
-         AtomFn -> AtomFn
-end.
+     list_to_atom(string:to_upper(binary_to_list(Fn))).
 
 canonicalise_col({identifier, X}) -> {identifier, [X]};
 canonicalise_col(X)               -> X.

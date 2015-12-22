@@ -420,9 +420,8 @@ select_arithmetic_test() ->
 window_aggregate_fn_1_test() ->
     ?sql_comp_assert("select avg(temp) from details",
                      #riak_sql_v1{'SELECT' = [
-                                              {funcall, {'AVG', 
-                                                         [{identifier, <<"temp">>}]
-                                                        }}
+                                              {{window_agg_fn, 'AVG'}, 
+                                               [{identifier, [<<"temp">>]}]}
                                              ],
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
@@ -431,9 +430,8 @@ window_aggregate_fn_1_test() ->
 window_aggregate_fn_1a_test() ->
     ?sql_comp_assert("select mean(temp) from details",
                      #riak_sql_v1{'SELECT' = [
-                                              {funcall, {'AVG',
-                                                         [{identifier, <<"temp">>}]
-                                               }}
+                                              {{window_agg_fn, 'MEAN'}, 
+                                               [{identifier, [<<"temp">>]}]}
                                              ],
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
@@ -442,10 +440,10 @@ window_aggregate_fn_1a_test() ->
 window_aggregate_fn_2_test() ->
     ?sql_comp_assert("select avg(temp), sum(counts) from details",
                      #riak_sql_v1{'SELECT' = [
-                                              {funcall, {'AVG',
-                                                          [{identifier, <<"temp">>}]}},
-                                              {funcall, {'SUM',
-                                                          [{identifier, <<"counts">>}]}}
+                                              {{window_agg_fn, 'AVG'},
+                                               [{identifier, [<<"temp">>]}]},
+                                              {{window_agg_fn, 'SUM'},
+                                                [{identifier, [<<"counts">>]}]}
                                              ],
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
@@ -454,7 +452,8 @@ window_aggregate_fn_2_test() ->
 window_aggregate_fn_wildcard_count_test() ->
     ?sql_comp_assert("select count(*) from details",
                      #riak_sql_v1{'SELECT' = [
-                                              {funcall, {'ROWCOUNT', []}}
+                                              {{window_agg_fn, 'ROWCOUNT'}, 
+                                               []}
                                              ],
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
@@ -463,8 +462,8 @@ window_aggregate_fn_wildcard_count_test() ->
 window_aggregate_fn_capitalisation_test() ->
     ?sql_comp_assert("select aVg(temp) from details",
                      #riak_sql_v1{'SELECT' = [
-                                              {funcall, {'AVG',
-                                                          [{identifier, <<"temp">>}]}}
+                                              {{window_agg_fn, 'AVG'},
+                                               [{identifier, [<<"temp">>]}]}
                                              ],
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
@@ -474,18 +473,18 @@ window_aggregate_fn_all_funs_test() ->
     ?sql_comp_assert("select avg(temp), sum(counts), count(counts), min(counts), " ++
                          "max(counts), stdev(counts) from details",
                      #riak_sql_v1{'SELECT' = [
-                                              {funcall, {'AVG',
-                                                         [{identifier, <<"temp">>}]}},
-                                              {funcall, {'SUM',
-                                                         [{identifier, <<"counts">>}]}},
-                                              {funcall, {'COUNT',
-                                                         [{identifier, <<"counts">>}]}},
-                                              {funcall, {'MIN',
-                                                          [{identifier, <<"counts">>}]}},
-                                              {funcall, {'MAX',
-                                                          [{identifier, <<"counts">>}]}},
-                                              {funcall, {'STDEV',
-                                                          [{identifier, <<"counts">>}]}}
+                                              {{window_agg_fn, 'AVG'},
+                                               [{identifier, [<<"temp">>]}]},
+                                              {{window_agg_fn, 'SUM'},
+                                               [{identifier, [<<"counts">>]}]},
+                                              {{window_agg_fn, 'COUNT'},
+                                               [{identifier, [<<"counts">>]}]},
+                                              {{window_agg_fn, 'MIN'},
+                                               [{identifier, [<<"counts">>]}]},
+                                              {{window_agg_fn, 'MAX'},
+                                               [{identifier, [<<"counts">>]}]},
+                                              {{window_agg_fn, 'STDEV'},
+                                               [{identifier, [<<"counts">>]}]}
                                              ],
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
@@ -498,8 +497,8 @@ window_aggregate_fn_arithmetic_1_test() ->
                                                {'*',
                                                 {'-',
                                                  {'+',
-                                                  {funcall,{'AVG',[{identifier,
-                                                                    <<"temperature">>}]}},
+                                                  {{window_agg_fn, 'AVG'}, 
+                                                   [{identifier, [<<"temperature">>]}]},
                                                   {integer,1}},
                                                  {integer,2}},
                                                 {integer,3}},
@@ -513,10 +512,10 @@ window_aggregate_fn_arithmetic_2_test() ->
     ?sql_comp_assert("select aVg(temperature) + count(temperature) from details",
                      #riak_sql_v1{'SELECT' = [
                                               {'+',
-                                               {funcall,{'AVG',[{identifier,
-                                                                 <<"temperature">>}]}},
-                                               {funcall,{'COUNT',[{identifier, 
-                                                                   <<"temperature">>}]}}}
+                                               {{window_agg_fn, 'AVG'},   
+                                                [{identifier, [<<"temperature">>]}]},
+                                               {{window_agg_fn, 'COUNT'}, 
+                                                [{identifier, [<<"temperature">>]}]}}
                                              ],
                                   'FROM'    = <<"details">>,
                                   'WHERE'   = []
@@ -525,12 +524,13 @@ window_aggregate_fn_arithmetic_2_test() ->
 %% window_aggregate_fn_arithmetic_3_test() ->
 %%     ?sql_comp_assert("select aVg(temperature + 1) + count(temperature / distance) from details",
 %%                      #riak_sql_v1{'SELECT' = [
-%%                                               {funcall, {'AVG', 
-%%                                                          [{identifier, <<"temperature">>}]}}
-%%                                              ],
-%%                                   'FROM'    = <<"details">>,
-%%                                   'WHERE'   = []
+%%                                               {{window_agg_fn, 'AVG'}, 
+%%                                                [{identifier, [<<"Temperature">>]}]}
+%%                                  ],
+%%                      'FROM'    = <<"details">>,
+%%                      'WHERE'   = []
 %%                     }).
+
 %%
 %% TS 1.1 fail tests
 %%

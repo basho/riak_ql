@@ -23,28 +23,30 @@
 -module(riak_ql_window_agg_fns).
 
 
--export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MIN'/2, 'MAX'/2, 'STDEV'/2]).
+-export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDEV'/2]).
 -export([finalise/2]).
 -export([start_state/1]).
--export([get_type_sig/1]).
-        
+-export([get_arity_and_type_sig/1]).
 
--type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' | 'MIN' | 'MAX' | 'STDEV'.
+
+-type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDEV'.
 
 -include("riak_ql_ddl.hrl").
 
 %% functions used in expression type validation
-get_type_sig('AVG')    -> [{sint64, double}, {double, double}];  %% double promotion
-get_type_sig('COUNT')  -> [{sint64, sint64}, {double, sint64}];
-get_type_sig('MAX')    -> [{sint64, sint64}, {double, double}];
-get_type_sig('MIN')    -> [{sint64, sint64}, {double, double}];
-get_type_sig('STDEV')  -> [{sint64, double}, {double, double}];  %% ditto
-get_type_sig('SUM')    -> [{sint64, sint64}, {double, double}].
+get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  %% double promotion
+get_arity_and_type_sig('MEAN')   -> {1, [{sint64, double}, {double, double}]};  %% double promotion
+get_arity_and_type_sig('COUNT')  -> {1, [{sint64, sint64}, {double, sint64}]};
+get_arity_and_type_sig('MAX')    -> {1, [{sint64, sint64}, {double, double}]};
+get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
+get_arity_and_type_sig('STDEV')  -> {1, [{sint64, double}, {double, double}]};  %% ditto
+get_arity_and_type_sig('SUM')    -> {1, [{sint64, sint64}, {double, double}]}.
 
 %% Get the initial accumulator state for the aggregation.
 -spec start_state(aggregate_function()) ->
     any().
 start_state('AVG') -> 0;
+start_state('MEAN') -> 0;
 start_state('COUNT') -> 0;
 start_state('MAX') -> not_a_value;
 start_state('MIN') -> not_a_value;
@@ -54,6 +56,8 @@ start_state(_) -> stateless.
 
 %% Calculate the final results using the accumulated result.
 -spec finalise(aggregate_function(), any()) -> any().
+finalise('MEAN', {N, Acc}) ->
+    finalise('AVG', {N, Acc});
 finalise('AVG', {N, Acc}) ->
     Acc / N;
 finalise('STDEV', {N, SumOfSquares, Mean}) ->
@@ -77,6 +81,9 @@ finalise(_, Acc) ->
 
 'SUM'(Arg, _State = Total) ->
     Arg + Total.
+
+'MEAN'(Arg, State) ->
+    'AVG'(Arg, State).
 
 'AVG'(Arg, _State = {N, Acc}) ->
     {N + 1, Acc + Arg}.

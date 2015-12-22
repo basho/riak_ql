@@ -179,6 +179,10 @@ syntax_error_to_msg(E) ->
         iolist_to_binary(io_lib:format(Fmt, Args)).
 
 %%
+syntax_error_to_msg2({type_check_failed, Fn, Arity, ExprTypes}) ->
+    {"Function ~p/~p called with arguments of the wrong type ~p.", [Fn, Arity, ExprTypes]};
+syntax_error_to_msg2({fn_called_with_wrong_arity, Fn, Arity, NoArgs}) ->
+    {"Function ~p/~p called with ~p arguments.", [Fn, Arity, NoArgs]};
 syntax_error_to_msg2({bucket_type_mismatch, B1, B2}) ->
     {"bucket_type_mismatch: DDL bucket type was ~s "
      "but query selected from bucket type ~s.", [B1, B2]};
@@ -315,9 +319,10 @@ is_compatible_operator(_,_,_)                 -> true.
 are_selections_valid(_, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
 are_selections_valid(Mod, Selections, _) ->
+
     CheckFn =
         fun(E, Acc) ->
-            is_selection_column_valid(Mod, E, Acc)
+                is_selection_column_valid(Mod, E, Acc)
         end,
     case lists:foldl(CheckFn, {[], true}, Selections) of
         {[],   true}  -> true;
@@ -329,13 +334,38 @@ is_selection_column_valid(Mod, {identifier, X}, {Acc, Status}) ->
     case Mod:is_field_valid(X) of
         true  ->
             {Acc, Status};
-        false -> 
+        false ->
             Msg = {unexpected_select_field, hd(X)},
             {[Msg | Acc], false}
     end;
-is_selection_column_valid(_, _, Acc) ->
+is_selection_column_valid(Mod, {{window_agg_fn, Fn}, Args}, {Acc, Status}) ->
     % if the field is not an identifier, it should already be validated
-    Acc.
+    {Arity, FnTypeSig} = riak_ql_window_agg_fns:get_arity_and_type_sig(Fn),
+    case length(Args) of
+        Arity -> ExprTypes = type(Args, Mod, []),
+                 case do_types_match(FnTypeSig, ExprTypes) of
+                     true  -> {Acc, Status};
+                     false -> Msg1 = {type_check_fail, Fn, Arity, ExprTypes},
+                              {[Msg1 | Acc], false}
+                 end;
+        N     -> Msg2 = {fn_called_with_wrong_arity, Fn, Arity, N},
+                 {[Msg2 | Acc], false}
+    end.
+
+do_types_match(FnTypeSig, ExprTypes) ->
+    CheckFn = fun(X, Acc) ->
+                      case lists:keymember(X, 1, FnTypeSig) of
+                          true  -> Acc;
+                          false -> false
+                      end
+              end,
+    lists:foldl(CheckFn, true, ExprTypes).
+
+type([], _Mod, Acc) ->
+    lists:reverse(Acc);
+type([{identifier, I} | T], Mod, Acc) ->
+    NewAcc = Mod:get_field_type(I),
+    type(T, Mod, [NewAcc | Acc]).
 
 %% Fold over the syntax tree for a where clause.
 fold_where_tree([], Acc, _) ->
@@ -771,7 +801,7 @@ simple_is_query_valid_map_test() ->
     Name0 = <<"name">>,
     Name1 = <<"temp">>,
     Name2 = <<"geo">>,
-    Selections  = [{identifier, [<<"temp">>, <<"geo">>]}, 
+    Selections  = [{identifier, [<<"temp">>, <<"geo">>]},
                                       {identifier, [<<"name">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
                          'SELECT' = Selections},
@@ -1142,5 +1172,73 @@ fold_where_tree_test() ->
         lists:reverse(fold_where_tree(Where, [],
                 fun({_, Field, _}, Acc) -> [Field | Acc] end))
     ).
+
+%%
+%% selection validity tests
+%%
+
+-define(SELECT_TABLE_DEF,
+
+).
+
+-define(select_test(Name, SelectClause, Expected),
+        Name() ->
+               CreateTab = "CREATE TABLE mytab" ++
+                   "   (myfamily    VARCHAR   NOT NULL, " ++
+                   "    myseries    VARCHAR   NOT NULL, " ++
+                   "    time        TIMESTAMP NOT NULL, " ++
+                   "    mysint64    SINT64    NOT NULL, " ++
+                   "    mydouble    DOUBLE    NOT NULL, " ++
+                   "    mybolean    BOOLEAN   NOT NULL, " ++
+                   "    myvarchar   VARCHAR   NOT NULL, " ++
+                   "    PRIMARY KEY ((myfamily, myseries, QUANTUM(time, 15, 'm')), " ++
+    "    myfamily, myseries, time))",
+               SQL = "SELECT " ++ SelectClause ++ " " ++
+                   "FROM mytab WHERE " ++
+                   "myfamily = 'fam1' " ++
+                   "and myseries = 'ser1' " ++
+                   "and time > 1 and time < 10",
+               DDL = test_parse(CreateTab),
+               {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+               Q = test_parse(SQL),
+               #riak_sql_v1{'SELECT' = Sel} = Q,
+               Got = are_selections_valid(Mod, Sel, ?CANTBEBLANK),
+               ?assertEqual(Expected, Got)).
+
+?select_test(simple_column_select_1_test, "*", true).
+
+?select_test(simple_column_select_2_test, "mysint64", true).
+
+?select_test(simple_column_select_3_test, "mysint64, mydouble", true).
+
+?select_test(simple_column_select_fail_1_test, "rootbeer",
+             {false, [
+                      {unexpected_select_field, <<"rootbeer">>}
+                     ]
+             }).
+
+?select_test(simple_column_select_fail_2_test, "mysint64, rootbeer, mydouble, deathsquad",
+             {false, [
+                      {unexpected_select_field, <<"rootbeer">>},
+                      {unexpected_select_field, <<"deathsquad">>}
+                     ]
+             }).
+
+?select_test(simple_agg_fn_select_1_test, "count(mysint64)", true).
+
+?select_test(simple_agg_fn_select_2_test, "count(mysint64), avg(mydouble)", true).
+
+?select_test(simple_agg_fn_select_fail_1_test, "count(mysint64), avg(myvarchar)",
+            {false, [
+                     {type_check_fail, 'AVG', 1, [varchar]}
+                    ]
+            }).
+
+?select_test(simple_agg_fn_select_fail_2_test, "count(mysint64, myboolean), avg(mysint64)",
+            {false, [
+                     {fn_called_with_wrong_arity, 'COUNT', 1, 2}
+                    ]
+            }).
+
 
 -endif.
