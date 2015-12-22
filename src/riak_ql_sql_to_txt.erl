@@ -26,56 +26,183 @@
 -include("riak_ql_ddl.hrl").
 
 
--export([
-         sql_to_txt/1,
-         col_names_from_select/1
-         ]).
+% -export([sql_to_txt/1]).
+-export([col_names_from_select/1]).
 
 %% TODO
 %% needs to reverse out the compiled versions as well for John Daily/Andrei
-sql_to_txt(#riak_sql_v1{'SELECT' = S,
-                        'FROM'    = F,
-                        'WHERE'   = W,
-                        type     = sql}) ->
-    SQL = [
-           "SELECT",
-           make_select_clause(select_to_col_names(S)),
-           "FROM",
-           make_from_clause(F),
-           "WHERE",
-           make_where_clause(W)
-          ],
-    string:join(SQL, " ");
-sql_to_txt(#ddl_v1{} = DDL) ->
-    gg:format("DDL is ~p~n", [DDL]),
-    "brando".
+% sql_to_txt(#riak_sql_v1{'SELECT' = S,
+%                         'FROM'    = F,
+%                         'WHERE'   = W,
+%                         type     = sql}) ->
+%     SQL = [
+%         "SELECT",
+%         make_select_clause(select_to_col_names(S)),
+%         "FROM",
+%         make_from_clause(F),
+%         "WHERE",
+%         make_where_clause(W)
+%     ],
+%     string:join(SQL, " ");
+% sql_to_txt(#ddl_v1{} = DDL) ->
+%     gg:format("DDL is ~p~n", [DDL]),
+%     "brando".
 
-make_select_clause(X) ->
-    string:join(col_names_from_select(X), " ").
 
-col_names_from_select(X) ->
-    gg:format("X is ~p~n", [X]),
-    "erko".
+% make_select_clause(X) ->
+%     string:join(col_names_from_select(X), " ").
 
-make_from_clause(_) ->
-    "berko".
 
-make_where_clause(_) ->
-    "jerko".
+%% Convert the selection in a #riak_sql_v1 statement to a list of strings, one
+%% element for each column. White space in the original query is not reproduced.
+-spec col_names_from_select(#riak_sql_v1{}) -> [string()].
+col_names_from_select(#riak_sql_v1{ 'SELECT' = Select }) ->
+    [select_col_to_string(S) || S <- Select].
+
+%% Convert one column to a flat string.
+-spec select_col_to_string(any()) -> 
+        string().
+select_col_to_string({identifier, [Name]}) ->
+    binary_to_list(Name);
+select_col_to_string({identifier, Name}) ->
+    binary_to_list(Name);
+select_col_to_string({integer, Value}) when is_integer(Value) ->
+    integer_to_list(Value);
+select_col_to_string({float, Value}) when is_float(Value) ->
+    float_to_list(Value);
+select_col_to_string({binary, Value}) when is_binary(Value) ->
+    binary_to_list(<<"'", Value/binary, "'">>);
+select_col_to_string({boolean, true}) ->
+    "true";
+select_col_to_string({boolean, false}) ->
+    "false";
+select_col_to_string({funcall, {FunName, Args}}) when is_atom(FunName) ->
+    lists:flatten([
+        atom_to_list(FunName),
+        $(,
+        string:join([select_col_to_string(A) || A <- Args], ", "),
+        $)
+    ]);
+select_col_to_string({expr, Expression}) ->
+    select_col_to_string(Expression);
+select_col_to_string({Op, Arg1, Arg2}) when is_atom(Op) ->
+    lists:flatten(
+        [select_col_to_string(Arg1), atom_to_list(Op), select_col_to_string(Arg2)]).                                            
+    
+
+% make_from_clause(_) ->
+%     "berko".
+
+% make_where_clause(_) ->
+%     "jerko".
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 
--define(sql_roundtrip_test(Name, SQL, ExpectedSQL),
-        Name() ->
-               Toks = riak_ql_lexer:get_tokens(SQL),
-               {ok, Rec} = riak_ql_parser:parse(Toks),
-               GotSQL = sql_to_txt(Rec),
-               ?assertEqual(ExpectedSQL, GotSQL)).
+select_col_to_string_all_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select * from bendy")),
+    ?assertEqual(
+        ["*"],
+        col_names_from_select(SQL)
+    ).
 
-?sql_roundtrip_test(basic_select_test, "select * from bendy", "SELECT * FROM bendy").
+select_col_to_string_colname_1_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select mindy from bendy")),
+    ?assertEqual(
+        ["mindy"],
+        col_names_from_select(SQL)
+    ).
 
+select_col_to_string_colname_2_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select mindy, raymond from bendy")),
+    ?assertEqual(
+        ["mindy", "raymond"],
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_integer_literal_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select 1 from bendy")),
+    ?assertEqual(
+        ["1"],
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_boolean_true_literal_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select true from bendy")),
+    ?assertEqual(
+        ["true"],
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_boolean_false_literal_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select false from bendy")),
+    ?assertEqual(
+        ["false"],
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_double_literal_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select 7.2 from bendy")),
+    ?assertEqual(
+        ["7.20000000000000017764e+00"], % weird float formatting!
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_varchar_literal_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select 'derp' from bendy")),
+    ?assertEqual(
+        ["'derp'"],
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_one_plus_one_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select 1+1 from bendy")),
+    ?assertEqual(
+        ["1+1"],
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_four_div_two_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select 4/2 from bendy")),
+    ?assertEqual(
+        ["4/2"],
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_four_times_ten_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select 4*10 from bendy")),
+    ?assertEqual(
+        ["4*10"],
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_avg_funcall_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select avg(mona) from bendy")),
+    ?assertEqual(
+        ["AVG(mona)"],
+        col_names_from_select(SQL)
+    ).
+
+select_col_to_string_avg_funcall_with_nested_maths_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select avg(10+5) from bendy")),
+    ?assertEqual(
+        ["AVG(10+5)"],
+        col_names_from_select(SQL)
+    ).
 
 %% "select value from response_times where time > 1388534400",
 
