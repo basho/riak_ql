@@ -43,6 +43,7 @@
 -export([get_local_key/2, get_local_key/3]).
 -export([get_partition_key/2, get_partition_key/3]).
 -export([is_query_valid/3]).
+%%-export([get_return_types_and_col_names/2]).
 -export([make_key/3]).
 -export([syntax_error_to_msg/1]).
 
@@ -1177,10 +1178,6 @@ fold_where_tree_test() ->
 %% selection validity tests
 %%
 
--define(SELECT_TABLE_DEF,
-
-).
-
 -define(select_test(Name, SelectClause, Expected),
         Name() ->
                CreateTab = "CREATE TABLE mytab" ++
@@ -1192,7 +1189,7 @@ fold_where_tree_test() ->
                    "    mybolean    BOOLEAN   NOT NULL, " ++
                    "    myvarchar   VARCHAR   NOT NULL, " ++
                    "    PRIMARY KEY ((myfamily, myseries, QUANTUM(time, 15, 'm')), " ++
-    "    myfamily, myseries, time))",
+                   "    myfamily, myseries, time))",
                SQL = "SELECT " ++ SelectClause ++ " " ++
                    "FROM mytab WHERE " ++
                    "myfamily = 'fam1' " ++
