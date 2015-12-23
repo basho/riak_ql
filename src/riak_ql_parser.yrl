@@ -538,7 +538,7 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
                                          Op2 =:= '=~' orelse
                                          Op2 =:= '!~' orelse
                                          Op2 =:= '!=') ->
-    (A < B).
+    (A =< B).
 
 remove_exprs({expr, A}) ->
     remove_exprs(A);

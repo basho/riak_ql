@@ -268,3 +268,18 @@ left_hand_side_literal_not_equals_test() ->
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(
             "SELECT * FROM mytable WHERE 10 != age"))
     ).
+
+% RTS-788
+% an infinite loop was occurring when two where clauses were the same
+% i.e. time = 10 and time 10
+infinite_loop_test_() ->
+    {timeout, 0.2,
+        fun() ->
+            ?assertMatch(
+                {ok, _},
+                riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+                    "Select myseries, temperature from GeoCheckin2 "
+                    "where time > 1234567 and time > 1234567 "
+                    "and myfamily = 'family1' and myseries = 'series1' "))
+            )
+        end}.
