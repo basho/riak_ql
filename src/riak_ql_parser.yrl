@@ -460,9 +460,14 @@ canon2({Cond, A, B}) when Cond =:= and_ orelse
     %% but our where clauses are bounded in size so thats OK
     A1 = canon2(A),
     B1 = canon2(B),
-    case is_lower(A1, B1) of
-        true  -> {Cond, A1, B1};
-        false -> {Cond, B1, A1}
+    case A1 == B1 of
+        true ->
+            A1;
+        false ->
+            case is_lower(A1, B1) of
+                true  -> {Cond, A1, B1};
+                false -> {Cond, B1, A1}
+            end
     end;
 canon2({Op, A, B}) ->
     {Op, strip(A), strip(B)};
@@ -496,13 +501,17 @@ hoist({A, B, C}) ->
 %% not tail recursive
 sort({and_, A, {and_, B, C}}) ->
     case is_lower(A, B) of
-        true  -> {and_, B1, C1} = sort({and_, B, C}),
-                 case is_lower(A, B1) of
-                     true  -> {and_, A, {and_, B1, C1}};
-                     false -> sort({and_, B1, {and_, A, C1}})
-                 end;
-        false -> sort({and_, B, sort({and_, A, C})})
+        true ->
+            {and_, B1, C1} = sort({and_, B, C}),
+            case is_lower(A, B1) of
+                true  -> {and_, A, {and_, B1, C1}};
+                false -> sort({and_, B1, {and_, A, C1}})
+            end;
+        false ->
+            sort({and_, B, sort({and_, A, C})})
     end;
+sort({and_, A, A}) ->
+    A;
 sort({Op, A, B}) ->
     case is_lower(A, B) of
         true  -> {Op, A, B};

@@ -283,3 +283,60 @@ infinite_loop_test_() ->
                     "and myfamily = 'family1' and myseries = 'series1' "))
             )
         end}.
+
+remove_duplicate_clauses_1_test() ->
+  ?assertEqual(
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 ")),
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 AND time > 1234567"))
+    ).
+
+remove_duplicate_clauses_2_test() ->
+  ?assertEqual(
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 ")),
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 AND time > 1234567 AND time > 1234567 "))
+    ).
+
+remove_duplicate_clauses_3_test() ->
+  ?assertEqual(
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 ")),
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 AND time > 1234567 OR time > 1234567 "))
+    ).
+
+remove_duplicate_clauses_4_test() ->
+  ?assertEqual(
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 ")),
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 AND (time > 1234567 OR time > 1234567) "))
+    ).
+
+% This fails. de-duping does not yet go through the entire tree and
+% pull out duplicates
+% remove_duplicate_clauses_5_test() ->
+%   ?assertEqual(
+%         riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+%             "SELECT * FROM mytab "
+%             "WHERE time > 1234567 "
+%             "AND (localtion > 'derby' OR time > 'sheffield') "
+%             "AND weather = 'raining' ")),
+%         riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+%             "SELECT * FROM mytab "
+%             "WHERE time > 1234567 "
+%             "AND (localtion > 'derby' OR time > 'sheffield') "
+%             "AND weather = 'raining' "
+%             "AND time > 1234567 "))
+%     ).
