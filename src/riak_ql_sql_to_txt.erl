@@ -69,7 +69,7 @@ select_col_to_string({identifier, Name}) ->
 select_col_to_string({integer, Value}) when is_integer(Value) ->
     integer_to_list(Value);
 select_col_to_string({float, Value}) when is_float(Value) ->
-    float_to_list(Value);
+    mochinum:digits(Value);
 select_col_to_string({binary, Value}) when is_binary(Value) ->
     binary_to_list(<<"'", Value/binary, "'">>);
 select_col_to_string({boolean, true}) ->
@@ -152,7 +152,7 @@ select_col_to_string_double_literal_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
         "select 7.2 from bendy")),
     ?assertEqual(
-        ["7.20000000000000017764e+00"], % weird float formatting!
+        ["7.2"],
         col_names_from_select(SQL)
     ).
 
