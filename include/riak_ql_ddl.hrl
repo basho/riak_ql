@@ -60,7 +60,14 @@
          }).
 
 %% TODO these types will be improved over the duration of the time series project
--type selection()  :: {identifier, [binary()]}.
+-type selection()  :: {identifier, [binary()]}
+						| {integer, integer()}
+						| {float, float()}
+						| {boolean, boolean()}
+						| {binary, binary()}
+						| {funcall, {FunctionName::atom(), [selection()]}}
+						| {expr, selection()}.
+						
 -type filter()     :: term().
 -type operator()   :: [binary()].
 -type sorter()     :: term().
