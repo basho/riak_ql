@@ -21,7 +21,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_ql_sql_to_txt).
+-module(riak_ql_to_string).
 
 -include("riak_ql_ddl.hrl").
 
