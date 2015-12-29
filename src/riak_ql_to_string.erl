@@ -204,6 +204,14 @@ select_col_to_string_avg_funcall_with_nested_maths_test() ->
         col_names_from_select(SQL)
     ).
 
+where_to_string_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "select v from bendy where v = 1")),
+    ?assertEqual(
+        ["AVG(10+5)"],
+        where_to_string(SQL)
+    ).
+
 %% "select value from response_times where time > 1388534400",
 
 %% "select value from response_times where time > 1388534400s",
