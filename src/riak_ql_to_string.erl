@@ -26,24 +26,25 @@
 -include("riak_ql_ddl.hrl").
 
 
--export([to_string/1]).
 -export([col_names_from_select/1]).
+-export([to_string/1]).
 
 %% TODO
 %% needs to reverse out the compiled versions as well for John Daily/Andrei
+-spec to_string(#riak_sql_v1{ }) -> string().
 to_string(#riak_sql_v1{ } = SQL) ->
-    SQL = [
-        "SELECT",
-        make_select_clause(SQL),
-        "FROM",
-        % make_from_clause(F),
-        "WHERE",
+    QueryIO = [
+        "SELECT ",
+        select_to_string(SQL),
+        " FROM ",
+        from_to_string(SQL),
+        " WHERE ",
         where_to_string(SQL)
     ],
-    string:join(SQL, " ").
+    lists:flatten(QueryIO).
 
-
-make_select_clause(SQL) ->
+%%
+select_to_string(SQL) ->
     string:join(col_names_from_select(SQL), " ").
 
 %% Convert the selection in a #riak_sql_v1 statement to a list of strings, one
@@ -81,10 +82,10 @@ select_col_to_string({expr, Expression}) ->
 select_col_to_string({Op, Arg1, Arg2}) when is_atom(Op) ->
     lists:flatten(
         [select_col_to_string(Arg1), atom_to_list(Op), select_col_to_string(Arg2)]).                                            
-    
 
-% make_from_clause(_) ->
-%     "berko".
+%%
+from_to_string(#riak_sql_v1{ 'FROM' = Table }) ->
+    binary_to_list(Table).
 
 %%
 where_to_string(#riak_sql_v1{ 'WHERE' = [Where] }) ->
@@ -103,12 +104,15 @@ where_clause_to_string({or_, LHS, RHS})->
 where_clause_to_string({Op, Identifier, {_, Literal}})->
     [binary_to_list(Identifier), " ", atom_to_list(Op), " ", literal_to_string(Literal)].
 
+%%
 to_string_each_side(LHS, Op, RHS) ->
     [where_clause_to_string(LHS), Op, where_clause_to_string(RHS)].
 
 %%
 literal_to_string(V) when is_binary(V) ->
     binary_to_list(<<"'", V/binary, "'">>);
+literal_to_string(V) when is_float(V) ->
+    mochinum:digits(V);
 literal_to_string(V) ->
     io_lib:format("~p", [V]).
 
@@ -274,6 +278,14 @@ where_to_string_or_or_op_test() ->
     ?assertEqual(
         "a = 1 OR b = 2 OR c = 3",
         where_to_string(SQL)
+    ).
+
+query_to_string_test() ->
+    QueryString = "SELECT v FROM bendy WHERE a = 1",
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(QueryString)),
+    ?assertEqual(
+        QueryString,
+        to_string(SQL)
     ).
 
 %% "select value from response_times where time > 1388534400",
