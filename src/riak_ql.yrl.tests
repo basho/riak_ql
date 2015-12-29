@@ -525,6 +525,35 @@ arithmetic_precedence_test() ->
                                   'WHERE' = []
                                  }).
 
+minus_sign_sans_space_literal_test() ->
+    ?sql_comp_assert("select -7.5 from dual",
+                     #riak_sql_v1{'SELECT' = [{float, -7.5}],
+                                  'FROM' = <<"dual">>
+                                 }).
+
+minus_sign_with_space_literal_test() ->
+    ?sql_comp_assert("select - 7.5 from dual",
+                     #riak_sql_v1{'SELECT' = [{negate, {float, 7.5}}],
+                                  'FROM' = <<"dual">>
+                                 }).
+
+minus_sign_sans_space_identifier_test() ->
+    ?sql_comp_assert("select -temperature from dual",
+                     #riak_sql_v1{'SELECT' =
+                                      [{negate,
+                                        {identifier, <<"temperature">>}}],
+                                  'FROM' = <<"dual">>
+                                 }).
+
+minus_sign_with_space_identifier_test() ->
+    ?sql_comp_assert("select - temperature from dual",
+                     #riak_sql_v1{'SELECT' =
+                                      [{negate,
+                                        {identifier, <<"temperature">>}}],
+                                  'FROM' = <<"dual">>
+                                 }).
+
+
 window_aggregate_fn_arithmetic_2_test() ->
     ?sql_comp_assert("select aVg(temperature) + count(temperature) from details",
                      #riak_sql_v1{'SELECT' = [
