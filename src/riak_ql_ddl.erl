@@ -210,8 +210,8 @@ is_query_valid(_, #ddl_v1{ table = T1 },
                #riak_sql_v1{ 'FROM' = T2 }) when T1 =/= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _,
-               #riak_sql_v1{'SELECT' = Selection,
-               'WHERE'  = Where}) ->
+               #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = Selection},
+                            'WHERE'  = Where}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
@@ -783,7 +783,7 @@ simple_is_query_valid_test() ->
     Bucket = <<"simple_is_query_valid_test">>,
     Selections  = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections},
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections}},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -807,7 +807,7 @@ simple_is_query_valid_map_test() ->
     Selections  = [{identifier, [<<"temp">>, <<"geo">>]},
                                       {identifier, [<<"name">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections},
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections}},
     Map = {map, [
                  #riak_field_v1{name     = Name2,
                                 position = 1,
@@ -835,7 +835,7 @@ simple_is_query_valid_map_wildcard_test() ->
     Name2 = <<"geo">>,
     Selections  = [{identifier, [<<"temp">>, <<"*">>]}, {identifier, [<<"name">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections},
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections}},
     Map = {map, [
                  #riak_field_v1{name     = Name2,
                                 position = 1,
@@ -869,7 +869,7 @@ simple_filter_query_test() ->
              }
             ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections,
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections},
                          'WHERE'  = Where},
     DDL = make_ddl(Bucket,
                    [
@@ -899,7 +899,7 @@ full_filter_query_test() ->
                  {'>=', <<"gte field">>,  {integer, 15}}}}}}
             ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections,
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections},
                          'WHERE'  = Where},
     DDL = make_ddl(Bucket,
                    [
@@ -935,7 +935,7 @@ timeseries_filter_test() ->
              }
             ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections,
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections},
                          'WHERE'  = Where},
     Fields = [
               #riak_field_v1{name     = <<"geohash">>,

@@ -337,12 +337,12 @@ convert(#outputs{type    = select,
                  where   = W}) ->
     Q = case B of
             {Type, _} when Type =:= list orelse Type =:= regex ->
-                #riak_sql_v1{'SELECT' = F,
+                #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = F},
                              'FROM'   = B,
                              'WHERE'  = W,
                              'LIMIT'  = L};
             _ ->
-                #riak_sql_v1{'SELECT'   = F,
+                #riak_sql_v1{'SELECT'   = #riak_sel_clause_v1{clause = F},
                              'FROM'     = B,
                              'WHERE'    = W,
                              'LIMIT'    = L,
