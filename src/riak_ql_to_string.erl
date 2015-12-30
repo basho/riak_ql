@@ -26,32 +26,26 @@
 -include("riak_ql_ddl.hrl").
 
 
-% -export([sql_to_txt/1]).
 -export([col_names_from_select/1]).
+-export([to_string/1]).
 
 %% TODO
 %% needs to reverse out the compiled versions as well for John Daily/Andrei
-% sql_to_txt(#riak_sql_v1{'SELECT' = S,
-%                         'FROM'    = F,
-%                         'WHERE'   = W,
-%                         type     = sql}) ->
-%     SQL = [
-%         "SELECT",
-%         make_select_clause(select_to_col_names(S)),
-%         "FROM",
-%         make_from_clause(F),
-%         "WHERE",
-%         make_where_clause(W)
-%     ],
-%     string:join(SQL, " ");
-% sql_to_txt(#ddl_v1{} = DDL) ->
-%     gg:format("DDL is ~p~n", [DDL]),
-%     "brando".
+-spec to_string(#riak_sql_v1{ }) -> string().
+to_string(#riak_sql_v1{ } = SQL) ->
+    QueryIO = [
+        "SELECT ",
+        select_to_string(SQL),
+        " FROM ",
+        from_to_string(SQL),
+        " WHERE ",
+        where_to_string(SQL)
+    ],
+    lists:flatten(QueryIO).
 
-
-% make_select_clause(X) ->
-%     string:join(col_names_from_select(X), " ").
-
+%%
+select_to_string(SQL) ->
+    string:join(col_names_from_select(SQL), " ").
 
 %% Convert the selection in a #riak_sql_v1 statement to a list of strings, one
 %% element for each column. White space in the original query is not reproduced.
@@ -88,13 +82,39 @@ select_col_to_string({expr, Expression}) ->
 select_col_to_string({Op, Arg1, Arg2}) when is_atom(Op) ->
     lists:flatten(
         [select_col_to_string(Arg1), atom_to_list(Op), select_col_to_string(Arg2)]).                                            
-    
 
-% make_from_clause(_) ->
-%     "berko".
+%%
+from_to_string(#riak_sql_v1{ 'FROM' = Table }) ->
+    binary_to_list(Table).
 
-% make_where_clause(_) ->
-%     "jerko".
+%%
+where_to_string(#riak_sql_v1{ 'WHERE' = [Where] }) ->
+    lists:flatten(where_clause_to_string(Where)).
+
+%%
+where_clause_to_string({and_, LHS, RHS})->
+    to_string_each_side(LHS, " AND ", RHS);
+where_clause_to_string({or_, LHS, {Op, _, _} = RHS}) when Op == and_ orelse
+                                                          Op == or_->
+    % if the next argument is an AND then switch the LHS and RHS to "unsort"
+    % the where clause sort.
+    to_string_each_side(RHS, " OR ", LHS);
+where_clause_to_string({or_, LHS, RHS})->
+    to_string_each_side(LHS, " OR ", RHS);
+where_clause_to_string({Op, Identifier, {_, Literal}})->
+    [binary_to_list(Identifier), " ", atom_to_list(Op), " ", literal_to_string(Literal)].
+
+%%
+to_string_each_side(LHS, Op, RHS) ->
+    [where_clause_to_string(LHS), Op, where_clause_to_string(RHS)].
+
+%%
+literal_to_string(V) when is_binary(V) ->
+    binary_to_list(<<"'", V/binary, "'">>);
+literal_to_string(V) when is_float(V) ->
+    mochinum:digits(V);
+literal_to_string(V) ->
+    io_lib:format("~p", [V]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -202,6 +222,70 @@ select_col_to_string_avg_funcall_with_nested_maths_test() ->
     ?assertEqual(
         ["AVG(10+5)"],
         col_names_from_select(SQL)
+    ).
+
+where_to_string_integer_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "SELECT v FROM bendy WHERE v = 1")),
+    ?assertEqual(
+        "v = 1",
+        where_to_string(SQL)
+    ).
+
+where_to_string_binary_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "SELECT v FROM bendy WHERE v = 'hello'")),
+    ?assertEqual(
+        "v = 'hello'",
+        where_to_string(SQL)
+    ).
+
+where_to_string_float_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "SELECT v FROM bendy WHERE v = 6.8")),
+    ?assertEqual(
+        "v = 6.8",
+        where_to_string(SQL)
+    ).
+
+where_to_string_and_op_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "SELECT v FROM bendy WHERE a = 1 AND b = 2")),
+    ?assertEqual(
+        "a = 1 AND b = 2",
+        where_to_string(SQL)
+    ).
+
+where_to_string_or_op_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "SELECT v FROM bendy WHERE a = 1 OR b = 2")),
+    ?assertEqual(
+        "a = 1 OR b = 2",
+        where_to_string(SQL)
+    ).
+
+where_to_string_and_or_op_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "SELECT v FROM bendy WHERE a = 1 AND b = 2 OR c = 3")),
+    ?assertEqual(
+        "a = 1 AND b = 2 OR c = 3",
+        where_to_string(SQL)
+    ).
+
+where_to_string_or_or_op_test() ->
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        "SELECT v FROM bendy WHERE a = 1 OR b = 2 OR c = 3")),
+    ?assertEqual(
+        "a = 1 OR b = 2 OR c = 3",
+        where_to_string(SQL)
+    ).
+
+query_to_string_test() ->
+    QueryString = "SELECT v FROM bendy WHERE a = 1",
+    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(QueryString)),
+    ?assertEqual(
+        QueryString,
+        to_string(SQL)
     ).
 
 %% "select value from response_times where time > 1388534400",
