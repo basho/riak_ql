@@ -26,4 +26,9 @@ test: testclean compile
 DIALYZER_APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
 	xmerl webtool snmp public_key mnesia eunit syntax_tools compiler
 
+shell:
+	@# the shell command is broken in the riak_ql version of rebar and doesn't
+	@# do distribution anyway.
+	erl -pa ebin -pa deps/*/ebin -sname riak_ql -setcookie riak_ql
+
 include tools.mk

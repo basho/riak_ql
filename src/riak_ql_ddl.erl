@@ -428,7 +428,7 @@ simplest_partition_key_test() ->
                                    type     = varchar}
                    ],
                    PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {Name},
     Result = (catch get_partition_key(DDL, Obj)),
     ?assertEqual([{varchar, Name}], Result).
@@ -453,7 +453,7 @@ simple_partition_key_test() ->
                                    type     = varchar}
                    ],
                    PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {<<"one">>, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
     ?assertEqual([{varchar, <<"three">>}, {varchar, <<"one">>}], Result).
@@ -486,7 +486,7 @@ function_partition_key_test() ->
                                    type     = varchar}
                    ],
                    PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {1234567890, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
     %% Yes the mock partition function is actually computed
@@ -559,7 +559,7 @@ complex_partition_key_test() ->
                                    type     = Map1}
                    ],
                    PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {{2, {3}, {4}}},
     Result = (catch get_partition_key(DDL, Obj)),
     Expected = [{sint64, 2}, {poodle, mock_result}, {wombat, mock_result}],
@@ -584,7 +584,7 @@ local_key_test() ->
                                    type     = varchar}
                    ],
                    PK, LK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {Name},
     Result = (catch get_local_key(DDL, Obj)),
     ?assertEqual([{varchar, Name}], Result).
@@ -611,7 +611,7 @@ simple_valid_map_get_type_1_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Result = (catch Module:get_field_type([<<"erko">>, <<"yarple">>])),
     ?assertEqual(sint64, Result).
 
@@ -633,7 +633,7 @@ simple_valid_map_get_type_2_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Result = (catch Module:get_field_type([<<"erko">>])),
     ?assertEqual(map, Result).
 
@@ -665,7 +665,7 @@ complex_valid_map_get_type_test() ->
                                    position = 1,
                                    type     = Map1}
                    ]),
-    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Path = [<<"Top_Map">>, <<"Level_1_map1">>, <<"in_Map_1">>],
     Res = (catch Module:get_field_type(Path)),
     ?assertEqual(sint64, Res).
@@ -695,7 +695,7 @@ make_plain_key_test() ->
             {<<"user">>, <<"user_1">>},
             {<<"time">>, Time}
            ],
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Got = make_key(Mod, Key, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, Time}],
     ?assertEqual(Expected, Got).
@@ -729,7 +729,7 @@ make_functional_key_test() ->
             {<<"user">>, <<"user_1">>},
             {<<"time">>, Time}
            ],
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Got = make_key(Mod, Key, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
     ?assertEqual(Expected, Got).
@@ -749,7 +749,7 @@ partial_wildcard_are_selections_valid_test() ->
                                    position = 2,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
         true,
         are_selections_valid(Mod, Selections, ?CANTBEBLANK)
@@ -767,7 +767,7 @@ partial_are_selections_valid_fail_test() ->
                                    position = 2,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
         {false, [{selections_cant_be_blank, []}]},
         are_selections_valid(Mod, Selections, ?CANTBEBLANK)
@@ -791,7 +791,7 @@ simple_is_query_valid_test() ->
                                    position = 2,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
         true,
         riak_ql_ddl:is_query_valid(Mod, DDL, Query)
@@ -820,7 +820,7 @@ simple_is_query_valid_map_test() ->
                                    position = 2,
                                    type     = Map}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
         true,
         riak_ql_ddl:is_query_valid(Mod, DDL, Query)
@@ -848,7 +848,7 @@ simple_is_query_valid_map_wildcard_test() ->
                                    position = 2,
                                    type     = Map}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
         true,
         riak_ql_ddl:is_query_valid(Mod, DDL, Query)
@@ -878,7 +878,7 @@ simple_filter_query_test() ->
                                    position = 2,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
 
@@ -914,7 +914,7 @@ full_filter_query_test() ->
                                    position = 4,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
 
@@ -975,7 +975,7 @@ timeseries_filter_test() ->
                   partition_key = PK,
                   local_key     = LK
                  },
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     Expected = true,
     ?assertEqual(Expected, Res).
@@ -991,7 +991,7 @@ is_query_valid_test_helper(Table_name, Table_def, Query) ->
     catch code:purge(Mod_name),
     DDL = test_parse(Table_def),
     % ?debugFmt("QUERY is ~p", [test_parse(Query)]),
-    {module,Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module,Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     is_query_valid(Mod, DDL, test_parse(Query)).
 
 -define(LARGE_TABLE_DEF,
