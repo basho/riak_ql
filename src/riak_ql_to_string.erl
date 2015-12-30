@@ -116,20 +116,9 @@ make_where_clause(XX) ->
 
 
 op_to_string(and_) -> "and";
-op_to_string( or_) ->  "or";
-op_to_string( '+') ->   "+";
-op_to_string( '-') ->   "-";
-op_to_string( '*') ->   "*";
-op_to_string( '/') ->   "/";
-op_to_string( '>') ->   ">";
-op_to_string( '<') ->   "<";
-op_to_string('>=') ->  ">=";
-op_to_string('<=') ->  "<=";
-op_to_string( '=') ->   "=";
-op_to_string('<>') ->  "<>";
-op_to_string('=~') ->  "=~";
-op_to_string('!~') ->  "!~";
-op_to_string('!=') ->  "!=".
+op_to_string(or_) -> "or";
+op_to_string(Op) ->
+    atom_to_list(Op).
 
 make_fields(FF) ->
     string:join(
