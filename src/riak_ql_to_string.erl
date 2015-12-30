@@ -122,21 +122,13 @@ op_to_string(Op) ->
 
 make_fields(FF) ->
     string:join(
-      [make_field(F) || F <- sort_fields(FF)], ", ").
+      [make_field(F) || F <- FF], ", ").
 
 make_field(#riak_field_v1{name = N, type = T, optional = Optional}) ->
     flat_format("~s ~s~s", [N, T, not_null_or_not(Optional)]).
 
 not_null_or_not(true)  -> "";
 not_null_or_not(false) -> " not null".
-
-sort_fields(FF) ->
-    lists:sort(
-      fun(#riak_field_v1{position = P1},
-          #riak_field_v1{position = P2}) ->
-              P1 < P2
-      end,
-      FF).
 
 make_key(#key_v1{ast = FF}) ->
     string:join(
