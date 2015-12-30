@@ -61,8 +61,8 @@ FunArgN
 
 Terminals
 
-or_
 and_
+asterisk
 boolean
 character_literal
 comma
@@ -78,15 +78,15 @@ gte
 identifier
 integer
 key
-limit
 left_paren
 less_than_operator
+limit
 lte
-asterisk
 minus_sign
 nomatch
 not_
 null
+or_
 plus_sign
 primary
 quantum
