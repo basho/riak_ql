@@ -256,7 +256,7 @@ TableElementList -> left_paren TableElements right_paren : '$2'.
 
 TableElements ->
     TableElement comma TableElements : make_table_element_list('$1', '$3').
-TableElements -> TableElement : '$1'.
+TableElements -> TableElement        : make_table_element_list('$1').
 
 TableElement -> ColumnDefinition : '$1'.
 TableElement -> KeyDefinition : '$1'.
@@ -573,7 +573,10 @@ make_funcall(_, _) ->
     error.
 
 canonicalise_expr({identifier, X}) ->
-    {identifier, [X]}.
+    {identifier, [X]};
+canonicalise_expr({expr, X}) ->
+    io:format("Expr to be canonicalised is ~p~n", [X]),
+    {expr, [X]}.
 
 get_func_type(FuncName) when FuncName =:= 'AVG'   orelse
                              FuncName =:= 'MEAN'  orelse
@@ -656,6 +659,9 @@ make_partition_and_local_keys(PFieldList, LFieldList) ->
      {partition_key, #key_v1{ast = PFields}},
      {local_key,     #key_v1{ast = LFields}}
     ].
+
+make_table_element_list(A) ->
+    {table_element_list, [A]}.
 
 make_table_element_list(A, {table_element_list, B}) ->
     {table_element_list, [A] ++ lists:flatten(B)};

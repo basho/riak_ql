@@ -76,7 +76,7 @@ select_col_to_string({boolean, true}) ->
     "true";
 select_col_to_string({boolean, false}) ->
     "false";
-select_col_to_string({funcall, {FunName, Args}}) when is_atom(FunName) ->
+select_col_to_string({{window_agg_fn, FunName}, Args}) when is_atom(FunName) ->
     lists:flatten([
         atom_to_list(FunName),
         $(,

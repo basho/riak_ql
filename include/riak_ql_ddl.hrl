@@ -61,13 +61,13 @@
 
 %% TODO these types will be improved over the duration of the time series project
 -type selection()  :: {identifier, [binary()]}
-						| {integer, integer()}
-						| {float, float()}
-						| {boolean, boolean()}
-						| {binary, binary()}
-						| {funcall, {FunctionName::atom(), [selection()]}}
-						| {expr, selection()}.
-						
+                    | {integer, integer()}
+                    | {float, float()}
+                    | {boolean, boolean()}
+                    | {binary, binary()}
+                    | {funcall, {FunctionName::atom(), [selection()]}}
+                    | {expr, selection()}.
+
 -type filter()     :: term().
 -type operator()   :: [binary()].
 -type sorter()     :: term().
@@ -84,7 +84,8 @@
           initial_state    = [],
           col_return_types = []   :: [sint64 | double | boolean | varchar | timestamp],
           col_names        = []   :: [binary()],
-          clause                  :: selection()
+          clause           = []   :: selection(),
+          is_valid         = true :: true | {error, [any()]}
         }).
 
 -record(riak_sql_v1,
