@@ -40,9 +40,8 @@ NotNull
 %% ValueExpression
 %% CommonValueExpression
 
-NumericValueExpression
-Term
-Factor
+uminus
+NumericExpression
 NumericPrimary
 
 BooleanValueExpression
@@ -105,6 +104,17 @@ where
 Rootsymbol Statement.
 Endsymbol '$end'.
 
+
+%% Operator precedence
+
+Nonassoc 200 equals_operator greater_than_operator less_than_operator gte lte nomatch.
+Left     300 minus_sign plus_sign.
+Left     400 solidus asterisk.
+Unary    500 uminus.
+
+
+%% Grammar rules
+
 Statement -> Query           : convert('$1').
 Statement -> TableDefinition : fix_up_keys('$1').
 
@@ -119,14 +129,13 @@ Describe -> describe Bucket : make_describe('$2').
 
 Where -> where BooleanValueExpression : make_where('$1', '$2').
 
-Fields -> left_paren Fields  right_paren : handle_brackets('$2').
 Fields -> Fields     comma   FieldElem   : concat_select('$1', '$3').
 Fields -> FieldElem                      : '$1'.
 
 FieldElem -> Field : '$1'.
 FieldElem -> Val   : '$1'.
 
-Field -> NumericValueExpression : '$1'.
+Field -> NumericExpression : '$1'.
 %Field -> Identifier    : canonicalise_col('$1').
 Field -> asterisk : make_wildcard('$1').
 
@@ -139,7 +148,7 @@ Identifier -> identifier : '$1'.
 
 CharacterLiteral -> character_literal : character_literal_to_binary('$1').
 
-FunArg -> NumericValueExpression : '$1'.
+FunArg -> NumericExpression : '$1'.
 FunArg -> Val        : '$1'.
 %% FunArg -> Funcall    : '$1'.
 
@@ -153,7 +162,7 @@ Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1',
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
-Vals -> NumericValueExpression : '$1'.
+Vals -> NumericExpression : '$1'.
 Vals -> regex            : '$1'.
 Vals -> Val              : '$1'.
 
@@ -181,39 +190,28 @@ NotNull -> not_ null : '$1'.
 %% ValueExpression -> BooleanValueExpression : '$1'.
 
 %% CommonValueExpression ->
-%%     NumericValueExpression : '$1'.
+%%     NumericExpression : '$1'.
 %% % todo: 6.29 string value expression
 %% CommonValueExpression ->
 %%     character_literal : '$1'.
 
 %% 6.27 NUMERIC VALUE EXPRESSION
 
-NumericValueExpression -> Term : '$1'.
-NumericValueExpression ->
-    NumericValueExpression plus_sign Term :
-        make_expr('$1', '$2', '$3').
-NumericValueExpression ->
-    NumericValueExpression minus_sign Term :
-        make_expr('$1', '$2', '$3').
+NumericExpression -> left_paren NumericExpression right_paren: '$2'.
+NumericExpression -> NumericPrimary : '$1'.
 
-Term -> Factor : '$1'.
-Term ->
-    Term asterisk Factor :
-        make_expr('$1', '$2', '$3').
-Term ->
-    Term solidus Factor :
-        make_expr('$1', '$2', '$3').
+NumericExpression -> NumericExpression plus_sign  NumericExpression : make_expr('$1', '$2', '$3').
+NumericExpression -> NumericExpression minus_sign NumericExpression : make_expr('$1', '$2', '$3').
+NumericExpression -> NumericExpression asterisk   NumericExpression : make_expr('$1', '$2', '$3').
+NumericExpression -> NumericExpression solidus    NumericExpression : make_expr('$1', '$2', '$3').
 
-Factor -> NumericPrimary : '$1'.
-Factor -> plus_sign NumericPrimary : '$2'.
-Factor -> minus_sign NumericPrimary : {negate, '$2'}.
+uminus -> minus_sign NumericExpression: {negate, '$2'}.
 
 NumericPrimary -> integer identifier : add_unit('$1', '$2').
 NumericPrimary -> integer : '$1'.
 NumericPrimary -> float : '$1'.
 NumericPrimary -> Identifier : '$1'.
 NumericPrimary -> Funcall : '$1'.
-% NumericPrimary -> NumericValueFunction : '$1'.
 
 %% 6.35 BOOLEAN VALUE EXPRESSION
 
@@ -297,6 +295,8 @@ KeyFieldArg -> float   : '$1'.
 KeyFieldArg -> CharacterLiteral    : '$1'.
 KeyFieldArg -> Identifier : '$1'.
 %% KeyFieldArg -> atom left_paren Word right_paren : make_atom('$3').
+
+Expect 2.
 
 Erlang code.
 
@@ -619,9 +619,6 @@ add_unit({Type, Value}, {identifier, Unit1}) ->
         Millis ->
             {Type, Millis}
     end.
-
-handle_brackets(X) ->
-    {evaluate, X}.
 
 concat_select(L1, L2) when is_list(L1) andalso
                            is_list(L2) ->
