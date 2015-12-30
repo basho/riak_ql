@@ -31,7 +31,7 @@
          }).
 
 -type field_type()         :: simple_field_type() | complex_field_type().
--type simple_field_type()  :: varchar | sint64 | double | timestamp | boolean | set.
+-type simple_field_type()  :: varchar | sint64 | double | timestamp | boolean.
 -type complex_field_type() :: {map, [#riak_field_v1{}]} | any().
 
 %% Relational operators allowed in a where clause.
@@ -78,11 +78,11 @@
 %% returns one row calculated from the result set for the query.
 -type select_result_type() :: rows | aggregate.
 
--record(riak_sel_clause_v1, 
+-record(riak_sel_clause_v1,
         {
           calc_type        = rows :: select_result_type(),
           initial_state    = [],
-          col_return_types = []   :: [sint64 | double | boolean | varchar | timestamp],
+          col_return_types = []   :: [field_type()],
           col_names        = []   :: [binary()],
           clause           = []   :: [selection()],
           is_valid         = true :: true | {error, [any()]}
