@@ -1196,7 +1196,7 @@ fold_where_tree_test() ->
                    "and myseries = 'ser1' " ++
                    "and time > 1 and time < 10",
                DDL = test_parse(CreateTab),
-               {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+               {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
                Q = test_parse(SQL),
                #riak_sql_v1{'SELECT' = Sel} = Q,
                Got = are_selections_valid(Mod, Sel, ?CANTBEBLANK),
@@ -1227,7 +1227,7 @@ fold_where_tree_test() ->
 
 ?select_test(simple_agg_fn_select_fail_1_test, "count(mysint64), avg(myvarchar)",
             {false, [
-                     {type_check_fail, 'AVG', 1, [varchar]}
+                     {type_check_failed, 'AVG', 1, [varchar]}
                     ]
             }).
 
