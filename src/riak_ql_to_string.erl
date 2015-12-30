@@ -361,11 +361,6 @@ roundtrip_ok(Text) ->
     ?assertEqual(
        SQL, string_to_sql(Text2)).
 
-roundtrip_fail(Text) ->
-    SQL = string_to_sql(Text),
-    ?assertNotEqual(
-       SQL, string_to_sql(sql_to_string(SQL))).
-
 string_to_sql(Text) ->
     {ok, SQL} =
         riak_ql_parser:parse(
