@@ -222,7 +222,7 @@ is_query_valid_result(true,        {false, L})  -> {false, L};
 is_query_valid_result({false, L},  true)        -> {false, L};
 is_query_valid_result({false, L1}, {false, L2}) -> {false, L1 ++ L2}.
 
--spec check_filters_valid(module(), [filter()]) -> true | [query_syntax_error()].
+-spec check_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
 check_filters_valid(Mod, Where) ->
     Errors = fold_where_tree(Where, [],
         fun(Clause, Acc) ->
