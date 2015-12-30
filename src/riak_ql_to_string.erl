@@ -357,7 +357,7 @@ select_multiple_simple_test() ->
 roundtrip_ok(Text) ->
     SQL = string_to_sql(Text),
     Text2 = sql_to_string(SQL),
-    ?debugFmt("\n  ~s", [Text2]),
+    %% ?debugFmt("\n  ~s", [Text2]),
     ?assertEqual(
        SQL, string_to_sql(Text2)).
 
