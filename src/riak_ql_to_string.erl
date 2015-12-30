@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_ql_sql_to_txt: module that converts the output of the compiler
-%%                     back to the text representation
+%% riak_ql_sql_to_string: module that converts the output of the compiler
+%%                        back to the text representation
 %%
 %%
 %% Copyright (c) 2015 Basho Technologies, Inc.  All Rights Reserved.
@@ -23,17 +23,17 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_to_string).
 
--export([sql_to_txt/1,
+-export([sql_to_string/1,
          col_names_from_select/1]).
 
 -include("riak_ql_ddl.hrl").
 
--spec sql_to_txt(#riak_sql_v1{} | #ddl_v1{}) ->
+-spec sql_to_string(#riak_sql_v1{} | #ddl_v1{}) ->
                         string().
-sql_to_txt(#riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = S},
-                        'FROM'   = F,
-                        'WHERE'  = W,
-                        type     = sql}) ->
+sql_to_string(#riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = S},
+                           'FROM'   = F,
+                           'WHERE'  = W,
+                           type     = sql}) ->
     SQL = [
         "SELECT",
         make_select_clause(S),
@@ -45,10 +45,10 @@ sql_to_txt(#riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = S},
     ],
     string:join(SQL, " ");
 
-sql_to_txt(#ddl_v1{table         = T,
-                   fields        = FF,
-                   partition_key = PK,
-                   local_key     = LK}) ->
+sql_to_string(#ddl_v1{table         = T,
+                      fields        = FF,
+                      partition_key = PK,
+                      local_key     = LK}) ->
     flat_format(
       "CREATE TABLE ~s (~s, PRIMARY KEY ((~s), ~s))",
       [T, make_fields(FF), make_key(PK), make_key(LK)]).
@@ -366,18 +366,18 @@ select_multiple_simple_test() ->
 %% differences, let's convert strings to SQL structure and do the
 %% comparisons on those
 roundtrip_ok(Text) ->
-    SQL = txt_to_sql(Text),
-    Text2 = sql_to_txt(SQL),
+    SQL = string_to_sql(Text),
+    Text2 = sql_to_string(SQL),
     ?debugFmt("\n  ~s", [Text2]),
     ?assertEqual(
-       SQL, txt_to_sql(Text2)).
+       SQL, string_to_sql(Text2)).
 
 roundtrip_fail(Text) ->
-    SQL = txt_to_sql(Text),
+    SQL = string_to_sql(Text),
     ?assertNotEqual(
-       SQL, txt_to_sql(sql_to_txt(SQL))).
+       SQL, string_to_sql(sql_to_string(SQL))).
 
-txt_to_sql(Text) ->
+string_to_sql(Text) ->
     {ok, SQL} =
         riak_ql_parser:parse(
           riak_ql_lexer:get_tokens(Text)),
