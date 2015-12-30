@@ -268,3 +268,75 @@ left_hand_side_literal_not_equals_test() ->
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(
             "SELECT * FROM mytable WHERE 10 != age"))
     ).
+
+% RTS-788
+% an infinite loop was occurring when two where clauses were the same
+% i.e. time = 10 and time 10
+infinite_loop_test_() ->
+    {timeout, 0.2,
+        fun() ->
+            ?assertMatch(
+                {ok, _},
+                riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+                    "Select myseries, temperature from GeoCheckin2 "
+                    "where time > 1234567 and time > 1234567 "
+                    "and myfamily = 'family1' and myseries = 'series1' "))
+            )
+        end}.
+
+remove_duplicate_clauses_1_test() ->
+  ?assertEqual(
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 ")),
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 AND time > 1234567"))
+    ).
+
+remove_duplicate_clauses_2_test() ->
+  ?assertEqual(
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 ")),
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 AND time > 1234567 AND time > 1234567 "))
+    ).
+
+remove_duplicate_clauses_3_test() ->
+  ?assertEqual(
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 ")),
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 AND time > 1234567 OR time > 1234567 "))
+    ).
+
+remove_duplicate_clauses_4_test() ->
+  ?assertEqual(
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 ")),
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE time > 1234567 AND (time > 1234567 OR time > 1234567) "))
+    ).
+
+% This fails. de-duping does not yet go through the entire tree and
+% pull out duplicates
+% remove_duplicate_clauses_5_test() ->
+%   ?assertEqual(
+%         riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+%             "SELECT * FROM mytab "
+%             "WHERE time > 1234567 "
+%             "AND (localtion > 'derby' OR time > 'sheffield') "
+%             "AND weather = 'raining' ")),
+%         riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+%             "SELECT * FROM mytab "
+%             "WHERE time > 1234567 "
+%             "AND (localtion > 'derby' OR time > 'sheffield') "
+%             "AND weather = 'raining' "
+%             "AND time > 1234567 "))
+%     ).
