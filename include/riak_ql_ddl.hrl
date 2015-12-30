@@ -84,7 +84,7 @@
           initial_state    = [],
           col_return_types = []   :: [sint64 | double | boolean | varchar | timestamp],
           col_names        = []   :: [binary()],
-          clause           = []   :: selection(),
+          clause           = []   :: [selection()],
           is_valid         = true :: true | {error, [any()]}
         }).
 
