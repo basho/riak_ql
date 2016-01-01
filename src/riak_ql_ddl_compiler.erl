@@ -163,7 +163,7 @@ make_extract_cls([], LineNo, _Prefix, Acc) ->
 make_extract_cls([H | T], LineNo, Prefix, Acc) ->
     NPref  = [H | Prefix],
     Args   = [make_string(binary_to_list(Nm), LineNo)
-	      || #riak_field_v1{name = Nm} <- NPref],
+              || #riak_field_v1{name = Nm} <- NPref],
     Poses  = [make_integer(P,  LineNo) || #riak_field_v1{position = P}  <- NPref],
     Conses = make_conses(Args, LineNo, {nil, LineNo}),
     Var    = make_var('Obj', LineNo),
@@ -178,11 +178,11 @@ make_extract_cls([H | T], LineNo, Prefix, Acc) ->
 
 %% this is gnarly because the field order is compile-time dependent
 -spec build_get_ddl_fn(#ddl_v1{}, pos_integer(), ast()) ->
-			      {expr(), pos_integer()}.
+                              {expr(), pos_integer()}.
 build_get_ddl_fn(#ddl_v1{table         = T,
-			 fields        = F,
-			 partition_key = PK,
-			 local_key     = LK}, LineNo, []) ->
+                         fields        = F,
+                         partition_key = PK,
+                         local_key     = LK}, LineNo, []) ->
     PosT  = #ddl_v1.table,
     PosF  = #ddl_v1.fields,
     PosPK = #ddl_v1.partition_key,
@@ -192,12 +192,12 @@ build_get_ddl_fn(#ddl_v1{table         = T,
     %% The record name is deliberatly put last in the list to check it is
     %% actually working ;-)
     {_Poses, List} = lists:unzip(lists:sort([
-					     {PosT,  make_binary(T, LineNo)},
-					     {PosF,  expand_fields(F, LineNo)},
-					     {PosPK, expand_key(PK, LineNo)},
-					     {PosLK, expand_key(LK, LineNo)},
-					     {1,     make_atom(ddl_v1, LineNo)}
-					    ])),
+                                             {PosT,  make_binary(T, LineNo)},
+                                             {PosF,  expand_fields(F, LineNo)},
+                                             {PosPK, expand_key(PK, LineNo)},
+                                             {PosLK, expand_key(LK, LineNo)},
+                                             {1,     make_atom(ddl_v1, LineNo)}
+                                            ])),
     Body = make_tuple(List, LineNo),
     Cl = make_clause([], [], Body, LineNo),
     Fn = make_fun(get_ddl, 0, [Cl], LineNo),
@@ -208,20 +208,20 @@ expand_fields(Fs, LineNo) ->
     make_conses(lists:reverse(Fields), LineNo, {nil, LineNo}).
 
 expand_field(#riak_field_v1{name     = Nm,
-			    position = Pos,
-			    type     = Ty,
-			    optional = Opt}, LineNo) ->
+                            position = Pos,
+                            type     = Ty,
+                            optional = Opt}, LineNo) ->
     PosNm  =  #riak_field_v1.name,
     PosPos =  #riak_field_v1.position,
     PosTy  =  #riak_field_v1.type,
     PosOpt = #riak_field_v1.optional,
     {_Poses, List} = lists:unzip(lists:sort([
-					     {PosNm,  make_binary(Nm, LineNo)},
-					     {PosPos, make_integer(Pos, LineNo)},
-					     {PosTy,  expand_type(Ty, LineNo)},
-					     {PosOpt, make_atom(Opt, LineNo)},
-					     {1,      make_atom(riak_field_v1, LineNo)}
-					    ])),
+                                             {PosNm,  make_binary(Nm, LineNo)},
+                                             {PosPos, make_integer(Pos, LineNo)},
+                                             {PosTy,  expand_type(Ty, LineNo)},
+                                             {PosOpt, make_atom(Opt, LineNo)},
+                                             {1,      make_atom(riak_field_v1, LineNo)}
+                                            ])),
     make_tuple(List, LineNo).
 
 expand_key(none, LineNo) ->
@@ -241,20 +241,20 @@ expand_a2(#param_v1{name = Nm}, LineNo) ->
     Conses = make_conses(Bins, LineNo, {nil, LineNo}),
     make_tuple([make_atom(param_v1, LineNo) | [Conses]], LineNo);
 expand_a2(#hash_fn_v1{mod  = Mod,
-		      fn   = Fn,
-		      args = Args,
-		      type = Ty}, LineNo) ->
+                      fn   = Fn,
+                      args = Args,
+                      type = Ty}, LineNo) ->
     PosMod  = #hash_fn_v1.mod,
     PosFn   = #hash_fn_v1.fn,
     PosArgs = #hash_fn_v1.args,
     PosType = #hash_fn_v1.type,
     {_Pos, List} = lists:unzip(lists:sort([
-					   {PosMod,  make_atom(Mod, LineNo)},
-					   {PosFn,   make_atom(Fn, LineNo)},
-					   {PosArgs, expand_args(Args, LineNo)},
-					   {PosType, make_atom(Ty, LineNo)},
-					   {1,       make_atom(hash_fn_v1, LineNo)}
-					  ])),
+                                           {PosMod,  make_atom(Mod, LineNo)},
+                                           {PosFn,   make_atom(Fn, LineNo)},
+                                           {PosArgs, expand_args(Args, LineNo)},
+                                           {PosType, make_atom(Ty, LineNo)},
+                                           {1,       make_atom(hash_fn_v1, LineNo)}
+                                          ])),
     make_tuple(List, LineNo).
 
 expand_args(Args, LineNo) ->
@@ -280,7 +280,7 @@ expand_type(Type, LineNo) ->
     make_atom(Type, LineNo).
 
 -spec build_is_valid_fn([#riak_field_v1{}], pos_integer()) ->
-			       {expr(), pos_integer()}.
+                               {expr(), pos_integer()}.
 build_is_valid_fn(Fields, LineNo) ->
     {Fns, LineNo2} = make_is_valid_cls(Fields, LineNo, ?NOPREFIX, []),
     {Fail, LineNo3} = make_fail_clause(LineNo2),
@@ -301,7 +301,7 @@ make_is_valid_cls([H | T], LineNo, Prefix, Acc) ->
     %% handle the prefixes slightly differently here than to the perviousls clause
     NPref  = [H | Prefix],
     Args   = [make_string(binary_to_list(Nm), LineNo)
-	      || #riak_field_v1{name = Nm} <- NPref],
+              || #riak_field_v1{name = Nm} <- NPref],
     Conses = make_conses(Args, LineNo, {nil, LineNo}),
     %% you need to reverse the lists of the positions to
     %% get the calls to element to nest correctly
@@ -313,7 +313,7 @@ make_is_valid_cls([H | T], LineNo, Prefix, Acc) ->
     make_is_valid_cls(T, NewLineNo, Prefix, NewA).
 
 -spec build_get_type_fn([#riak_field_v1{}], pos_integer()) ->
-			       {expr(), pos_integer()}.
+                               {expr(), pos_integer()}.
 build_get_type_fn(Field, LineNo) ->
     {Fns, LineNo2} = make_get_type_cls(Field, LineNo, ?NOPREFIX, []),
     Clauses = lists:flatten(lists:reverse(Fns)),
@@ -325,7 +325,7 @@ make_get_type_cls([], LineNo, _Prefix, Acc) ->
 make_get_type_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
     NPref  = [H | Prefix],
     Args   = [make_string(binary_to_list(Nm), LineNo)
-	      || #riak_field_v1{name = Nm} <- NPref],
+              || #riak_field_v1{name = Nm} <- NPref],
     Conses = make_conses(Args, LineNo, {nil, LineNo}),
     %% you need to reverse the lists of the positions to
     %% get the calls to element to nest correctly
@@ -510,7 +510,7 @@ make_module_attr(ModName, LineNo) ->
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
                                   {validate_obj,    1},
-				  {add_column_info, 1},
+                                  {add_column_info, 1},
                                   {get_field_type,  1},
                                   {is_field_valid,  1},
                                   {extract,         2},
@@ -561,11 +561,11 @@ simplest_valid_test() ->
 
 make_simplest_valid_ddl() ->
     make_ddl(<<"simplest_valid_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = varchar}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = varchar}
+             ]).
 
 simple_valid_varchar_test() ->
     DDL = make_simple_valid_varchar_ddl(),
@@ -575,14 +575,14 @@ simple_valid_varchar_test() ->
 
 make_simple_valid_varchar_ddl() ->
     make_ddl(<<"simple_valid_varchar_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = varchar},
-	      #riak_field_v1{name     = <<"erko">>,
-			     position = 2,
-			     type     = varchar}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = varchar},
+              #riak_field_v1{name     = <<"erko">>,
+                             position = 2,
+                             type     = varchar}
+             ]).
 
 simple_valid_sint64_test() ->
     DDL = make_simple_valid_sint64_ddl(),
@@ -592,17 +592,17 @@ simple_valid_sint64_test() ->
 
 make_simple_valid_sint64_ddl() ->
     make_ddl(<<"simple_valid_sint64_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = sint64},
-	      #riak_field_v1{name     = <<"erko">>,
-			     position = 2,
-			     type     = sint64},
-	      #riak_field_v1{name     = <<"erkle">>,
-			     position = 3,
-			     type     = sint64}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = sint64},
+              #riak_field_v1{name     = <<"erko">>,
+                             position = 2,
+                             type     = sint64},
+              #riak_field_v1{name     = <<"erkle">>,
+                             position = 3,
+                             type     = sint64}
+             ]).
 
 simple_valid_double_test() ->
     DDL = make_simple_valid_double_ddl(),
@@ -612,17 +612,17 @@ simple_valid_double_test() ->
 
 make_simple_valid_double_ddl() ->
     make_ddl(<<"simple_valid_double_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = double},
-	      #riak_field_v1{name     = <<"erko">>,
-			     position = 2,
-			     type     = double},
-	      #riak_field_v1{name     = <<"erkle">>,
-			     position = 3,
-			     type     = double}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = double},
+              #riak_field_v1{name     = <<"erko">>,
+                             position = 2,
+                             type     = double},
+              #riak_field_v1{name     = <<"erkle">>,
+                             position = 3,
+                             type     = double}
+             ]).
 
 simple_valid_boolean_test() ->
     DDL = make_simple_valid_boolean_ddl(),
@@ -632,14 +632,14 @@ simple_valid_boolean_test() ->
 
 make_simple_valid_boolean_ddl() ->
     make_ddl(<<"simple_valid_boolean_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = boolean},
-	      #riak_field_v1{name     = <<"erko">>,
-			     position = 2,
-			     type     = boolean}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = boolean},
+              #riak_field_v1{name     = <<"erko">>,
+                             position = 2,
+                             type     = boolean}
+             ]).
 
 simple_valid_timestamp_test() ->
     DDL = make_simple_valid_timestamp_ddl(),
@@ -649,17 +649,17 @@ simple_valid_timestamp_test() ->
 
 make_simple_valid_timestamp_ddl() ->
     make_ddl(<<"simple_valid_timestamp_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = timestamp},
-	      #riak_field_v1{name     = <<"erko">>,
-			     position = 2,
-			     type     = timestamp},
-	      #riak_field_v1{name     = <<"erkle">>,
-			     position = 3,
-			     type     = timestamp}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = timestamp},
+              #riak_field_v1{name     = <<"erko">>,
+                             position = 2,
+                             type     = timestamp},
+              #riak_field_v1{name     = <<"erkle">>,
+                             position = 3,
+                             type     = timestamp}
+             ]).
 
 simple_valid_optional_1_test() ->
     DDL = make_simple_valid_optional_1_ddl(),
@@ -669,12 +669,12 @@ simple_valid_optional_1_test() ->
 
 make_simple_valid_optional_1_ddl() ->
     make_ddl(<<"simple_valid_optional_1_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = varchar,
-			     optional = true}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = varchar,
+                             optional = true}
+             ]).
 
 simple_valid_optional_2_test() ->
     DDL = make_simple_valid_optional_2_ddl(),
@@ -684,32 +684,32 @@ simple_valid_optional_2_test() ->
 
 make_simple_valid_optional_2_ddl() ->
     make_ddl(<<"simple_valid_optional_2_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = varchar,
-			     optional = true},
-	      #riak_field_v1{name     = <<"erko">>,
-			     position = 2,
-			     type     = sint64,
-			     optional = true},
-	      #riak_field_v1{name     = <<"erkle">>,
-			     position = 3,
-			     type     = double,
-			     optional = true},
-	      #riak_field_v1{name     = <<"eejit">>,
-			     position = 4,
-			     type     = boolean,
-			     optional = true},
-	      #riak_field_v1{name     = <<"ergot">>,
-			     position = 5,
-			     type     = boolean,
-			     optional = true},
-	      #riak_field_v1{name     = <<"endofdays">>,
-			     position = 6,
-			     type     = timestamp,
-			     optional = true}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = varchar,
+                             optional = true},
+              #riak_field_v1{name     = <<"erko">>,
+                             position = 2,
+                             type     = sint64,
+                             optional = true},
+              #riak_field_v1{name     = <<"erkle">>,
+                             position = 3,
+                             type     = double,
+                             optional = true},
+              #riak_field_v1{name     = <<"eejit">>,
+                             position = 4,
+                             type     = boolean,
+                             optional = true},
+              #riak_field_v1{name     = <<"ergot">>,
+                             position = 5,
+                             type     = boolean,
+                             optional = true},
+              #riak_field_v1{name     = <<"endofdays">>,
+                             position = 6,
+                             type     = timestamp,
+                             optional = true}
+             ]).
 
 simple_valid_optional_3_test() ->
     DDL = make_simple_valid_optional_3_ddl(),
@@ -719,16 +719,16 @@ simple_valid_optional_3_test() ->
 
 make_simple_valid_optional_3_ddl() ->
     make_ddl(<<"simple_valid_optional_3_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = varchar,
-			     optional = true},
-	      #riak_field_v1{name     = <<"yerk">>,
-			     position = 2,
-			     type     = varchar,
-			     optional = false}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = varchar,
+                             optional = true},
+              #riak_field_v1{name     = <<"yerk">>,
+                             position = 2,
+                             type     = varchar,
+                             optional = false}
+             ]).
 
 simple_valid_mixed_test() ->
     DDL = make_simple_valid_mixed_ddl(),
@@ -738,20 +738,20 @@ simple_valid_mixed_test() ->
 
 make_simple_valid_mixed_ddl() ->
     make_ddl(<<"simple_valid_mixed_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = varchar},
-	      #riak_field_v1{name     = <<"erko">>,
-			     position = 2,
-			     type     = sint64},
-	      #riak_field_v1{name     = <<"erkle">>,
-			     position = 3,
-			     type     = double},
-	      #riak_field_v1{name     = <<"banjo">>,
-			     position = 4,
-			     type     = timestamp}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = varchar},
+              #riak_field_v1{name     = <<"erko">>,
+                             position = 2,
+                             type     = sint64},
+              #riak_field_v1{name     = <<"erkle">>,
+                             position = 3,
+                             type     = double},
+              #riak_field_v1{name     = <<"banjo">>,
+                             position = 4,
+                             type     = timestamp}
+             ]).
 
 %%
 %% invalid tests
@@ -949,48 +949,48 @@ make_complex_ddl_ddl() ->
     #ddl_v1{
        table = <<"temperatures">>,
        fields = [
-		 #riak_field_v1{
-		    name     = <<"time">>,
-		    position = 1,
-		    type     = timestamp,
-		    optional = false},
-		 #riak_field_v1{
-		    name     = <<"user_id">>,
-		    position = 2,
-		    type     = varchar,
-		    optional = false}
-		],
+                 #riak_field_v1{
+                    name     = <<"time">>,
+                    position = 1,
+                    type     = timestamp,
+                    optional = false},
+                 #riak_field_v1{
+                    name     = <<"user_id">>,
+                    position = 2,
+                    type     = varchar,
+                    optional = false}
+                ],
        partition_key = #key_v1{ast = [
-				      #param_v1{name = [<<"time">>]},
-				      #hash_fn_v1{mod  = crypto,
-						  fn   = hash,
-						  %% list isn't a valid arg
-						  %% type output from the
-						  %% lexer/parser
-						  args = [
-							  sha512,
-							  true,
-							  1,
-							  1.0,
-							  <<"abc">>
-							 ]}
-				     ]},
+                                      #param_v1{name = [<<"time">>]},
+                                      #hash_fn_v1{mod  = crypto,
+                                                  fn   = hash,
+                                                  %% list isn't a valid arg
+                                                  %% type output from the
+                                                  %% lexer/parser
+                                                  args = [
+                                                          sha512,
+                                                          true,
+                                                          1,
+                                                          1.0,
+                                                          <<"abc">>
+                                                         ]}
+                                     ]},
        local_key = #key_v1{ast = [
-				  #hash_fn_v1{mod  = crypto,
-					      fn   = hash,
-					      args = [ripemd]},
-				  #param_v1{name = [<<"time">>]}
-				 ]}}.
+                                  #hash_fn_v1{mod  = crypto,
+                                              fn   = hash,
+                                              args = [ripemd]},
+                                  #param_v1{name = [<<"time">>]}
+                                 ]}}.
 
 %%
 %% test the get_ddl function
 %%
 
 -define(ddl_roundtrip_assert(MakeDDLFunName),
-	DDL = erlang:apply(?MODULE, MakeDDLFunName, []),
-	{module, Module} = compile_and_load_from_tmp(DDL),
-	Got = Module:get_ddl(),
-	?assertEqual(DDL, Got)).
+        DDL = erlang:apply(?MODULE, MakeDDLFunName, []),
+        {module, Module} = compile_and_load_from_tmp(DDL),
+        Got = Module:get_ddl(),
+        ?assertEqual(DDL, Got)).
 
 simplest_valid_get_test() ->
     ?ddl_roundtrip_assert(make_simplest_valid_ddl).
@@ -1030,44 +1030,44 @@ timeseries_ddl_get_test() ->
 
 make_timeseries_ddl() ->
     Fields = [
-	      #riak_field_v1{name     = <<"geohash">>,
-			     position = 1,
-			     type     = varchar,
-			     optional = false},
-	      #riak_field_v1{name     = <<"user">>,
-			     position = 2,
-			     type     = varchar,
-			     optional = false},
-	      #riak_field_v1{name     = <<"time">>,
-			     position = 3,
-			     type     = timestamp,
-			     optional = false},
-	      #riak_field_v1{name     = <<"weather">>,
-			     position = 4,
-			     type     = varchar,
-			     optional = false},
-	      #riak_field_v1{name     = <<"temperature">>,
-			     position = 5,
-			     type     = varchar,
-			     optional = true}
-	     ],
+              #riak_field_v1{name     = <<"geohash">>,
+                             position = 1,
+                             type     = varchar,
+                             optional = false},
+              #riak_field_v1{name     = <<"user">>,
+                             position = 2,
+                             type     = varchar,
+                             optional = false},
+              #riak_field_v1{name     = <<"time">>,
+                             position = 3,
+                             type     = timestamp,
+                             optional = false},
+              #riak_field_v1{name     = <<"weather">>,
+                             position = 4,
+                             type     = varchar,
+                             optional = false},
+              #riak_field_v1{name     = <<"temperature">>,
+                             position = 5,
+                             type     = varchar,
+                             optional = true}
+             ],
     PK = #key_v1{ ast = [
-			 #hash_fn_v1{mod  = riak_ql_quanta,
-				     fn   = quantum,
-				     args = [
-					     #param_v1{name = [<<"time">>]},
-					     15,
-					     s
-					    ]}
-			]},
+                         #hash_fn_v1{mod  = riak_ql_quanta,
+                                     fn   = quantum,
+                                     args = [
+                                             #param_v1{name = [<<"time">>]},
+                                             15,
+                                             s
+                                            ]}
+                        ]},
     LK = #key_v1{ast = [
-			#param_v1{name = [<<"time">>]},
-			#param_v1{name = [<<"user">>]}]
-		},
+                        #param_v1{name = [<<"time">>]},
+                        #param_v1{name = [<<"user">>]}]
+                },
     _DDL = #ddl_v1{table         = <<"timeseries_filter_test">>,
-		   fields        = Fields,
-		   partition_key = PK,
-		   local_key     = LK
-		  }.
+                   fields        = Fields,
+                   partition_key = PK,
+                   local_key     = LK
+                  }.
 
 -endif.
