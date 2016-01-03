@@ -32,7 +32,9 @@
 
 -include("riak_ql_ddl.hrl").
 
-%% functions used in expression type validation
+-spec get_arity_and_type_sig(aggregate_function()) -> {non_neg_integer(), [{field_type(), field_type()}]}.
+%% functions used in expression type validation for each Function, the
+%% returned tuple gives the arity and arg-type to return-type pairs
 get_arity_and_type_sig('COUNT')  -> {1, [{sint64, sint64}, {double, sint64}, {boolean, sint64}, {varchar, sint64}, {timestamp, sint64}]};
 get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  %% double promotion
 get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG'); 
