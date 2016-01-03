@@ -35,7 +35,7 @@
 %% functions used in expression type validation
 get_arity_and_type_sig('COUNT')  -> {1, [{sint64, sint64}, {double, sint64}, {boolean, sint64}, {varchar, sint64}, {timestamp, sint64}]};
 get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  %% double promotion
-get_arity_and_type_sig('MEAN')   -> {1, [{sint64, double}, {double, double}]};  %% double promotion
+get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG'); 
 get_arity_and_type_sig('MAX')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('STDEV')  -> {1, [{sint64, double}, {double, double}]};  %% ditto
@@ -44,26 +44,29 @@ get_arity_and_type_sig('SUM')    -> {1, [{sint64, sint64}, {double, double}]}.
 %% Get the initial accumulator state for the aggregation.
 -spec start_state(aggregate_function()) ->
     any().
-start_state('AVG') -> 0;
-start_state('MEAN') -> 0;
+start_state('AVG')   -> {0, 0.0};
+start_state('MEAN')  -> start_state('AVG');
 start_state('COUNT') -> 0;
-start_state('MAX') -> not_a_value;
-start_state('MIN') -> not_a_value;
+start_state('MAX')   -> not_a_value;
+start_state('MIN')   -> not_a_value;
 start_state('STDEV') -> {0, 0.0, 0.0};
-start_state('SUM') -> 0;
-start_state(_) -> stateless.
+start_state('SUM')   -> 0;
+start_state(_)       -> stateless.
 
 %% Calculate the final results using the accumulated result.
 -spec finalise(aggregate_function(), any()) -> any().
 finalise('MEAN', {N, Acc}) ->
     finalise('AVG', {N, Acc});
+%% TODO
+finalise('AVG', {0, _}) ->
+    exit('need to handle nulls boyo');
 finalise('AVG', {N, Acc}) ->
     Acc / N;
 finalise('STDEV', {N, _A, Q}) ->
     math:sqrt(Q / N);
 finalise(_, not_a_value) ->
-    0;
-finalise(_, Acc) ->
+    exit('still need to handle nulls boyo');
+finalise(_Fn, Acc) ->
     Acc.
 
 %% Group functions (avg, mean etc). These can only appear as top-level
@@ -77,37 +80,50 @@ finalise(_, Acc) ->
 'COUNT'(_, N) when is_integer(N) ->
     N + 1.
 
-'SUM'(Arg, _State = Total) ->
-    Arg + Total.
+'SUM'({_ColName, Arg}, _State = Total) when is_number(Arg) ->
+    Arg + Total;
+'SUM'({_ColName, _Arg}, State) ->
+    State.
 
 'MEAN'(Arg, State) ->
     'AVG'(Arg, State).
 
-'AVG'(Arg, _State = {N, Acc}) ->
-    {N + 1, Acc + Arg}.
+'AVG'({_ColName, Arg}, _State = {N, Acc}) when is_number(Arg) ->
+    {N + 1, Acc + Arg};
+'AVG'(_Arg, State) ->
+    State.
 
-'MIN'(Arg, not_a_value)        -> Arg;
-'MIN'(Arg, Acc) when Arg < Acc -> Arg;
-'MIN'(Arg, _)                  -> Arg.
+'MIN'({_ColName, []},   State)                  -> State;
+'MIN'({_ColName, Arg},  not_a_value)            -> Arg;
+'MIN'({_ColName, Arg},  State) when Arg < State -> Arg;
+'MIN'({_ColName, _Arg}, State)                  -> State.
 
-'MAX'(Arg, not_a_value)        -> Arg;
-'MAX'(Arg, Acc) when Arg > Acc -> Arg;
-'MAX'(Arg, _)                  -> Arg.
+'MAX'({_ColName, []},   State)                  -> State;
+'MAX'({_ColName, Arg},  not_a_value)            -> Arg;
+'MAX'({_ColName, Arg},  State) when Arg > State -> Arg;
+'MAX'({_ColName, _Arg}, State)                  -> State.
 
-'STDEV'(Arg, _State = {N_old, A_old, Q_old}) ->
+'STDEV'({_ColName, Arg}, _State = {N_old, A_old, Q_old}) when is_number(Arg) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
     N = N_old + 1,
     A = A_old + (Arg - A_old) / N,
     Q = Q_old + (Arg - A_old) * (Arg - A),
-    {N, A, Q}.
-
+    {N, A, Q};
+'STDEV'(_, State) ->
+    State.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+-define(COL, <<"fake column name">>).
+
 stdev_test() ->
     State0 = start_state('STDEV'),
-    Data = [1.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 4.0, 4.0, 3.0, 2.0, 3.0, 2.0, 1.0, 1.0],
+    Data = [
+            {?COL, 1.0}, {?COL, 2.0}, {?COL, 3.0}, {?COL, 4.0}, {?COL, 2.0}, 
+            {?COL, 3.0}, {?COL, 4.0}, {?COL, 4.0}, {?COL, 4.0}, {?COL, 3.0}, 
+            {?COL, 2.0}, {?COL, 3.0}, {?COL, 2.0}, {?COL, 1.0}, {?COL, 1.0}
+           ],
     %% numpy.std(Data) computes it to:
     Expected = 1.0832051206181281,
     %% There is a possibility of Erlang computing it differently, on
