@@ -360,6 +360,9 @@ is_selection_column_valid(Mod, {{window_agg_fn, Fn}, Args}, {Acc, Status}) ->
 is_selection_column_valid(_, {Type, _}, Acc) when is_atom(Type) ->
     % literal types, integer double etc.
     Acc;
+is_selection_column_valid(_, {Op, _, _}, Acc) when is_atom(Op) ->
+    % arithmetic
+    Acc;
 is_selection_column_valid(_, Other, {Acc, _}) ->
     {[{unknown_column_type, Other} | Acc], false}.
 
