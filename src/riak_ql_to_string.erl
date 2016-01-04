@@ -217,7 +217,7 @@ select_col_to_string_one_plus_one_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
         "select 1+1 from bendy")),
     ?assertEqual(
-        ["(1 + 1)"],
+        ["(1+1)"],
         col_names_from_select(SQL)
     ).
 
@@ -225,7 +225,7 @@ select_col_to_string_four_div_two_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
         "select 4/2 from bendy")),
     ?assertEqual(
-        ["(4 / 2)"],
+        ["(4/2)"],
         col_names_from_select(SQL)
     ).
 
@@ -233,7 +233,7 @@ select_col_to_string_four_times_ten_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
         "select 4*10 from bendy")),
     ?assertEqual(
-        ["(4 * 10)"],
+        ["(4*10)"],
         col_names_from_select(SQL)
     ).
 
@@ -249,7 +249,7 @@ select_col_to_string_avg_funcall_with_nested_maths_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
         "select avg(10+5) from bendy")),
     ?assertEqual(
-        ["AVG((10 + 5))"],
+        ["AVG((10+5))"],
         col_names_from_select(SQL)
     ).
 
