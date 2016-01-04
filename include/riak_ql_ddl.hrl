@@ -86,7 +86,7 @@
           col_names        = []   :: [binary()],
           clause           = []   :: [selection()],
           is_valid         = true :: true | {error, [any()]},
-          finalisers       = []   :: function()
+          finalisers       = []   :: [function()]
         }).
 
 -record(riak_sql_v1,
