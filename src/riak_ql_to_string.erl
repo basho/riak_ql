@@ -100,7 +100,7 @@ select_col_to_string({expr, Expression}) ->
     select_col_to_string(Expression);
 select_col_to_string({Op, Arg1, Arg2}) when is_atom(Op) ->
     flat_format(
-      "(~s ~s ~s)",
+      "(~s~s~s)",
       [select_col_to_string(Arg1), op_to_string(Op), select_col_to_string(Arg2)]).
 
 make_from_clause(X) when is_binary(X) ->
