@@ -65,7 +65,7 @@
                     | {float, float()}
                     | {boolean, boolean()}
                     | {binary, binary()}
-                    | {funcall, {FunctionName::atom(), [selection()]}}
+                    | {{window_agg_fn, FunctionName::atom()}, [any()]}
                     | {expr, selection()}.
 
 -type filter()     :: term().
@@ -85,7 +85,8 @@
           col_return_types = []   :: [sint64 | double | boolean | varchar | timestamp],
           col_names        = []   :: [binary()],
           clause           = []   :: [selection()],
-          is_valid         = true :: true | {error, [any()]}
+          is_valid         = true :: true | {error, [any()]},
+          finalisers       = []   :: function()
         }).
 
 -record(riak_sql_v1,
