@@ -82,30 +82,24 @@ finalise(_Fn, Acc) ->
 'COUNT'(_, N) when is_integer(N) ->
     N + 1.
 
-'SUM'({_ColName, Arg}, _State = Total) when is_number(Arg) ->
-    Arg + Total;
-'SUM'({_ColName, _Arg}, State) ->
-    State.
+'SUM'(Arg, Total) when is_number(Arg) ->
+    Arg + Total.
 
 'MEAN'(Arg, State) ->
     'AVG'(Arg, State).
 
-'AVG'({_ColName, Arg}, _State = {N, Acc}) when is_number(Arg) ->
-    {N + 1, Acc + Arg};
-'AVG'(_Arg, State) ->
-    State.
+'AVG'(Arg, {N, Acc}) when is_number(Arg) ->
+    {N + 1, Acc + Arg}.
 
-'MIN'({_ColName, []},   State)                  -> State;
-'MIN'({_ColName, Arg},  not_a_value)            -> Arg;
-'MIN'({_ColName, Arg},  State) when Arg < State -> Arg;
-'MIN'({_ColName, _Arg}, State)                  -> State.
+'MIN'(Arg, not_a_value) -> Arg;
+'MIN'(Arg, State) when Arg < State -> Arg;
+'MIN'(_, State) -> State.
 
-'MAX'({_ColName, []},   State)                  -> State;
-'MAX'({_ColName, Arg},  not_a_value)            -> Arg;
-'MAX'({_ColName, Arg},  State) when Arg > State -> Arg;
-'MAX'({_ColName, _Arg}, State)                  -> State.
+'MAX'(Arg, not_a_value) -> Arg;
+'MAX'(Arg, State) when Arg > State -> Arg;
+'MAX'(_, State) -> State.
 
-'STDEV'({_ColName, Arg}, _State = {N_old, A_old, Q_old}) when is_number(Arg) ->
+'STDEV'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
     N = N_old + 1,
     A = A_old + (Arg - A_old) / N,
@@ -117,14 +111,12 @@ finalise(_Fn, Acc) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
--define(COL, <<"fake column name">>).
-
 stdev_test() ->
     State0 = start_state('STDEV'),
     Data = [
-            {?COL, 1.0}, {?COL, 2.0}, {?COL, 3.0}, {?COL, 4.0}, {?COL, 2.0}, 
-            {?COL, 3.0}, {?COL, 4.0}, {?COL, 4.0}, {?COL, 4.0}, {?COL, 3.0}, 
-            {?COL, 2.0}, {?COL, 3.0}, {?COL, 2.0}, {?COL, 1.0}, {?COL, 1.0}
+            1.0, 2.0, 3.0, 4.0, 2.0, 
+            3.0, 4.0, 4.0, 4.0, 3.0, 
+            2.0, 3.0, 2.0, 1.0, 1.0
            ],
     %% numpy.std(Data) computes it to:
     Expected = 1.0832051206181281,
@@ -136,5 +128,8 @@ stdev_test() ->
     State9 = lists:foldl(fun 'STDEV'/2, State0, Data),
     Got = finalise('STDEV', State9),
     ?assertEqual(Expected, Got).
+
+min_1_test() ->
+    ?assertEqual('MAX'(1, 3), erlang:max(1, 3)).
 
 -endif.
