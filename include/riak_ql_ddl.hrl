@@ -81,7 +81,7 @@
 -record(riak_sel_clause_v1, 
         {
           calc_type        = rows :: select_result_type(),
-          initial_state    = [],
+          initial_state    = []   :: [any()],
           col_return_types = []   :: [sint64 | double | boolean | varchar | timestamp],
           col_names        = []   :: [binary()],
           clause           = []   :: [selection()],
