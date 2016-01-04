@@ -84,7 +84,7 @@
           initial_state    = []   :: [any()],
           col_return_types = []   :: [sint64 | double | boolean | varchar | timestamp],
           col_names        = []   :: [binary()],
-          clause           = []   :: [selection()],
+          clause           = []   :: [riak_kv_qry_compiler:compiled_select()],
           is_valid         = true :: true | {error, [any()]},
           finalisers       = []   :: [function()]
         }).
