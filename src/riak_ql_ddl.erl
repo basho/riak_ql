@@ -202,7 +202,10 @@ syntax_error_to_msg2({unexpected_select_field, Field}) ->
 syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
     {"subexpressions_not_supported: expressions in where clause operators"
      " (~s ~s ...) are not supported.",
-     [Field, Op]}.
+     [Field, Op]};
+syntax_error_to_msg2({unknown_column_type, Other}) ->
+    {"Unexpected select column type ~p.", [Other]}.
+
 
 -spec is_query_valid(module(), #ddl_v1{}, #riak_sql_v1{}) ->
         true | {false, [query_syntax_error()]}.
@@ -332,7 +335,7 @@ are_selections_valid(Mod, Selections, _) ->
         {Msgs, false} -> {false, lists:reverse(Msgs)}
     end.
 
-%%
+%% Reported error types must be supported by the function syntax_error_to_msg2 
 is_selection_column_valid(Mod, {identifier, X}, {Acc, Status}) ->
     case Mod:is_field_valid(X) of
         true  ->
@@ -353,7 +356,12 @@ is_selection_column_valid(Mod, {{window_agg_fn, Fn}, Args}, {Acc, Status}) ->
                  end;
         N     -> Msg2 = {fn_called_with_wrong_arity, Fn, Arity, N},
                  {[Msg2 | Acc], false}
-    end.
+    end;
+is_selection_column_valid(_, {Type, _}, Acc) when is_atom(Type) ->
+    % literal types, integer double etc.
+    Acc;
+is_selection_column_valid(_, Other, {Acc, _}) ->
+    {[{unknown_column_type, Other} | Acc], false}.
 
 do_types_match(FnTypeSig, ExprTypes) ->
     CheckFn = fun(X, Acc) ->
