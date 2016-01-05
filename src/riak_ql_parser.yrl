@@ -120,7 +120,6 @@ Describe -> describe Bucket : make_describe('$2').
 
 Where -> where BooleanValueExpression : make_where('$1', '$2').
 
-%% Fields -> left_paren Fields  right_paren : handle_brackets('$2').
 Fields -> Fields     comma   FieldElem   : concat_select('$1', '$3').
 Fields -> FieldElem                      : '$1'.
 
@@ -620,9 +619,6 @@ add_unit({Type, Value}, {identifier, Unit1}) ->
         Millis ->
             {Type, Millis}
     end.
-
-%% handle_brackets(X) ->
-%%     {evaluate, X}.
 
 concat_select(L1, L2) when is_list(L1) andalso
                            is_list(L2) ->
