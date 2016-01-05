@@ -43,6 +43,7 @@
 -export([get_local_key/2, get_local_key/3]).
 -export([get_partition_key/2, get_partition_key/3]).
 -export([is_query_valid/3]).
+%%-export([get_return_types_and_col_names/2]).
 -export([make_key/3]).
 -export([syntax_error_to_msg/1]).
 
@@ -179,6 +180,10 @@ syntax_error_to_msg(E) ->
         iolist_to_binary(io_lib:format(Fmt, Args)).
 
 %%
+syntax_error_to_msg2({type_check_failed, Fn, Arity, ExprTypes}) ->
+    {"Function ~p/~p called with arguments of the wrong type ~p.", [Fn, Arity, ExprTypes]};
+syntax_error_to_msg2({fn_called_with_wrong_arity, Fn, Arity, NoArgs}) ->
+    {"Function ~p/~p called with ~p arguments.", [Fn, Arity, NoArgs]};
 syntax_error_to_msg2({bucket_type_mismatch, B1, B2}) ->
     {"bucket_type_mismatch: DDL bucket type was ~s "
      "but query selected from bucket type ~s.", [B1, B2]};
@@ -197,7 +202,10 @@ syntax_error_to_msg2({unexpected_select_field, Field}) ->
 syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
     {"subexpressions_not_supported: expressions in where clause operators"
      " (~s ~s ...) are not supported.",
-     [Field, Op]}.
+     [Field, Op]};
+syntax_error_to_msg2({unknown_column_type, Other}) ->
+    {"Unexpected select column type ~p.", [Other]}.
+
 
 -spec is_query_valid(module(), #ddl_v1{}, #riak_sql_v1{}) ->
         true | {false, [query_syntax_error()]}.
@@ -205,8 +213,8 @@ is_query_valid(_, #ddl_v1{ table = T1 },
                #riak_sql_v1{ 'FROM' = T2 }) when T1 =/= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _,
-               #riak_sql_v1{'SELECT' = Selection,
-               'WHERE'  = Where}) ->
+               #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = Selection},
+                            'WHERE'  = Where}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
@@ -217,6 +225,7 @@ is_query_valid_result(true,        {false, L})  -> {false, L};
 is_query_valid_result({false, L},  true)        -> {false, L};
 is_query_valid_result({false, L1}, {false, L2}) -> {false, L1 ++ L2}.
 
+-spec check_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
 check_filters_valid(Mod, Where) ->
     Errors = fold_where_tree(Where, [],
         fun(Clause, Acc) ->
@@ -312,20 +321,65 @@ is_compatible_operator('!=', boolean, boolean)-> true;
 is_compatible_operator(_,    boolean, boolean)-> false;
 is_compatible_operator(_,_,_)                 -> true.
 
+-spec are_selections_valid(module(), [selection()], boolean()) ->
+                                  true | {false, [query_syntax_error()]}.
 are_selections_valid(_, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
 are_selections_valid(Mod, Selections, _) ->
-    CheckFn = fun({identifier, X}, {Acc, Status}) ->
-                      case Mod:is_field_valid(X) of
-                          true  -> {Acc, Status};
-                          false -> Msg = {unexpected_select_field, hd(X)},
-                                   {[Msg | Acc], false}
-                      end
-              end,
+    CheckFn =
+        fun(E, Acc) ->
+                is_selection_column_valid(Mod, E, Acc)
+        end,
     case lists:foldl(CheckFn, {[], true}, Selections) of
         {[],   true}  -> true;
         {Msgs, false} -> {false, lists:reverse(Msgs)}
     end.
+
+%% Reported error types must be supported by the function syntax_error_to_msg2 
+is_selection_column_valid(Mod, {identifier, X}, {Acc, Status}) ->
+    case Mod:is_field_valid(X) of
+        true  ->
+            {Acc, Status};
+        false ->
+            Msg = {unexpected_select_field, hd(X)},
+            {[Msg | Acc], false}
+    end;
+is_selection_column_valid(Mod, {{window_agg_fn, Fn}, Args}, {Acc, Status}) ->
+    % if the field is not an identifier, it should already be validated
+    {Arity, FnTypeSig} = riak_ql_window_agg_fns:get_arity_and_type_sig(Fn),
+    case length(Args) of
+        Arity -> ExprTypes = type(Args, Mod, []),
+                 case do_types_match(FnTypeSig, ExprTypes) of
+                     true  -> {Acc, Status};
+                     false -> Msg1 = {type_check_failed, Fn, Arity, ExprTypes},
+                              {[Msg1 | Acc], false}
+                 end;
+        N     -> Msg2 = {fn_called_with_wrong_arity, Fn, Arity, N},
+                 {[Msg2 | Acc], false}
+    end;
+is_selection_column_valid(_, {Type, _}, Acc) when is_atom(Type) ->
+    % literal types, integer double etc.
+    Acc;
+is_selection_column_valid(_, {Op, _, _}, Acc) when is_atom(Op) ->
+    % arithmetic
+    Acc;
+is_selection_column_valid(_, Other, {Acc, _}) ->
+    {[{unknown_column_type, Other} | Acc], false}.
+
+do_types_match(FnTypeSig, ExprTypes) ->
+    CheckFn = fun(X, Acc) ->
+                      case lists:keymember(X, 1, FnTypeSig) of
+                          true  -> Acc;
+                          false -> false
+                      end
+              end,
+    lists:foldl(CheckFn, true, ExprTypes).
+
+type([], _Mod, Acc) ->
+    lists:reverse(Acc);
+type([{identifier, I} | T], Mod, Acc) ->
+    NewAcc = Mod:get_field_type(I),
+    type(T, Mod, [NewAcc | Acc]).
 
 %% Fold over the syntax tree for a where clause.
 fold_where_tree([], Acc, _) ->
@@ -740,7 +794,7 @@ simple_is_query_valid_test() ->
     Bucket = <<"simple_is_query_valid_test">>,
     Selections  = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections},
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections}},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -764,7 +818,7 @@ simple_is_query_valid_map_test() ->
     Selections  = [{identifier, [<<"temp">>, <<"geo">>]},
                                       {identifier, [<<"name">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections},
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections}},
     Map = {map, [
                  #riak_field_v1{name     = Name2,
                                 position = 1,
@@ -792,7 +846,7 @@ simple_is_query_valid_map_wildcard_test() ->
     Name2 = <<"geo">>,
     Selections  = [{identifier, [<<"temp">>, <<"*">>]}, {identifier, [<<"name">>]}],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections},
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections}},
     Map = {map, [
                  #riak_field_v1{name     = Name2,
                                 position = 1,
@@ -826,7 +880,7 @@ simple_filter_query_test() ->
              }
             ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections,
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections},
                          'WHERE'  = Where},
     DDL = make_ddl(Bucket,
                    [
@@ -856,7 +910,7 @@ full_filter_query_test() ->
                  {'>=', <<"gte field">>,  {integer, 15}}}}}}
             ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections,
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections},
                          'WHERE'  = Where},
     DDL = make_ddl(Bucket,
                    [
@@ -892,7 +946,7 @@ timeseries_filter_test() ->
              }
             ],
     Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections,
+                         'SELECT' = #riak_sel_clause_v1{clause = Selections},
                          'WHERE'  = Where},
     Fields = [
               #riak_field_v1{name     = <<"geohash">>,
@@ -1132,5 +1186,69 @@ fold_where_tree_test() ->
         lists:reverse(fold_where_tree(Where, [],
                 fun({_, Field, _}, Acc) -> [Field | Acc] end))
     ).
+
+%%
+%% selection validity tests
+%%
+
+-define(select_test(Name, SelectClause, Expected),
+        Name() ->
+               CreateTab = "CREATE TABLE mytab" ++
+                   "   (myfamily    VARCHAR   NOT NULL, " ++
+                   "    myseries    VARCHAR   NOT NULL, " ++
+                   "    time        TIMESTAMP NOT NULL, " ++
+                   "    mysint64    SINT64    NOT NULL, " ++
+                   "    mydouble    DOUBLE    NOT NULL, " ++
+                   "    mybolean    BOOLEAN   NOT NULL, " ++
+                   "    myvarchar   VARCHAR   NOT NULL, " ++
+                   "    PRIMARY KEY ((myfamily, myseries, QUANTUM(time, 15, 'm')), " ++
+                   "    myfamily, myseries, time))",
+               SQL = "SELECT " ++ SelectClause ++ " " ++
+                   "FROM mytab WHERE " ++
+                   "myfamily = 'fam1' " ++
+                   "and myseries = 'ser1' " ++
+                   "and time > 1 and time < 10",
+               DDL = test_parse(CreateTab),
+               {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
+               Q = test_parse(SQL),
+               #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = Selections}} = Q,
+               Got = are_selections_valid(Mod, Selections, ?CANTBEBLANK),
+               ?assertEqual(Expected, Got)).
+
+?select_test(simple_column_select_1_test, "*", true).
+
+?select_test(simple_column_select_2_test, "mysint64", true).
+
+?select_test(simple_column_select_3_test, "mysint64, mydouble", true).
+
+?select_test(simple_column_select_fail_1_test, "rootbeer",
+             {false, [
+                      {unexpected_select_field, <<"rootbeer">>}
+                     ]
+             }).
+
+?select_test(simple_column_select_fail_2_test, "mysint64, rootbeer, mydouble, deathsquad",
+             {false, [
+                      {unexpected_select_field, <<"rootbeer">>},
+                      {unexpected_select_field, <<"deathsquad">>}
+                     ]
+             }).
+
+?select_test(simple_agg_fn_select_1_test, "count(mysint64)", true).
+
+?select_test(simple_agg_fn_select_2_test, "count(mysint64), avg(mydouble)", true).
+
+?select_test(simple_agg_fn_select_fail_1_test, "count(mysint64), avg(myvarchar)",
+            {false, [
+                     {type_check_failed, 'AVG', 1, [varchar]}
+                    ]
+            }).
+
+?select_test(simple_agg_fn_select_fail_2_test, "count(mysint64, myboolean), avg(mysint64)",
+            {false, [
+                     {fn_called_with_wrong_arity, 'COUNT', 1, 2}
+                    ]
+            }).
+
 
 -endif.

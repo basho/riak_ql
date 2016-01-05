@@ -107,19 +107,19 @@ Endsymbol '$end'.
 
 Statement -> Query           : convert('$1').
 Statement -> TableDefinition : fix_up_keys('$1').
+Statement -> Describe : '$1'.
 
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
-Query -> Describe             : '$1'.
 
 Select -> select Fields from Buckets Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4').
 
+%% 20.9 DESCRIBE STATEMENT
 Describe -> describe Bucket : make_describe('$2').
 
 Where -> where BooleanValueExpression : make_where('$1', '$2').
 
-Fields -> left_paren Fields  right_paren : handle_brackets('$2').
 Fields -> Fields     comma   FieldElem   : concat_select('$1', '$3').
 Fields -> FieldElem                      : '$1'.
 
@@ -143,13 +143,13 @@ FunArg -> NumericValueExpression : '$1'.
 FunArg -> Val        : '$1'.
 %% FunArg -> Funcall    : '$1'.
 
-FunArgN -> comma FunArg         : '$1'.
-FunArgN -> comma FunArg FunArgN : '$1'.
+FunArgN -> comma FunArg         : ['$2'].
+FunArgN -> comma FunArg FunArgN : ['$2' , '$3'].
 
 Funcall -> Identifier left_paren                right_paren : make_funcall('$1', []).
 Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1', ['$3']).
 Funcall -> Identifier left_paren asterisk       right_paren : make_funcall('$1', ['$3']).
-Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3', '$4']).
+Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3'] ++ '$4').
 
 Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
@@ -213,6 +213,7 @@ NumericPrimary -> integer : '$1'.
 NumericPrimary -> float : '$1'.
 NumericPrimary -> Identifier : '$1'.
 NumericPrimary -> Funcall : '$1'.
+NumericPrimary -> left_paren NumericValueExpression right_paren : '$2'.
 % NumericPrimary -> NumericValueFunction : '$1'.
 
 %% 6.35 BOOLEAN VALUE EXPRESSION
@@ -256,7 +257,7 @@ TableElementList -> left_paren TableElements right_paren : '$2'.
 
 TableElements ->
     TableElement comma TableElements : make_table_element_list('$1', '$3').
-TableElements -> TableElement : '$1'.
+TableElements -> TableElement        : make_table_element_list('$1').
 
 TableElement -> ColumnDefinition : '$1'.
 TableElement -> KeyDefinition : '$1'.
@@ -337,22 +338,18 @@ convert(#outputs{type    = select,
                  where   = W}) ->
     Q = case B of
             {Type, _} when Type =:= list orelse Type =:= regex ->
-                #riak_sql_v1{'SELECT' = F,
+                #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = F},
                              'FROM'   = B,
                              'WHERE'  = W,
                              'LIMIT'  = L};
             _ ->
-                #riak_sql_v1{'SELECT'   = F,
+                #riak_sql_v1{'SELECT'   = #riak_sel_clause_v1{clause = F},
                              'FROM'     = B,
                              'WHERE'    = W,
                              'LIMIT'    = L,
                              helper_mod = riak_ql_ddl:make_module_name(B)}
         end,
     Q;
-convert(#outputs{type = describe,
-                 buckets = [B]
-                }) ->
-    #riak_sql_describe_v1{'DESCRIBE' = B};
 convert(#outputs{type = create} = O) ->
     O.
 
@@ -389,8 +386,7 @@ wrap_identifier({identifier, IdentifierName})
 wrap_identifier(Default) -> Default.
 
 make_describe({identifier, D}) ->
-    #outputs{type = describe,
-             buckets = [D]}.
+    #riak_sql_describe_v1{'DESCRIBE' = D}.
 
 add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
@@ -460,9 +456,14 @@ canon2({Cond, A, B}) when Cond =:= and_ orelse
     %% but our where clauses are bounded in size so thats OK
     A1 = canon2(A),
     B1 = canon2(B),
-    case is_lower(A1, B1) of
-        true  -> {Cond, A1, B1};
-        false -> {Cond, B1, A1}
+    case A1 == B1 of
+        true ->
+            A1;
+        false ->
+            case is_lower(A1, B1) of
+                true  -> {Cond, A1, B1};
+                false -> {Cond, B1, A1}
+            end
     end;
 canon2({Op, A, B}) ->
     {Op, strip(A), strip(B)};
@@ -496,13 +497,17 @@ hoist({A, B, C}) ->
 %% not tail recursive
 sort({and_, A, {and_, B, C}}) ->
     case is_lower(A, B) of
-        true  -> {and_, B1, C1} = sort({and_, B, C}),
-                 case is_lower(A, B1) of
-                     true  -> {and_, A, {and_, B1, C1}};
-                     false -> sort({and_, B1, {and_, A, C1}})
-                 end;
-        false -> sort({and_, B, sort({and_, A, C})})
+        true ->
+            {and_, B1, C1} = sort({and_, B, C}),
+            case is_lower(A, B1) of
+                true  -> {and_, A, {and_, B1, C1}};
+                false -> sort({and_, B1, {and_, A, C1}})
+            end;
+        false ->
+            sort({and_, B, sort({and_, A, C})})
     end;
+sort({and_, A, A}) ->
+    A;
 sort({Op, A, B}) ->
     case is_lower(A, B) of
         true  -> {Op, A, B};
@@ -538,7 +543,7 @@ is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
                                          Op2 =:= '=~' orelse
                                          Op2 =:= '!~' orelse
                                          Op2 =:= '!=') ->
-    (A < B).
+    (A =< B).
 
 remove_exprs({expr, A}) ->
     remove_exprs(A);
@@ -562,7 +567,8 @@ make_funcall({identifier, FuncName}, Args) ->
                         _ ->
                             {Fn, Args}
                     end,
-            {funcall, {Fn2, Args2}};
+            Args3 = [canonicalise_expr(X) || X <- Args2],
+            {{window_agg_fn, Fn2}, Args3};
         not_supported ->
             Msg2 = io_lib:format("Function not supported - '~s'.", [FuncName]),
             return_error(0, iolist_to_binary(Msg2))
@@ -571,7 +577,14 @@ make_funcall(_, _) ->
     % make dialyzer stop erroring on no local return.
     error.
 
+canonicalise_expr({identifier, X}) ->
+    {identifier, [X]};
+canonicalise_expr({expr, X}) ->
+    io:format("Expr to be canonicalised is ~p~n", [X]),
+    {expr, [X]}.
+
 get_func_type(FuncName) when FuncName =:= 'AVG'   orelse
+                             FuncName =:= 'MEAN'  orelse
                              FuncName =:= 'SUM'   orelse
                              FuncName =:= 'COUNT' orelse
                              FuncName =:= 'MIN'   orelse
@@ -585,11 +598,7 @@ get_func_type(FuncName) when is_atom(FuncName)    -> not_supported.
 %% will definetely be existing - but just not now
 %% also try/catch round it
 canonicalise_window_aggregate_fn(Fn) when is_binary(Fn)->
-     case list_to_atom(string:to_upper(binary_to_list(Fn))) of
-         %% create an alias for MEAN becuz 'Muricans, amirite?
-        'MEAN'  -> 'AVG';
-         AtomFn -> AtomFn
-end.
+     list_to_atom(string:to_upper(binary_to_list(Fn))).
 
 %% canonicalise_col({identifier, X}) -> {identifier, [X]};
 %% canonicalise_col(X)               -> X.
@@ -610,9 +619,6 @@ add_unit({Type, Value}, {identifier, Unit1}) ->
         Millis ->
             {Type, Millis}
     end.
-
-handle_brackets(X) ->
-    {evaluate, X}.
 
 concat_select(L1, L2) when is_list(L1) andalso
                            is_list(L2) ->
@@ -655,6 +661,9 @@ make_partition_and_local_keys(PFieldList, LFieldList) ->
      {partition_key, #key_v1{ast = PFields}},
      {local_key,     #key_v1{ast = LFields}}
     ].
+
+make_table_element_list(A) ->
+    {table_element_list, [A]}.
 
 make_table_element_list(A, {table_element_list, B}) ->
     {table_element_list, [A] ++ lists:flatten(B)};
