@@ -98,6 +98,8 @@ select_col_to_string({{window_agg_fn, FunName}, Args}) when is_atom(FunName) ->
     ]);
 select_col_to_string({expr, Expression}) ->
     select_col_to_string(Expression);
+select_col_to_string({negate, Expression}) ->
+    "-" ++ select_col_to_string(Expression);
 select_col_to_string({Op, Arg1, Arg2}) when is_atom(Op) ->
     flat_format(
       "(~s~s~s)",
@@ -148,6 +150,14 @@ flat_format(F, AA) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
+
+test_col_names(SQL, ColNames) ->
+    {ok, Parsed} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+        SQL)),
+    ?assertEqual(
+        ColNames,
+        col_names_from_select(Parsed)
+    ).
 
 select_col_to_string_all_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
@@ -252,6 +262,19 @@ select_col_to_string_avg_funcall_with_nested_maths_test() ->
         ["AVG((10+5))"],
         col_names_from_select(SQL)
     ).
+
+select_col_to_string_negated_test() ->
+    test_col_names("select - 1.0, - 1, -asdf, - asdf from dual",
+                   ["-1.0",
+                    "-1",
+                    "-asdf",
+                    "-asdf"]).
+
+select_col_to_string_negated_parens_test() ->
+    test_col_names("select -(1), -(asdf), -(3 + -4) from dual",
+                   ["-1",
+                    "-asdf",
+                    "-(3+-4)"]).
 
 %% "select value from response_times where time > 1388534400",
 
