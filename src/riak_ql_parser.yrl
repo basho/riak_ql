@@ -214,6 +214,7 @@ NumericPrimary -> integer : '$1'.
 NumericPrimary -> float : '$1'.
 NumericPrimary -> Identifier : '$1'.
 NumericPrimary -> Funcall : '$1'.
+NumericPrimary -> left_paren NumericValueExpression right_paren : '$2'.
 % NumericPrimary -> NumericValueFunction : '$1'.
 
 %% 6.35 BOOLEAN VALUE EXPRESSION
