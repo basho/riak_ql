@@ -37,7 +37,7 @@
 %% returned tuple gives the arity and arg-type to return-type pairs
 get_arity_and_type_sig('COUNT')  -> {1, [{sint64, sint64}, {double, sint64}, {boolean, sint64}, {varchar, sint64}, {timestamp, sint64}]};
 get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  %% double promotion
-get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG'); 
+get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG');
 get_arity_and_type_sig('MAX')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('STDEV')  -> {1, [{sint64, double}, {double, double}]};  %% ditto
@@ -78,26 +78,31 @@ finalise(_Fn, Acc) ->
 %%
 %% Incrementally operates on chunks, needs to carry state.
 
-
 'COUNT'(_, N) when is_integer(N) ->
     N + 1.
 
 'SUM'(Arg, Total) when is_number(Arg) ->
-    Arg + Total.
+    Arg + Total;
+'SUM'(_, Total) ->
+    Total.
 
 'MEAN'(Arg, State) ->
     'AVG'(Arg, State).
 
 'AVG'(Arg, {N, Acc}) when is_number(Arg) ->
-    {N + 1, Acc + Arg}.
+    {N + 1, Acc + Arg};
+'AVG'(_Arg, {N, Acc}) ->
+    {N, Acc}.
 
-'MIN'(Arg, not_a_value) -> Arg;
-'MIN'(Arg, State) when Arg < State -> Arg;
-'MIN'(_, State) -> State.
+'MIN'(Arg, not_a_value) when is_number(Arg) -> Arg;
+'MIN'(Arg, State)       when Arg < State andalso
+                             is_number(Arg) -> Arg;
+'MIN'(_, State)         -> State.
 
-'MAX'(Arg, not_a_value) -> Arg;
-'MAX'(Arg, State) when Arg > State -> Arg;
-'MAX'(_, State) -> State.
+'MAX'(Arg, not_a_value) when is_number(Arg) -> Arg;
+'MAX'(Arg, State)       when Arg > State andalso
+                             is_number(Arg) -> Arg;
+'MAX'(_, State)         -> State.
 
 'STDEV'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
@@ -114,8 +119,8 @@ finalise(_Fn, Acc) ->
 stdev_test() ->
     State0 = start_state('STDEV'),
     Data = [
-            1.0, 2.0, 3.0, 4.0, 2.0, 
-            3.0, 4.0, 4.0, 4.0, 3.0, 
+            1.0, 2.0, 3.0, 4.0, 2.0,
+            3.0, 4.0, 4.0, 4.0, 3.0,
             2.0, 3.0, 2.0, 1.0, 1.0
            ],
     %% numpy.std(Data) computes it to:
