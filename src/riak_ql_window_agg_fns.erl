@@ -83,21 +83,27 @@ finalise(_Fn, Acc) ->
     N + 1.
 
 'SUM'(Arg, Total) when is_number(Arg) ->
-    Arg + Total.
+    Arg + Total;
+'SUM'(_, Total) ->
+    Total.
 
 'MEAN'(Arg, State) ->
     'AVG'(Arg, State).
 
 'AVG'(Arg, {N, Acc}) when is_number(Arg) ->
-    {N + 1, Acc + Arg}.
+    {N + 1, Acc + Arg};
+'AVG'(_Arg, {N, Acc}) ->
+    {N, Acc}.
 
-'MIN'(Arg, not_a_value) -> Arg;
-'MIN'(Arg, State) when Arg < State -> Arg;
-'MIN'(_, State) -> State.
+'MIN'(Arg, not_a_value) when is_number(Arg) -> Arg;
+'MIN'(Arg, State)       when Arg < State andalso 
+                             is_number(Arg) -> Arg;
+'MIN'(_, State)         -> State.
 
-'MAX'(Arg, not_a_value) -> Arg;
-'MAX'(Arg, State) when Arg > State -> Arg;
-'MAX'(_, State) -> State.
+'MAX'(Arg, not_a_value) when is_number(Arg) -> Arg;
+'MAX'(Arg, State)       when Arg > State andalso 
+                             is_number(Arg) -> Arg;
+'MAX'(_, State)         -> State.
 
 'STDEV'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
