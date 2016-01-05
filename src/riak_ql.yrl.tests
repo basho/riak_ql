@@ -402,18 +402,6 @@ select_quoted_escape_sql_test() ->
 select_field_to_field_forbidden_test() ->
     ?sql_comp_fail("select * from table where time = time").
 
-select_arithmetic_test() ->
-    ?sql_comp_assert("select temperature + 1 from details",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {'+',
-                                               {identifier, <<"temperature">>},
-                                               {integer, 1}
-                                              }
-                                             ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
-
 %%
 %% window_aggregate fns in the select clause tests
 %%
@@ -421,7 +409,7 @@ select_arithmetic_test() ->
 window_aggregate_fn_1_test() ->
     ?sql_comp_assert("select avg(temp) from details",
                      #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {{window_agg_fn, 'AVG'}, 
+                                              {{window_agg_fn, 'AVG'},
                                                [{identifier, [<<"temp">>]}]}
                                              ]},
                                   'FROM'    = <<"details">>,
@@ -431,7 +419,7 @@ window_aggregate_fn_1_test() ->
 window_aggregate_fn_1a_test() ->
     ?sql_comp_assert("select mean(temp) from details",
                      #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {{window_agg_fn, 'MEAN'}, 
+                                              {{window_agg_fn, 'MEAN'},
                                                [{identifier, [<<"temp">>]}]}
                                              ]},
                                   'FROM'    = <<"details">>,
@@ -491,37 +479,6 @@ window_aggregate_fn_all_funs_test() ->
                                   'WHERE'   = []
                                  }).
 
-window_aggregate_fn_arithmetic_1_test() ->
-    ?sql_comp_assert("select aVg(temperature) + 1 - 2 * 3 / 4 from details",
-                     #riak_sql_v1{'SELECT' =
-                                      #riak_sel_clause_v1{clause = [
-                                       {'-',
-                                        {'+',
-                                         {{window_agg_fn,'AVG'},
-                                          [{identifier,[<<"temperature">>]}]},
-                                         {integer,1}},
-                                        {'/',
-                                         {'*',
-                                          {integer,2},{integer,3}},
-                                         {integer,4}}}
-                                      ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
-
-arithmetic_precedence_test() ->
-    ?sql_comp_assert("select 1 * 2 + 3 / 4 - 5 * 6 from dual",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{'-',
-                                               {'+',
-                                                {'*', {integer,1}, {integer,2}},
-                                                {'/', {integer,3}, {integer,4}}
-                                               },
-                                               {'*', {integer,5}, {integer,6}}
-                                               }]},
-                                  'FROM' = <<"dual">>,
-                                  'WHERE' = []
-                                 }).
-
 window_aggregate_fn_arithmetic_2_test() ->
     ?sql_comp_assert("select aVg(temperature) + count(temperature) from details",
                      #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
@@ -538,7 +495,7 @@ window_aggregate_fn_arithmetic_2_test() ->
 %% window_aggregate_fn_arithmetic_3_test() ->
 %%     ?sql_comp_assert("select aVg(temperature + 1) + count(temperature / distance) from details",
 %%                      #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-%%                                               {{window_agg_fn, 'AVG'}, 
+%%                                               {{window_agg_fn, 'AVG'},
 %%                                                [{identifier, [<<"Temperature">>]}]}
 %%                                  ],
 %%                      'FROM'    = <<"details">>,
