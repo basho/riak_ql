@@ -559,7 +559,7 @@ make_funcall({identifier, FuncName}, Args) ->
         window_aggregate_fn ->
             {Fn2, Args2} = case {Fn, Args} of
                                {'COUNT', [{asterisk, _Asterisk}]} ->
-                                  {'ROWCOUNT', []};
+                                  {'COUNT', []};
                         {_, [{asterisk, _Asterisk}]} ->
                             Msg1 = io_lib:format("Function '~s' does not support " ++
                                                      "wild cards args.", [Fn]),
