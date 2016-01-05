@@ -402,18 +402,6 @@ select_quoted_escape_sql_test() ->
 select_field_to_field_forbidden_test() ->
     ?sql_comp_fail("select * from table where time = time").
 
-select_arithmetic_test() ->
-    ?sql_comp_assert("select temperature + 1 from details",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-                                                                          {'+',
-                                                                           {identifier, <<"temperature">>},
-                                                                           {integer, 1}
-                                                                          }
-                                                                         ]},
-                                 'FROM'    = <<"details">>,
-                                 'WHERE'   = []
-                                }).
-
 %%
 %% window_aggregate fns in the select clause tests
 %%
@@ -489,37 +477,6 @@ window_aggregate_fn_all_funs_test() ->
                                                                          ]},
                                  'FROM'    = <<"details">>,
                                  'WHERE'   = []
-                                }).
-
-window_aggregate_fn_arithmetic_1_test() ->
-    ?sql_comp_assert("select aVg(temperature) + 1 - 2 * 3 / 4 from details",
-                     ?SQL_SELECT{'SELECT' =
-                                     #riak_sel_clause_v1{clause = [
-                                                                   {'-',
-                                                                    {'+',
-                                                                     {{window_agg_fn,'AVG'},
-                                                                      [{identifier,[<<"temperature">>]}]},
-                                                                     {integer,1}},
-                                                                    {'/',
-                                                                     {'*',
-                                                                      {integer,2},{integer,3}},
-                                                                     {integer,4}}}
-                                                                  ]},
-                                 'FROM'    = <<"details">>,
-                                 'WHERE'   = []
-                                }).
-
-arithmetic_precedence_test() ->
-    ?sql_comp_assert("select 1 * 2 + 3 / 4 - 5 * 6 from dual",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{'-',
-                                                                           {'+',
-                                                                            {'*', {integer,1}, {integer,2}},
-                                                                            {'/', {integer,3}, {integer,4}}
-                                                                           },
-                                                                           {'*', {integer,5}, {integer,6}}
-                                                                          }]},
-                                 'FROM' = <<"dual">>,
-                                 'WHERE' = []
                                 }).
 
 window_aggregate_fn_arithmetic_2_test() ->
