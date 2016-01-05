@@ -270,6 +270,12 @@ select_col_to_string_negated_test() ->
                     "-asdf",
                     "-asdf"]).
 
+select_col_to_string_negated_parens_test() ->
+    test_col_names("select -(1), -(asdf), -(3 + -4) from dual",
+                   ["-1",
+                    "-asdf",
+                    "-(3+-4)"]).
+
 %% "select value from response_times where time > 1388534400",
 
 %% "select value from response_times where time > 1388534400s",
