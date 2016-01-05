@@ -5,7 +5,7 @@
         Exp2 = fix(Expected),
         Toks = riak_ql_lexer:get_tokens(String),
         Got = parse(Toks),
-%% io:format(standard_error, "~p~n~p~n", [Exp2, Got]),
+        %% io:format(standard_error, "~p~n~p~n", [Exp2, Got]),
         ?assertEqual({ok, Exp2}, Got)).
 
 -define(where_test(Uncanonical, Expected),
@@ -25,12 +25,12 @@
         Got = parse(Toks),
         ?assertMatch({error, _}, Got)).
 
-fix(#riak_sql_v1{'FROM' = F} = Expected) ->
+fix(?SQL_SELECT{'FROM' = F} = Expected) ->
     case F of
         {regex, _} -> Expected;
         {list,  _} -> Expected;
         _          -> Mod = riak_ql_ddl:make_module_name(F),
-                      Expected#riak_sql_v1{helper_mod = Mod}
+                      Expected?SQL_SELECT{helper_mod = Mod}
     end;
 fix(Other) ->
     Other.
@@ -39,149 +39,149 @@ fix(Other) ->
 
 select_sql_test() ->
     ?sql_comp_assert("select * from argle",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"argle">>}).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"argle">>}).
 
 select_quoted_sql_test() ->
     ?sql_comp_assert("select * from \"argle\"",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"argle">>}).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"argle">>}).
 
 select_quoted_keyword_sql_test() ->
     ?sql_comp_assert("select * from \"select\"",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"select">>}).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"select">>}).
 
 select_nested_quotes_sql_test() ->
     ?sql_comp_assert("select * from \"some \"\"quotes\"\" in me\"",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"some \"quotes\" in me">>}).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"some \"quotes\" in me">>}).
 
 select_from_lists_sql_test() ->
     ?sql_comp_assert("select * from events, errors",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = {list, [<<"events">>, <<"errors">>]}
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = {list, [<<"events">>, <<"errors">>]}
+                                }).
 
 select_fields_from_lists_sql_test() ->
     ?sql_comp_assert("select hip, hop, dont, stop from events",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {identifier, [<<"hip">>]},
-                                              {identifier, [<<"hop">>]},
-                                              {identifier, [<<"dont">>]},
-                                              {identifier, [<<"stop">>]}
-                                             ]},
-                                  'FROM'   = <<"events">>
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {identifier, [<<"hip">>]},
+                                                                          {identifier, [<<"hop">>]},
+                                                                          {identifier, [<<"dont">>]},
+                                                                          {identifier, [<<"stop">>]}
+                                                                         ]},
+                                 'FROM'   = <<"events">>
+                                }).
 
 
 select_where_1_sql_test() ->
     ?sql_comp_assert("select value from response_times " ++
                          "where time > '2013-08-12 23:32:01' and time < '2013-08-13 12:34:56'",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"value">>]}]},
-                                  'FROM'   = <<"response_times">>,
-                                  'WHERE'  = [
-                                              {and_,
-                                               {'<', <<"time">>, {binary,<<"2013-08-13 12:34:56">>}},
-                                               {'>', <<"time">>, {binary, <<"2013-08-12 23:32:01">>}}
-                                              }
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"value">>]}]},
+                                 'FROM'   = <<"response_times">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'<', <<"time">>, {binary,<<"2013-08-13 12:34:56">>}},
+                                              {'>', <<"time">>, {binary, <<"2013-08-12 23:32:01">>}}
+                                             }
+                                            ]
+                                }).
 
 select_where_1_reverse_sql_test() ->
     ?sql_comp_assert("select value from response_times " ++
                          "where '2013-08-12 23:32:01' < time and '2013-08-13 12:34:56' > time",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"value">>]}]},
-                                  'FROM'   = <<"response_times">>,
-                                  'WHERE'  = [
-                                              {and_,
-                                               {'<', <<"time">>, {binary,<<"2013-08-13 12:34:56">>}},
-                                               {'>', <<"time">>, {binary, <<"2013-08-12 23:32:01">>}}
-                                              }
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"value">>]}]},
+                                 'FROM'   = <<"response_times">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'<', <<"time">>, {binary,<<"2013-08-13 12:34:56">>}},
+                                              {'>', <<"time">>, {binary, <<"2013-08-12 23:32:01">>}}
+                                             }
+                                            ]
+                                }).
 
 select_where_3_sql_test() ->
     ?sql_comp_assert("select value from response_times where time > 1388534400",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"value">>]}]},
-                                  'FROM'   = <<"response_times">>,
-                                  'WHERE'  = [
-                                              {'>', <<"time">>, {integer, 1388534400}}
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"value">>]}]},
+                                 'FROM'   = <<"response_times">>,
+                                 'WHERE'  = [
+                                             {'>', <<"time">>, {integer, 1388534400}}
+                                            ]
+                                }).
 
 select_where_4_sql_test() ->
     ?sql_comp_assert("select value from response_times where time > 1388534400s",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"value">>]}]},
-                                  'FROM'   = <<"response_times">>,
-                                  'WHERE'  = [
-                                              {'>', <<"time">>, {integer, 1388534400000}}
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"value">>]}]},
+                                 'FROM'   = <<"response_times">>,
+                                 'WHERE'  = [
+                                             {'>', <<"time">>, {integer, 1388534400000}}
+                                            ]
+                                }).
 
 select_where_5_sql_test() ->
     ?sql_comp_assert("select * from events where time = 1400497861762723 "++
                          "and sequence_number = 2321",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"events">>,
-                                  'WHERE'  = [
-                                              {and_,
-                                               {'=', <<"sequence_number">>, {integer, 2321}},
-                                               {'=', <<"time">>,            {integer, 1400497861762723}}
-                                              }
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"events">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'=', <<"sequence_number">>, {integer, 2321}},
+                                              {'=', <<"time">>,            {integer, 1400497861762723}}
+                                             }
+                                            ]
+                                }).
 
 select_where_8_sql_test() ->
     ?sql_comp_assert("select * from events where state = 'NY'",
-                            #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                         'FROM'   = <<"events">>,
-                                         'WHERE'  = [
-                                                     {'=', <<"state">>, {binary, <<"NY">>}}
-                                                    ]
-                                        }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"events">>,
+                                 'WHERE'  = [
+                                             {'=', <<"state">>, {binary, <<"NY">>}}
+                                            ]
+                                }).
 
 select_where_approxmatch_sql_test() ->
     ?sql_comp_fail("select * from log_lines where line =~ /error/i").
 
 select_where_10_sql_test() ->
     ?sql_comp_assert("select * from events where customer_id = 23 and type = 'click10'",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"events">>,
-                                  'WHERE'  = [
-                                              {and_,
-                                               {'=', <<"customer_id">>, {integer,  23}},
-                                               {'=', <<"type">>,        {binary, <<"click10">>}}
-                                              }
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"events">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'=', <<"customer_id">>, {integer,  23}},
+                                              {'=', <<"type">>,        {binary, <<"click10">>}}
+                                             }
+                                            ]
+                                }).
 
 select_where_11_sql_test() ->
     ?sql_comp_assert("select * from response_times where value > 500",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"response_times">>,
-                                  'WHERE'  = [
-                                              {'>', <<"value">>, {integer, 500}}
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"response_times">>,
+                                 'WHERE'  = [
+                                             {'>', <<"value">>, {integer, 500}}
+                                            ]
+                                }).
 
 select_where_11a_sql_test() ->
     ?sql_comp_assert("select * from response_times where value >= 500",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"response_times">>,
-                                  'WHERE'  = [
-                                              {'>=', <<"value">>, {integer, 500}}
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"response_times">>,
+                                 'WHERE'  = [
+                                             {'>=', <<"value">>, {integer, 500}}
+                                            ]
+                                }).
 
 select_where_11b_sql_test() ->
     ?sql_comp_assert("select * from response_times where value <= 500",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"response_times">>,
-                                  'WHERE'  = [
-                                              {'<=', <<"value">>, {integer, 500}}
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"response_times">>,
+                                 'WHERE'  = [
+                                             {'<=', <<"value">>, {integer, 500}}
+                                            ]
+                                }).
 
 select_where_not_approx_sql_test() ->
     ?sql_comp_fail("select * from events where email !~ /.*gmail.*/").
@@ -191,21 +191,21 @@ select_where_ne_sql_test() ->
 
 select_where_14_sql_test() ->
     ?sql_comp_assert("select * from events where signed_in = false",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"events">>,
-                                  'WHERE'  = [
-                                              {'=', <<"signed_in">>, {boolean, false}}
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"events">>,
+                                 'WHERE'  = [
+                                             {'=', <<"signed_in">>, {boolean, false}}
+                                            ]
+                                }).
 
 select_where_15_sql_test() ->
     ?sql_comp_assert("select * from events where signed_in = -3",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"events">>,
-                                  'WHERE'  = [
-                                              {'=', <<"signed_in">>, {integer, -3}}
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"events">>,
+                                 'WHERE'  = [
+                                             {'=', <<"signed_in">>, {integer, -3}}
+                                            ]
+                                }).
 
 select_where_approx_or_approx_sql_test() ->
     ?sql_comp_fail("select * from events where (email =~ /.*gmail.*/ or " ++
@@ -213,64 +213,64 @@ select_where_approx_or_approx_sql_test() ->
 
 select_where_letters_nos_in_strings_1a_test() ->
     ?sql_comp_assert("select * from events where user = 'user 1'",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"events">>,
-                                  'WHERE'  = [
-                                              {'=', <<"user">>, {binary, <<"user 1">>}}
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"events">>,
+                                 'WHERE'  = [
+                                             {'=', <<"user">>, {binary, <<"user 1">>}}
+                                            ]
+                                }).
 
 select_where_letters_nos_in_strings_2a_test() ->
     ?sql_comp_assert(
        "select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
-       #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
-                    'FROM'   = <<"GeoCheckin">>,
-                    'WHERE'  = [
+       ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
+                   'FROM'   = <<"GeoCheckin">>,
+                   'WHERE'  = [
+                               {and_,
+                                {'=', <<"user">>, {binary, <<"user_1">>}},
                                 {and_,
-                                 {'=', <<"user">>, {binary, <<"user_1">>}},
-                                 {and_,
-                                  {'<', <<"time">>, {integer, 8000}},
-                                  {'>', <<"time">>, {integer, 2000}}
-                                 }
+                                 {'<', <<"time">>, {integer, 8000}},
+                                 {'>', <<"time">>, {integer, 2000}}
                                 }
-                               ]
-                   }).
+                               }
+                              ]
+                  }).
 
 select_where_single_quotes_test() ->
     ?sql_comp_assert(
        "select weather from GeoCheckin where user = 'user_1' and location = 'San Francisco'",
-       #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
-                    'FROM'   = <<"GeoCheckin">>,
-                    'WHERE'  = [
-                                {and_,
-                                 {'=', <<"location">>, {binary, <<"San Francisco">>}},
-                                 {'=', <<"user">>, {binary, <<"user_1">>}}
-                                }
-                               ]
-                   }).
+       ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
+                   'FROM'   = <<"GeoCheckin">>,
+                   'WHERE'  = [
+                               {and_,
+                                {'=', <<"location">>, {binary, <<"San Francisco">>}},
+                                {'=', <<"user">>, {binary, <<"user_1">>}}
+                               }
+                              ]
+                  }).
 
 select_where_ors_at_start_test() ->
     ?sql_comp_assert(
        "select * FROM tsall2 WHERE "
        "d3 = 1.0 OR d3 = 2.0 "
        "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1",
-       #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                    'FROM' = <<"tsall2">>,
-                    'WHERE' = [
-                               {or_,
-                                {'=', <<"d3">>, {float, 1.0}},
+       ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                   'FROM' = <<"tsall2">>,
+                   'WHERE' = [
+                              {or_,
+                               {'=', <<"d3">>, {float, 1.0}},
+                               {and_,
+                                {'<', <<"ts1nn">>, {integer, 1}},
                                 {and_,
-                                 {'<', <<"ts1nn">>, {integer, 1}},
+                                 {'>', <<"ts1nn">>, {integer, 0}},
                                  {and_,
-                                  {'>', <<"ts1nn">>, {integer, 0}},
+                                  {'!=', <<"vc2nn">>, {binary, <<"3">>}},
                                   {and_,
-                                   {'!=', <<"vc2nn">>, {binary, <<"3">>}},
-                                   {and_,
-                                    {'!=', <<"vc1nn">>, {binary, <<"2">>}},
-                                    {'=', <<"d3">>, {float, 2.0}}
-                                   }}}}}
-                              ]
-                   }).
+                                   {'!=', <<"vc1nn">>, {binary, <<"2">>}},
+                                   {'=', <<"d3">>, {float, 2.0}}
+                                  }}}}}
+                             ]
+                  }).
 
 select_where_ors_at_end_test() ->
     ?sql_comp_assert(
@@ -278,141 +278,141 @@ select_where_ors_at_end_test() ->
        "d3 = 1.0 OR d3 = 2.0 "
        "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1 "
        "OR d3 = 3.0 OR d3 = 4.0",
-       #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                    'FROM' = <<"tsall2">>,
-                    'WHERE' = [
+       ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                   'FROM' = <<"tsall2">>,
+                   'WHERE' = [
+                              {or_,
+                               {'=',<<"d3">>,{float,4.0}},
                                {or_,
-                                {'=',<<"d3">>,{float,4.0}},
+                                {'=',<<"d3">>,{float,3.0}},
                                 {or_,
-                                 {'=',<<"d3">>,{float,3.0}},
-                                 {or_,
-                                  {'=', <<"d3">>, {float, 1.0}},
+                                 {'=', <<"d3">>, {float, 1.0}},
+                                 {and_,
+                                  {'<', <<"ts1nn">>, {integer, 1}},
                                   {and_,
-                                   {'<', <<"ts1nn">>, {integer, 1}},
+                                   {'>', <<"ts1nn">>, {integer, 0}},
                                    {and_,
-                                    {'>', <<"ts1nn">>, {integer, 0}},
+                                    {'!=', <<"vc2nn">>, {binary, <<"3">>}},
                                     {and_,
-                                     {'!=', <<"vc2nn">>, {binary, <<"3">>}},
-                                     {and_,
-                                      {'!=', <<"vc1nn">>, {binary, <<"2">>}},
-                                      {'=', <<"d3">>, {float, 2.0}}
-                                     }}}}}}}
-                              ]
-                   }).
+                                     {'!=', <<"vc1nn">>, {binary, <<"2">>}},
+                                     {'=', <<"d3">>, {float, 2.0}}
+                                    }}}}}}}
+                             ]
+                  }).
 
 
 select_where_letters_nos_in_strings_1b_test() ->
     ?sql_comp_assert("select * from events where user = 'user 1'",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"events">>,
-                                  'WHERE'  = [
-                                              {'=', <<"user">>, {binary, <<"user 1">>}}
-                                             ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"events">>,
+                                 'WHERE'  = [
+                                             {'=', <<"user">>, {binary, <<"user 1">>}}
+                                            ]
+                                }).
 
 select_where_letters_nos_in_strings_2b_test() ->
     ?sql_comp_assert("select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
-                                  'FROM'   = <<"GeoCheckin">>,
-                                  'WHERE'  = [
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
+                                 'FROM'   = <<"GeoCheckin">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'=', <<"user">>, {binary, <<"user_1">>}},
                                               {and_,
-                                               {'=', <<"user">>, {binary, <<"user_1">>}},
-                                               {and_,
-                                                {'<', <<"time">>, {integer, 8000}},
-                                                {'>', <<"time">>, {integer, 2000}}
-                                               }
+                                               {'<', <<"time">>, {integer, 8000}},
+                                               {'>', <<"time">>, {integer, 2000}}
                                               }
-                                             ]
-                                 }).
+                                             }
+                                            ]
+                                }).
 
 select_where_brackets_1_test() ->
     ?sql_comp_assert("select weather from GeoCheckin where (time > 2000 and time < 8000) and user = 'user_1'",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
-                                  'FROM'   = <<"GeoCheckin">>,
-                                  'WHERE'  = [
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
+                                 'FROM'   = <<"GeoCheckin">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'=', <<"user">>, {binary, <<"user_1">>}},
                                               {and_,
-                                               {'=', <<"user">>, {binary, <<"user_1">>}},
-                                               {and_,
-                                                {'<', <<"time">>, {integer, 8000}},
-                                                {'>', <<"time">>, {integer, 2000}}
-                                               }
+                                               {'<', <<"time">>, {integer, 8000}},
+                                               {'>', <<"time">>, {integer, 2000}}
                                               }
-                                             ]
-                                 }).
+                                             }
+                                            ]
+                                }).
 
 select_where_brackets_2_test() ->
     ?sql_comp_assert("select weather from GeoCheckin where user = 'user_1' and (time > 2000 and time < 8000)",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
-                                  'FROM'   = <<"GeoCheckin">>,
-                                  'WHERE'  = [
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
+                                 'FROM'   = <<"GeoCheckin">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'=', <<"user">>, {binary, <<"user_1">>}},
                                               {and_,
-                                               {'=', <<"user">>, {binary, <<"user_1">>}},
-                                               {and_,
-                                                {'<', <<"time">>, {integer, 8000}},
-                                                {'>', <<"time">>, {integer, 2000}}
-                                               }
+                                               {'<', <<"time">>, {integer, 8000}},
+                                               {'>', <<"time">>, {integer, 2000}}
                                               }
-                                             ]
-                                 }).
+                                             }
+                                            ]
+                                }).
 
 select_where_brackets_2a_test() ->
     ?sql_comp_assert("select weather from GeoCheckin where user = 'user_1' and (time > 2000 and (time < 8000))",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
-                                  'FROM'   = <<"GeoCheckin">>,
-                                  'WHERE'  = [
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"weather">>]}]},
+                                 'FROM'   = <<"GeoCheckin">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'=', <<"user">>, {binary, <<"user_1">>}},
                                               {and_,
-                                               {'=', <<"user">>, {binary, <<"user_1">>}},
-                                               {and_,
-                                                {'<', <<"time">>, {integer, 8000}},
-                                                {'>', <<"time">>, {integer, 2000}}
-                                               }
+                                               {'<', <<"time">>, {integer, 8000}},
+                                               {'>', <<"time">>, {integer, 2000}}
                                               }
-                                             ]
-                                 }).
+                                             }
+                                            ]
+                                }).
 
 select_quoted_spaces_sql_test() ->
     ?sql_comp_assert("select * from \"table with spaces\"",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"table with spaces">>}).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"table with spaces">>}).
 
 
 select_quoted_where_sql_test() ->
     ?sql_comp_assert("select * from \"table with spaces\" where \"color spaces\" = 'someone had painted it blue'",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"table with spaces">>,
-                                  'WHERE' = [
-                                             {'=', <<"color spaces">>, {binary, <<"someone had painted it blue">>}}
-                                            ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"table with spaces">>,
+                                 'WHERE' = [
+                                            {'=', <<"color spaces">>, {binary, <<"someone had painted it blue">>}}
+                                           ]
+                                }).
 
 select_quoted_escape_sql_test() ->
     ?sql_comp_assert("select * from \"table with spaces\" where "
                      "\"co\"\"or\" = 'klingon''name' or "
                      "\"co\"\"or\" = '\"'",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"table with spaces">>,
-                                  'WHERE' = [
-                                             {or_,
-                                              {'=', <<"co\"or">>, {binary, <<"\"">>}},
-                                              {'=', <<"co\"or">>, {binary, <<"klingon'name">>}}
-                                             }
-                                            ]
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"table with spaces">>,
+                                 'WHERE' = [
+                                            {or_,
+                                             {'=', <<"co\"or">>, {binary, <<"\"">>}},
+                                             {'=', <<"co\"or">>, {binary, <<"klingon'name">>}}
+                                            }
+                                           ]
+                                }).
 
 select_field_to_field_forbidden_test() ->
     ?sql_comp_fail("select * from table where time = time").
 
 select_arithmetic_test() ->
     ?sql_comp_assert("select temperature + 1 from details",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {'+',
-                                               {identifier, <<"temperature">>},
-                                               {integer, 1}
-                                              }
-                                             ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {'+',
+                                                                           {identifier, <<"temperature">>},
+                                                                           {integer, 1}
+                                                                          }
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
 %%
 %% window_aggregate fns in the select clause tests
@@ -420,124 +420,124 @@ select_arithmetic_test() ->
 
 window_aggregate_fn_1_test() ->
     ?sql_comp_assert("select avg(temp) from details",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {{window_agg_fn, 'AVG'}, 
-                                               [{identifier, [<<"temp">>]}]}
-                                             ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {{window_agg_fn, 'AVG'}, 
+                                                                           [{identifier, [<<"temp">>]}]}
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
 window_aggregate_fn_1a_test() ->
     ?sql_comp_assert("select mean(temp) from details",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {{window_agg_fn, 'MEAN'}, 
-                                               [{identifier, [<<"temp">>]}]}
-                                             ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {{window_agg_fn, 'MEAN'}, 
+                                                                           [{identifier, [<<"temp">>]}]}
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
 window_aggregate_fn_2_test() ->
     ?sql_comp_assert("select avg(temp), sum(counts) from details",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {{window_agg_fn, 'AVG'},
-                                               [{identifier, [<<"temp">>]}]},
-                                              {{window_agg_fn, 'SUM'},
-                                                [{identifier, [<<"counts">>]}]}
-                                             ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {{window_agg_fn, 'AVG'},
+                                                                           [{identifier, [<<"temp">>]}]},
+                                                                          {{window_agg_fn, 'SUM'},
+                                                                           [{identifier, [<<"counts">>]}]}
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
 window_aggregate_fn_wildcard_count_test() ->
     ?sql_comp_assert("select count(*) from details",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {{window_agg_fn, 'ROWCOUNT'},
-                                               []}
-                                             ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {{window_agg_fn, 'ROWCOUNT'},
+                                                                           []}
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
 window_aggregate_fn_capitalisation_test() ->
     ?sql_comp_assert("select aVg(temp) from details",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {{window_agg_fn, 'AVG'},
-                                               [{identifier, [<<"temp">>]}]}
-                                             ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {{window_agg_fn, 'AVG'},
+                                                                           [{identifier, [<<"temp">>]}]}
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
 window_aggregate_fn_all_funs_test() ->
     ?sql_comp_assert("select avg(temp), sum(counts), count(counts), min(counts), " ++
                          "max(counts), stdev(counts) from details",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {{window_agg_fn, 'AVG'},
-                                               [{identifier, [<<"temp">>]}]},
-                                              {{window_agg_fn, 'SUM'},
-                                               [{identifier, [<<"counts">>]}]},
-                                              {{window_agg_fn, 'COUNT'},
-                                               [{identifier, [<<"counts">>]}]},
-                                              {{window_agg_fn, 'MIN'},
-                                               [{identifier, [<<"counts">>]}]},
-                                              {{window_agg_fn, 'MAX'},
-                                               [{identifier, [<<"counts">>]}]},
-                                              {{window_agg_fn, 'STDEV'},
-                                               [{identifier, [<<"counts">>]}]}
-                                             ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {{window_agg_fn, 'AVG'},
+                                                                           [{identifier, [<<"temp">>]}]},
+                                                                          {{window_agg_fn, 'SUM'},
+                                                                           [{identifier, [<<"counts">>]}]},
+                                                                          {{window_agg_fn, 'COUNT'},
+                                                                           [{identifier, [<<"counts">>]}]},
+                                                                          {{window_agg_fn, 'MIN'},
+                                                                           [{identifier, [<<"counts">>]}]},
+                                                                          {{window_agg_fn, 'MAX'},
+                                                                           [{identifier, [<<"counts">>]}]},
+                                                                          {{window_agg_fn, 'STDEV'},
+                                                                           [{identifier, [<<"counts">>]}]}
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
 window_aggregate_fn_arithmetic_1_test() ->
     ?sql_comp_assert("select aVg(temperature) + 1 - 2 * 3 / 4 from details",
-                     #riak_sql_v1{'SELECT' =
-                                      #riak_sel_clause_v1{clause = [
-                                       {'-',
-                                        {'+',
-                                         {{window_agg_fn,'AVG'},
-                                          [{identifier,[<<"temperature">>]}]},
-                                         {integer,1}},
-                                        {'/',
-                                         {'*',
-                                          {integer,2},{integer,3}},
-                                         {integer,4}}}
-                                      ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' =
+                                     #riak_sel_clause_v1{clause = [
+                                                                   {'-',
+                                                                    {'+',
+                                                                     {{window_agg_fn,'AVG'},
+                                                                      [{identifier,[<<"temperature">>]}]},
+                                                                     {integer,1}},
+                                                                    {'/',
+                                                                     {'*',
+                                                                      {integer,2},{integer,3}},
+                                                                     {integer,4}}}
+                                                                  ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
 arithmetic_precedence_test() ->
     ?sql_comp_assert("select 1 * 2 + 3 / 4 - 5 * 6 from dual",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{'-',
-                                               {'+',
-                                                {'*', {integer,1}, {integer,2}},
-                                                {'/', {integer,3}, {integer,4}}
-                                               },
-                                               {'*', {integer,5}, {integer,6}}
-                                               }]},
-                                  'FROM' = <<"dual">>,
-                                  'WHERE' = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{'-',
+                                                                           {'+',
+                                                                            {'*', {integer,1}, {integer,2}},
+                                                                            {'/', {integer,3}, {integer,4}}
+                                                                           },
+                                                                           {'*', {integer,5}, {integer,6}}
+                                                                          }]},
+                                 'FROM' = <<"dual">>,
+                                 'WHERE' = []
+                                }).
 
 window_aggregate_fn_arithmetic_2_test() ->
     ?sql_comp_assert("select aVg(temperature) + count(temperature) from details",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
-                                              {'+',
-                                               {{window_agg_fn, 'AVG'},
-                                                [{identifier, [<<"temperature">>]}]},
-                                               {{window_agg_fn, 'COUNT'},
-                                                [{identifier, [<<"temperature">>]}]}}
-                                             ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {'+',
+                                                                           {{window_agg_fn, 'AVG'},
+                                                                            [{identifier, [<<"temperature">>]}]},
+                                                                           {{window_agg_fn, 'COUNT'},
+                                                                            [{identifier, [<<"temperature">>]}]}}
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
 %% window_aggregate_fn_arithmetic_3_test() ->
 %%     ?sql_comp_assert("select aVg(temperature + 1) + count(temperature / distance) from details",
-%%                      #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [
+%%                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
 %%                                               {{window_agg_fn, 'AVG'}, 
 %%                                                [{identifier, [<<"Temperature">>]}]}
 %%                                  ],
@@ -915,16 +915,16 @@ create_with_all_nullable_key_test() ->
 
 select_sql_case_insensitive_1_test() ->
     ?sql_comp_assert_match("SELECT * from argle",
-                           #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
+                           ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
 
 select_sql_case_insensitive_2_test() ->
     ?sql_comp_assert_match("seLEct * from argle",
-                           #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
+                           ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
 
 
 sql_first_char_is_newline_test() ->
     ?sql_comp_assert_match("\nselect * from argle",
-                           #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
+                           ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
 
 %%%
 %%% Failure tests
@@ -949,18 +949,18 @@ rts_433_regression_test() ->
                          "and date <= 567 " ++
                          "and family = 'Hitachi HDS5C4040ALE630' " ++
                          "and series = 'true'",
-                     #riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                  'FROM'   = <<"HardDrivesV14">>,
-                                  'WHERE'  = [
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"HardDrivesV14">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'=', <<"series">>, {binary, <<"true">>}},
                                               {and_,
-                                               {'=', <<"series">>, {binary, <<"true">>}},
+                                               {'=', <<"family">>, {binary, <<"Hitachi HDS5C4040ALE630">>}},
                                                {and_,
-                                                {'=', <<"family">>, {binary, <<"Hitachi HDS5C4040ALE630">>}},
-                                                {and_,
-                                                 {'<=', <<"date">>, {integer, 567}},
-                                                 {'>=', <<"date">>, {integer, 123}}
-                                                }
+                                                {'<=', <<"date">>, {integer, 567}},
+                                                {'>=', <<"date">>, {integer, 123}}
                                                }
                                               }
-                                             ]
-                                 }).
+                                             }
+                                            ]
+                                }).

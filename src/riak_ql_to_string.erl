@@ -28,21 +28,21 @@
 
 -include("riak_ql_ddl.hrl").
 
--spec sql_to_string(#riak_sql_v1{} | #ddl_v1{}) ->
-                        string().
-sql_to_string(#riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = S},
-                           'FROM'   = F,
-                           'WHERE'  = W,
-                           type     = sql}) ->
+-spec sql_to_string(?SQL_SELECT{} | #ddl_v1{}) ->
+                           string().
+sql_to_string(?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = S},
+                          'FROM'   = F,
+                          'WHERE'  = W,
+                          type     = sql}) ->
     SQL = [
-        "SELECT",
-        make_select_clause(S),
-        "FROM",
-        make_from_clause(F),
-        "WHERE",
-        make_where_clause(W)
-        %% don't forget to add 'ORDER BY' and 'LIMIT' when/if appropriate
-    ],
+           "SELECT",
+           make_select_clause(S),
+           "FROM",
+           make_from_clause(F),
+           "WHERE",
+           make_where_clause(W)
+           %% don't forget to add 'ORDER BY' and 'LIMIT' when/if appropriate
+          ],
     string:join(SQL, " ");
 
 sql_to_string(#ddl_v1{table         = T,
@@ -60,15 +60,15 @@ sql_to_string(#ddl_v1{table         = T,
 make_select_clause(FF) ->
     string:join([select_col_to_string(F) || F <- FF], ", ").
 
-%% Convert the selection in a #riak_sql_v1 statement to a list of strings, one
+%% Convert the selection in a ?SQL_SELECT statement to a list of strings, one
 %% element for each column. White space in the original query is not reproduced.
--spec col_names_from_select(#riak_sql_v1{}) -> [string()].
-col_names_from_select(#riak_sql_v1{'SELECT' = #riak_sel_clause_v1{clause = Select}}) ->
+-spec col_names_from_select(?SQL_SELECT{}) -> [string()].
+col_names_from_select(?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = Select}}) ->
     [select_col_to_string(S) || S <- Select].
 
 %% Convert one column to a flat string.
 -spec select_col_to_string(any()) ->
-        string().
+                                  string().
 %% these two happen only in sql
 select_col_to_string(Bare) when is_binary(Bare) ->  %% bare column name in where expression
     binary_to_list(Bare);
@@ -91,11 +91,11 @@ select_col_to_string({boolean, false}) ->
     "false";
 select_col_to_string({{window_agg_fn, FunName}, Args}) when is_atom(FunName) ->
     lists:flatten([
-        atom_to_list(FunName),
-        $(,
-        string:join([select_col_to_string(A) || A <- Args], ", "),
-        $)
-    ]);
+                   atom_to_list(FunName),
+                   $(,
+                   string:join([select_col_to_string(A) || A <- Args], ", "),
+                   $)
+                  ]);
 select_col_to_string({expr, Expression}) ->
     select_col_to_string(Expression);
 select_col_to_string({Op, Arg1, Arg2}) when is_atom(Op) ->
@@ -151,107 +151,107 @@ flat_format(F, AA) ->
 
 select_col_to_string_all_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select * from bendy")),
+                                       "select * from bendy")),
     ?assertEqual(
-        ["*"],
-        col_names_from_select(SQL)
-    ).
+       ["*"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_colname_1_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select mindy from bendy")),
+                                       "select mindy from bendy")),
     ?assertEqual(
-        ["mindy"],
-        col_names_from_select(SQL)
-    ).
+       ["mindy"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_colname_2_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select mindy, raymond from bendy")),
+                                       "select mindy, raymond from bendy")),
     ?assertEqual(
-        ["mindy", "raymond"],
-        col_names_from_select(SQL)
-    ).
+       ["mindy", "raymond"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_integer_literal_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select 1 from bendy")),
+                                       "select 1 from bendy")),
     ?assertEqual(
-        ["1"],
-        col_names_from_select(SQL)
-    ).
+       ["1"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_boolean_true_literal_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select true from bendy")),
+                                       "select true from bendy")),
     ?assertEqual(
-        ["true"],
-        col_names_from_select(SQL)
-    ).
+       ["true"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_boolean_false_literal_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select false from bendy")),
+                                       "select false from bendy")),
     ?assertEqual(
-        ["false"],
-        col_names_from_select(SQL)
-    ).
+       ["false"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_double_literal_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select 7.2 from bendy")),
+                                       "select 7.2 from bendy")),
     ?assertEqual(
-        ["7.2"],
-        col_names_from_select(SQL)
-    ).
+       ["7.2"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_varchar_literal_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select 'derp' from bendy")),
+                                       "select 'derp' from bendy")),
     ?assertEqual(
-        ["'derp'"],
-        col_names_from_select(SQL)
-    ).
+       ["'derp'"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_one_plus_one_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select 1+1 from bendy")),
+                                       "select 1+1 from bendy")),
     ?assertEqual(
-        ["(1+1)"],
-        col_names_from_select(SQL)
-    ).
+       ["(1+1)"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_four_div_two_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select 4/2 from bendy")),
+                                       "select 4/2 from bendy")),
     ?assertEqual(
-        ["(4/2)"],
-        col_names_from_select(SQL)
-    ).
+       ["(4/2)"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_four_times_ten_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select 4*10 from bendy")),
+                                       "select 4*10 from bendy")),
     ?assertEqual(
-        ["(4*10)"],
-        col_names_from_select(SQL)
-    ).
+       ["(4*10)"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_avg_funcall_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select avg(mona) from bendy")),
+                                       "select avg(mona) from bendy")),
     ?assertEqual(
-        ["AVG(mona)"],
-        col_names_from_select(SQL)
-    ).
+       ["AVG(mona)"],
+       col_names_from_select(SQL)
+      ).
 
 select_col_to_string_avg_funcall_with_nested_maths_test() ->
     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        "select avg(10+5) from bendy")),
+                                       "select avg(10+5) from bendy")),
     ?assertEqual(
-        ["AVG((10+5))"],
-        col_names_from_select(SQL)
-    ).
+       ["AVG((10+5))"],
+       col_names_from_select(SQL)
+      ).
 
 %% "select value from response_times where time > 1388534400",
 
