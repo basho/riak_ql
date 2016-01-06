@@ -89,7 +89,7 @@
           finalisers       = []   :: [function()]
         }).
 
--record(riak_sql_v1,
+-record(riak_select_v1,
         {
           'SELECT'              :: #riak_sel_clause_v1{},
           'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
@@ -109,5 +109,7 @@
         {
           'DESCRIBE' = <<>>  :: binary()
         }).
+
+-define(SQL_SELECT, #riak_select_v1).
 
 -endif.
