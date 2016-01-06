@@ -348,6 +348,9 @@ is_selection_column_valid(Mod, {{window_agg_fn, Fn}, Args}, {Acc, Status}) ->
     % if the field is not an identifier, it should already be validated
     {Arity, FnTypeSig} = riak_ql_window_agg_fns:get_arity_and_type_sig(Fn),
     case length(Args) of
+        Arity when is_atom(FnTypeSig) ->
+            %% function takes args of any type
+            {Acc, Status};
         Arity -> ExprTypes = type(Args, Mod, []),
                  case do_types_match(FnTypeSig, ExprTypes) of
                      true  -> {Acc, Status};
