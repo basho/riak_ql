@@ -559,14 +559,14 @@ make_funcall({identifier, FuncName}, Args) ->
         window_aggregate_fn ->
             {Fn2, Args2} = case {Fn, Args} of
                                {'COUNT', [{asterisk, _Asterisk}]} ->
-                                  {'ROWCOUNT', []};
-                        {_, [{asterisk, _Asterisk}]} ->
-                            Msg1 = io_lib:format("Function '~s' does not support " ++
-                                                     "wild cards args.", [Fn]),
-                            return_error(0, iolist_to_binary(Msg1));
-                        _ ->
-                            {Fn, Args}
-                    end,
+                                   {'COUNT', [{identifier, <<"*">>}]};
+                               {_, [{asterisk, _Asterisk}]} ->
+                                   Msg1 = io_lib:format("Function '~s' does not support"
+                                                        " wild cards args.", [Fn]),
+                                   return_error(0, iolist_to_binary(Msg1));
+                               _ ->
+                                   {Fn, Args}
+                           end,
             Args3 = [canonicalise_expr(X) || X <- Args2],
             {{window_agg_fn, Fn2}, Args3};
         not_supported ->
