@@ -32,16 +32,22 @@
 
 -include("riak_ql_ddl.hrl").
 
--spec get_arity_and_type_sig(aggregate_function()) -> {non_neg_integer(), [{field_type(), field_type()}]}.
-%% functions used in expression type validation for each Function, the
-%% returned tuple gives the arity and arg-type to return-type pairs
-get_arity_and_type_sig('COUNT')  -> {1, [{sint64, sint64}, {double, sint64}, {boolean, sint64}, {varchar, sint64}, {timestamp, sint64}]};
+-spec get_arity_and_type_sig(aggregate_function()) ->
+                                    {Arity::non_neg_integer(),
+                                     field_type() | [{field_type(), field_type()}]}.
+%% Functions used in expression type validation for each Function, the
+%% returned tuple gives the arity and arg-type to return-type pairs.
+%% For functions accepting '*' (such as COUNT), arguments are the entire row, passed
+%% as a list, and no type checking is done on the elements
+get_arity_and_type_sig('COUNT')  -> {1, sint64};
 get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  %% double promotion
 get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG');
 get_arity_and_type_sig('MAX')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('STDEV')  -> {1, [{sint64, double}, {double, double}]};  %% ditto
 get_arity_and_type_sig('SUM')    -> {1, [{sint64, sint64}, {double, double}]}.
+
+
 
 %% Get the initial accumulator state for the aggregation.
 -spec start_state(aggregate_function()) ->

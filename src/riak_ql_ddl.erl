@@ -335,7 +335,7 @@ are_selections_valid(Mod, Selections, _) ->
         {Msgs, false} -> {false, lists:reverse(Msgs)}
     end.
 
-%% Reported error types must be supported by the function syntax_error_to_msg2 
+%% Reported error types must be supported by the function syntax_error_to_msg2
 is_selection_column_valid(Mod, {identifier, X}, {Acc, Status}) ->
     case Mod:is_field_valid(X) of
         true  ->
@@ -348,6 +348,9 @@ is_selection_column_valid(Mod, {{window_agg_fn, Fn}, Args}, {Acc, Status}) ->
     %% if the field is not an identifier, it should already be validated
     {Arity, FnTypeSig} = riak_ql_window_agg_fns:get_arity_and_type_sig(Fn),
     case length(Args) of
+        Arity when is_atom(FnTypeSig) ->
+            %% function takes args of any type
+            {Acc, Status};
         Arity -> ExprTypes = type(Args, Mod, []),
                  case do_types_match(FnTypeSig, ExprTypes) of
                      true  -> {Acc, Status};

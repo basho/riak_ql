@@ -441,8 +441,8 @@ window_aggregate_fn_2_test() ->
 window_aggregate_fn_wildcard_count_test() ->
     ?sql_comp_assert("select count(*) from details",
                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-                                                                          {{window_agg_fn, 'ROWCOUNT'},
-                                                                           []}
+                                                                          {{window_agg_fn, 'COUNT'},
+                                                                           [{identifier, [<<"*">>]}]}
                                                                          ]},
                                  'FROM'    = <<"details">>,
                                  'WHERE'   = []
