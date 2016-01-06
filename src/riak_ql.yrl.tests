@@ -722,6 +722,11 @@ create_no_key_sql_test() ->
                    " time timestamp not null, "
                    " temp_k double)").
 
+create_wrong_field_order_sql_test() ->
+    ?sql_comp_fail("create table consufed ("
+                   " a varchar not null, b varchar not null, c timestamp not null,"
+                   " PRIMARY KEY ((a, c, quantum(b, 15, 'm')), a, c, b))").
+
 
 create_timeseries_sql_test() ->
     String =
