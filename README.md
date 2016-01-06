@@ -1,13 +1,24 @@
-Readme
-------
+# Riak QL
 
 riak_ql provides a number of different functions to Riak
 * a lexer/parser for the SQL sub-set we support
 * a function for calculating time quanta for Time Series
 * a compiler for generating helper modules to validate and manipulate records that correspond to a defined table schema in the DDL
 
-Generated Modules
------------------
+Link to the official and still private [docs](https://github.com/basho/private_basho_docs/tree/timeseries/1.0.0/source/languages/en/riakts).
+
+### Compiling and Decompiling
+
+```
+Table_def = "CREATE TABLE MyTable (myfamily varchar not null, myseries varchar not null, time timestamp not null, weather varchar not null, temperature double, PRIMARY KEY ((myfamily, myseries, quantum(time, 10, 'm')), myfamily, myseries, time))".
+
+{ok, DDL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)).
+{ModName, AST} = riak_ql_ddl_compiler:compile(DDL).
+
+riak_ql_ddl_compiler:write_source_to_files("/tmp", DDL, AST).
+```
+
+### Generated Modules
 
 The structure and interfaces of the generated modules is shown as per this `.erl` file which has been reverse generated from the AST that riak_kv_ddl_compiler emits. The comments contain details of the fields and keys used in the creation of the DDL.
 

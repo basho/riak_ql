@@ -19,6 +19,7 @@ OR = (O|o)(R|r)
 PRIMARY = (P|p)(R|r)(I|i)(M|m)(A|a)(R|r)(Y|y)
 QUANTUM = (Q|q)(U|u)(A|a)(N|n)(T|t)(U|u)(M|m)
 SELECT = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
+DESCRIBE = (D|d)(E|e)(S|s)(C|c)(R|r)(I|i)(B|b)(E|e)
 SINT64 = (S|s)(I|i)(N|n)(T|t)64
 TABLE = (T|t)(A|a)(B|b)(L|l)(E|e)
 TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
@@ -53,10 +54,10 @@ NOTAPPROX   = (!\~)
 OPEN        = \(
 CLOSE       =\)
 
-PLUS  = (\+)
-MINUS = (\-)
-TIMES = (\*)
-DIV   = (/)
+PLUS     = (\+)
+MINUS    = (\-)
+ASTERISK = (\*)
+SOLIDUS  = (/)
 
 COMMA = (,)
 
@@ -76,6 +77,7 @@ Rules.
 {PRIMARY} : {token, {primary, list_to_binary(TokenChars)}}.
 {QUANTUM} : {token, {quantum, list_to_binary(TokenChars)}}.
 {SELECT} : {token, {select, list_to_binary(TokenChars)}}.
+{DESCRIBE} : {token, {describe, list_to_binary(TokenChars)}}.
 {SINT64} : {token, {sint64, list_to_binary(TokenChars)}}.
 {TABLE} : {token, {table, list_to_binary(TokenChars)}}.
 {TIMESTAMP} : {token, {timestamp, list_to_binary(TokenChars)}}.
@@ -103,10 +105,10 @@ Rules.
 {OPEN}  :  {token, {left_paren,  list_to_binary(TokenChars)}}.
 {CLOSE} :  {token, {right_paren, list_to_binary(TokenChars)}}.
 
-{PLUS}  : {token, {plus_sign,     list_to_binary(TokenChars)}}.
-{MINUS} : {token, {minus_sign,    list_to_binary(TokenChars)}}.
-{TIMES} : {token, {maybeasterisk, list_to_binary(TokenChars)}}.
-{DIV}   : {token, {solidus,       list_to_binary(TokenChars)}}.
+{PLUS}     : {token, {plus_sign,  list_to_binary(TokenChars)}}.
+{MINUS}    : {token, {minus_sign, list_to_binary(TokenChars)}}.
+{ASTERISK} : {token, {asterisk,   list_to_binary(TokenChars)}}.
+{SOLIDUS}  : {token, {solidus,    list_to_binary(TokenChars)}}.
 
 {CHARACTER_LITERAL} :
   {token, {character_literal, clean_up_literal(TokenChars)}}.

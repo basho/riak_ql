@@ -60,26 +60,57 @@
          }).
 
 %% TODO these types will be improved over the duration of the time series project
--type selection()  :: {identifier, [binary()]}.
+-type selection()  :: {identifier, [binary()]}
+                    | {integer, integer()}
+                    | {float, float()}
+                    | {boolean, boolean()}
+                    | {binary, binary()}
+                    | {{window_agg_fn, FunctionName::atom()}, [any()]}
+                    | {expr, selection()}.
+
 -type filter()     :: term().
 -type operator()   :: [binary()].
 -type sorter()     :: term().
 -type combinator() :: [binary()].
 -type limit()      :: any().
 
--record(riak_sql_v1,
+%% the result type of a query, rows means to return all mataching rows, aggregate
+%% returns one row calculated from the result set for the query.
+-type select_result_type() :: rows | aggregate.
+
+-record(riak_sel_clause_v1, 
         {
-          'SELECT'      = []    :: [selection() | operator() | combinator()],
+          calc_type        = rows :: select_result_type(),
+          initial_state    = []   :: [any()],
+          col_return_types = []   :: [field_type()],
+          col_names        = []   :: [binary()],
+          clause           = []   :: [riak_kv_qry_compiler:compiled_select()],
+          is_valid         = true :: true | {error, [any()]},
+          finalisers       = []   :: [function()]
+        }).
+
+-record(riak_select_v1,
+        {
+          'SELECT'              :: #riak_sel_clause_v1{},
           'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
           'WHERE'       = []    :: [filter()],
           'ORDER BY'    = []    :: [sorter()],
           'LIMIT'       = []    :: [limit()],
           helper_mod            :: atom(),
+          %% will include groups when we get that far
           partition_key = none  :: none | #key_v1{},
+          %% indicates whether this query has already been compiled to a sub query
           is_executable = false :: boolean(),
           type          = sql   :: sql | timeseries,
           cover_context = undefined :: term(), %% for parallel queries
           local_key                                  % prolly a mistake to put this here - should be in DDL
         }).
+
+-record(riak_sql_describe_v1,
+        {
+          'DESCRIBE' = <<>>  :: binary()
+        }).
+
+-define(SQL_SELECT, #riak_select_v1).
 
 -endif.

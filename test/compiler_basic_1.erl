@@ -34,13 +34,13 @@
 
 %%
 %% this test calls into the PRIVATE interface
-%% mk_helper_m2/1
+%% compile_and_load_from_tmp/1
 %%
 -define(passing_test(Name, Query, Val, ExpectedPK, ExpectedLK),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               case riak_ql_ddl_compiler:mk_helper_m2(DDL, "/tmp") of
+               case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
                        GotPK = riak_ql_ddl:get_partition_key(DDL, Val),
@@ -57,7 +57,7 @@
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+               case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
                        ?assertEqual(?VALID, Result);
@@ -69,13 +69,13 @@
 
 %%
 %% this test calls into the PRIVATE interface
-%% mk_helper_m2/1
+%% compile_and_load_from_tmp/1
 %%
 -define(failing_test(Name, Query, Val),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+               case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
                        ?assertEqual(?INVALID, Result);
@@ -86,13 +86,13 @@
 
 %%
 %% this test calls in the PUBLIC interface
-%% make_helper_mod/1
+%% compile_and_load_from_tmp/1
 %%
 -define(not_valid_test(Name, Query),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               case riak_ql_ddl_compiler:make_helper_mod(DDL) of
+               case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {error, _} ->
                        ?assertEqual(?VALID, true);
                    Other ->
@@ -109,7 +109,7 @@
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
                %% ?debugFmt("in ~p~n- DDL is:~n -~p~n", [Name, DDL]),
-               {module, Module} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
+               {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
                Got = Module:get_ddl(),
                %% ?debugFmt("in ~p~n- Got is:~n -~p~n", [Name, Got]),
                ?assertEqual(DDL, Got)).
