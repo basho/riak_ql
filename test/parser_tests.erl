@@ -8,9 +8,9 @@
 not_null_white_space_test() ->
     Table_def =
         "CREATE TABLE temperatures ("
-        "time TIMESTAMP NOT                NULL, "
         "family VARCHAR NOT NULL, "
         "series VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT                NULL, "
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
@@ -21,9 +21,9 @@ not_null_white_space_test() ->
 create_table_white_space_test() ->
     Table_def =
         "CREATE               \tTABLE temperatures ("
-        "time TIMESTAMP NOT NULL, "
         "family VARCHAR NOT NULL, "
         "series VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT NULL, "
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
@@ -34,9 +34,9 @@ create_table_white_space_test() ->
 primary_key_white_space_test() ->
     Table_def =
         "CREATE TABLE temperatures ("
-        "time TIMESTAMP NOT NULL, "
         "family VARCHAR NOT NULL, "
         "series VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT NULL, "
         "PRIMARY               \t  KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(

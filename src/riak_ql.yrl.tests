@@ -676,6 +676,11 @@ create_no_key_sql_test() ->
                    " time timestamp not null, "
                    " temp_k double)").
 
+create_wrong_field_order_sql_test() ->
+    ?sql_comp_fail("create table consufed ("
+                   " a varchar not null, b varchar not null, c timestamp not null,"
+                   " PRIMARY KEY ((a, c, quantum(b, 15, 'm')), a, c, b))").
+
 
 create_timeseries_sql_test() ->
     String =
@@ -744,8 +749,8 @@ create_timeseries_sql_test() ->
 create_all_types_sql_test() ->
     String =
         "CREATE TABLE GeoCheckin ("
-        " geohash varchar not null,"
         " user varchar not null,"
+        " geohash varchar not null,"
         " time timestamp not null,"
         " isweather boolean not null,"
         " temp double not null,"
@@ -766,12 +771,12 @@ create_all_types_sql_test() ->
                   table = <<"GeoCheckin">>,
                   fields = [
                             #riak_field_v1{
-                               name = <<"geohash">>,
+                               name = <<"user">>,
                                position = 1,
                                type = varchar,
                                optional = false},
                             #riak_field_v1{
-                               name = <<"user">>,
+                               name = <<"geohash">>,
                                position = 2,
                                type = varchar,
                                optional = false},
