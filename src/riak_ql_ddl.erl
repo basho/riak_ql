@@ -335,7 +335,7 @@ are_selections_valid(Mod, Selections, _) ->
         {Msgs, false} -> {false, lists:reverse(Msgs)}
     end.
 
-%% Reported error types must be supported by the function syntax_error_to_msg2 
+%% Reported error types must be supported by the function syntax_error_to_msg2
 is_selection_column_valid(Mod, {identifier, X}, {Acc, Status}) ->
     case Mod:is_field_valid(X) of
         true  ->
