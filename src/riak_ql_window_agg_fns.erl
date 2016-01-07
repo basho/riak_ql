@@ -34,12 +34,16 @@
 
 -include("riak_ql_ddl.hrl").
 
--spec get_arity_and_type_sig(aggregate_function()) -> {non_neg_integer(), [{field_type(), field_type()}]}.
-%% functions used in expression type validation for each Function, the
-%% returned tuple gives the arity and arg-type to return-type pairs
-get_arity_and_type_sig('COUNT')  -> {1, [{sint64, sint64}, {double, sint64}, {boolean, sint64}, {varchar, sint64}, {timestamp, sint64}]};
+-spec get_arity_and_type_sig(aggregate_function()) ->
+                                    {Arity::non_neg_integer(),
+                                     field_type() | [{field_type(), field_type()}]}.
+%% Functions used in expression type validation for each Function, the
+%% returned tuple gives the arity and arg-type to return-type pairs.
+%% For functions accepting '*' (such as COUNT), arguments are the entire row, passed
+%% as a list, and no type checking is done on the elements
+get_arity_and_type_sig('COUNT')  -> {1, sint64};
 get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  %% double promotion
-get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG'); 
+get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG');
 get_arity_and_type_sig('MAX')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('STDEV')  -> {1, [{sint64, double}, {double, double}]};  %% ditto
@@ -59,11 +63,19 @@ start_state(_)       -> stateless.
 
 %% Calculate the final results using the accumulated result.
 -spec finalise(aggregate_function(), any()) -> any().
-finalise(_, ?SQL_NULL) -> ?SQL_NULL;
-finalise('MEAN', {N, Acc}) -> finalise('AVG', {N, Acc});
-finalise('AVG', {N, Acc})  -> Acc / N;
-finalise('STDEV', {N, _, Q}) -> math:sqrt(Q / N);
-finalise(_Fn, Acc) -> Acc.
+finalise(_, ?SQL_NULL) ->
+    ?SQL_NULL;
+finalise('MEAN', State) ->
+    finalise('AVG', State);
+finalise('AVG', {N, Acc})  ->
+    Acc / N;
+finalise('STDEV', {N, _, _}) when N < 2 ->
+    % STDDEV must have two or more values to or return NULL
+    ?SQL_NULL;
+finalise('STDEV', {N, _, Q}) ->
+    math:sqrt(Q / N);
+finalise(_Fn, Acc) ->
+    Acc.
 
 %% Group functions (avg, mean etc). These can only appear as top-level
 %% expressions in SELECT part, and there can be only one in a query.
@@ -72,10 +84,8 @@ finalise(_Fn, Acc) -> Acc.
 %%
 %% Incrementally operates on chunks, needs to carry state.
 
-
 'COUNT'(_, State) when is_integer(State) ->
     State + 1.
-
 
 'SUM'(Arg, State) when is_number(Arg), is_number(State) ->
     Arg + State;
@@ -121,8 +131,8 @@ finalise(_Fn, Acc) -> Acc.
 stdev_test() ->
     State0 = start_state('STDEV'),
     Data = [
-            1.0, 2.0, 3.0, 4.0, 2.0, 
-            3.0, 4.0, 4.0, 4.0, 3.0, 
+            1.0, 2.0, 3.0, 4.0, 2.0,
+            3.0, 4.0, 4.0, 4.0, 3.0,
             2.0, 3.0, 2.0, 1.0, 1.0
            ],
     %% numpy.std(Data) computes it to:
@@ -135,6 +145,23 @@ stdev_test() ->
     State9 = lists:foldl(fun 'STDEV'/2, State0, Data),
     Got = finalise('STDEV', State9),
     ?assertEqual(Expected, Got).
+
+stdev_no_value_test() ->
+    ?assertEqual(
+        [], 
+        finalise('STDEV', start_state('STDEV'))
+    ).
+stdev_one_value_test() ->
+    ?assertEqual(
+        ?SQL_NULL, 
+        finalise('STDEV', 'STDEV'(3, start_state('STDEV')))
+    ).
+stdev_two_value_test() ->
+    ?assertEqual(
+        0.5, 
+        finalise('STDEV', lists:foldl(fun 'STDEV'/2, start_state('STDEV'), [1.0,2.0]))
+    ).
+
 
 testing_fold_avg(InitialState, InputList) ->
     finalise('AVG', lists:foldl(fun 'AVG'/2, InitialState, InputList)).
@@ -196,4 +223,3 @@ max_finalise_null_test() ->
     ?assertEqual(?SQL_NULL, finalise('MAX', start_state('MAX'))).
 
 -endif.
-    
