@@ -387,6 +387,7 @@ validate_no_mixed_aggregate_arith(SingleField) ->
     case aggregate_or_arith(SingleField) of
         aggregate -> SingleField;
         arithmetic -> SingleField;
+        either -> SingleField;
         mixed -> return_error(0,
                               <<"Mixing arithmetic and aggregate functions in "
                                 "a single field is not supported">>)
@@ -395,22 +396,35 @@ validate_no_mixed_aggregate_arith(SingleField) ->
 aggregate_or_arith({_Operation, LeftOperand, RightOperand}) ->
     LeftSide = aggregate_or_arith(LeftOperand),
     RightSide = aggregate_or_arith(RightOperand),
-    BothSides = if LeftSide =:= RightSide ->
-                        LeftSide;
-                   true ->
-                        mixed
-                end,
+    BothSides = merge_aggregate_or_arith(LeftSide, RightSide),
     case BothSides of
         arithmetic -> arithmetic;
         aggregate -> mixed;
+        either -> either;
         mixed -> mixed
     end;
 aggregate_or_arith({negate, _NegateVal}) ->
     arithmetic;
-aggregate_or_arith({{window_agg_fn, _FnName}, _AggFnArgs}) ->
-    aggregate;
+aggregate_or_arith({{window_agg_fn, _FnName}, AggFnArgs}) ->
+    ArgFlavor = lists:foldl(
+                  fun(Arg, AccumFlavor) ->
+                          ArgFlavor = aggregate_or_arith(Arg),
+                          merge_aggregate_or_arith(AccumFlavor, ArgFlavor)
+                  end, either, AggFnArgs),
+    merge_aggregate_or_arith(aggregate, ArgFlavor);
+aggregate_or_arith({identifier, _IdentName}) ->
+    either;
 aggregate_or_arith({_Type, _Val}) ->
     arithmetic.
+
+merge_aggregate_or_arith(SameFlavor, SameFlavor) ->
+    SameFlavor;
+merge_aggregate_or_arith(either, SomeFlavor) ->
+    SomeFlavor;
+merge_aggregate_or_arith(SomeFlavor, either) ->
+    SomeFlavor;
+merge_aggregate_or_arith(_LeftFlavor, _RightFlavor) ->
+    mixed.
 
 
 wrap_identifier({identifier, IdentifierName})
