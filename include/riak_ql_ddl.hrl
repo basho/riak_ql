@@ -42,11 +42,11 @@
          }).
 
 -record(hash_fn_v1, {
-              mod       :: atom(),
+          mod       :: atom(),
           fn        :: atom(),
           args = [] :: [#param_v1{} | any()],
           type      :: field_type()
-         }).
+	 }).
 
 -record(key_v1, {
           ast = [] :: [#hash_fn_v1{} | #param_v1{}]
@@ -82,7 +82,7 @@
         {
           calc_type        = rows :: select_result_type(),
           initial_state    = []   :: [any()],
-          col_return_types = []   :: [sint64 | double | boolean | varchar | timestamp],
+          col_return_types = []   :: [field_type()],
           col_names        = []   :: [binary()],
           clause           = []   :: [riak_kv_qry_compiler:compiled_select()],
           is_valid         = true :: true | {error, [any()]},
@@ -102,6 +102,7 @@
           %% indicates whether this query has already been compiled to a sub query
           is_executable = false :: boolean(),
           type          = sql   :: sql | timeseries,
+          cover_context = undefined :: term(), %% for parallel queries
           local_key                                  % prolly a mistake to put this here - should be in DDL
         }).
 
@@ -111,5 +112,6 @@
         }).
 
 -define(SQL_SELECT, #riak_select_v1).
+-define(SQL_SELECT_RECORD_NAME, riak_select_v1).
 
 -endif.
