@@ -368,14 +368,14 @@ make_select({select, _SelectBytes},
                  list   -> {list, [X || X <- D]};
                  regex  -> {regex, D}
              end,
-    S2 = case is_list(Select) of
-                                true  -> Select;
-                                false -> [Select]
-                            end,
-    S3 = [remove_exprs(X) || X <- S2],
-    S4 = [wrap_identifier(X) || X <- S3],
+    FieldsAsList = case is_list(Select) of
+                       true  -> Select;
+                       false -> [Select]
+                   end,
+    FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
+    FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
     _O = #outputs{type    = select,
-                  fields  = S4,
+                  fields  = FieldsWrappedIdentifiers,
                   buckets = Bucket,
                   where   = E
                  }.
