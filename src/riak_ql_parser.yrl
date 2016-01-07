@@ -368,17 +368,64 @@ make_select({select, _SelectBytes},
                  list   -> {list, [X || X <- D]};
                  regex  -> {regex, D}
              end,
-    S2 = case is_list(Select) of
-                                true  -> Select;
-                                false -> [Select]
-                            end,
-    S3 = [remove_exprs(X) || X <- S2],
-    S4 = [wrap_identifier(X) || X <- S3],
+    FieldsAsList = case is_list(Select) of
+                       true  -> Select;
+                       false -> [Select]
+                   end,
+    FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
+    validate_no_mixed_aggregate_arith(FieldsWithoutExprs),
+    FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
     _O = #outputs{type    = select,
-                  fields  = S4,
+                  fields  = FieldsWrappedIdentifiers,
                   buckets = Bucket,
                   where   = E
                  }.
+
+validate_no_mixed_aggregate_arith(Fields) when is_list(Fields) ->
+    [validate_no_mixed_aggregate_arith(F) || F <- Fields];
+validate_no_mixed_aggregate_arith(SingleField) ->
+    case aggregate_or_arith(SingleField) of
+        aggregate -> SingleField;
+        arithmetic -> SingleField;
+        either -> SingleField;
+        mixed -> return_error(0,
+                              <<"Mixing arithmetic and aggregate functions in "
+                                "a single field is not supported">>)
+    end.
+
+aggregate_or_arith({_Operation, LeftOperand, RightOperand}) ->
+    LeftSide = aggregate_or_arith(LeftOperand),
+    RightSide = aggregate_or_arith(RightOperand),
+    BothSides = merge_aggregate_or_arith(LeftSide, RightSide),
+    case BothSides of
+        arithmetic -> arithmetic;
+        aggregate -> mixed;
+        either -> either;
+        mixed -> mixed
+    end;
+aggregate_or_arith({negate, _NegateVal}) ->
+    arithmetic;
+aggregate_or_arith({{window_agg_fn, _FnName}, AggFnArgs}) ->
+    ArgFlavor = lists:foldl(
+                  fun(Arg, AccumFlavor) ->
+                          ArgFlavor = aggregate_or_arith(Arg),
+                          merge_aggregate_or_arith(AccumFlavor, ArgFlavor)
+                  end, either, AggFnArgs),
+    merge_aggregate_or_arith(aggregate, ArgFlavor);
+aggregate_or_arith({identifier, _IdentName}) ->
+    either;
+aggregate_or_arith({_Type, _Val}) ->
+    arithmetic.
+
+merge_aggregate_or_arith(SameFlavor, SameFlavor) ->
+    SameFlavor;
+merge_aggregate_or_arith(either, SomeFlavor) ->
+    SomeFlavor;
+merge_aggregate_or_arith(SomeFlavor, either) ->
+    SomeFlavor;
+merge_aggregate_or_arith(_LeftFlavor, _RightFlavor) ->
+    mixed.
+
 
 wrap_identifier({identifier, IdentifierName})
   when is_binary(IdentifierName) ->
