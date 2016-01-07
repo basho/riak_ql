@@ -44,39 +44,10 @@ window_aggregate_fn_arithmetic_1_test() ->
     ?sql_comp_fail("select aVg(temperature) + 1 - 2 * 3 / 4 from details").
 
 arith_inside_aggregate_fn_test() ->
-    ?sql_comp_assert("select aVg((temperature * 2) + 32) from details",
-                     ?SQL_SELECT{
-                        'SELECT' =
-                            #riak_sel_clause_v1{
-                               clause = [
-                                         {{window_agg_fn, 'AVG'},
-                                          [{expr,
-                                            [{'+',
-                                             {expr,
-                                              {'*',
-                                               {identifier,<<"temperature">>},
-                                               {integer, 2}}},
-                                            {integer,32}}]}]}]},
-                        'FROM' = <<"details">>,
-                        'WHERE' = []}).
+    ?sql_comp_fail("select aVg((temperature * 2) + 32) from details").
 
 arith_with_multiple_agg_fn_test() ->
-    ?sql_comp_assert("select count(x) + 1 / avg(y) from details",
-                     ?SQL_SELECT{
-                        'SELECT' =
-                            #riak_sel_clause_v1{
-                               clause = [
-                                         {'+',
-                                          {
-                                            {window_agg_fn,'COUNT'},
-                                            [{identifier,[<<"x">>]}]},
-                                          {'/',
-                                           {integer,1},
-                                           {{window_agg_fn,'AVG'},
-                                            [{identifier,[<<"y">>]}]}}}
-                                        ]},
-                        'FROM' = <<"details">>,
-                        'WHERE' = []}).
+    ?sql_comp_fail("select count(x) + 1 / avg(y) from details").
 
 arithmetic_precedence_test() ->
     ?sql_comp_assert("select 1 * 2 + 3 / 4 - 5 * 6 from dual",
@@ -118,9 +89,6 @@ negated_parens_test() ->
                                   'FROM' = <<"dual">>,
                                   'WHERE' = []
                                  }).
-
-no_arithmetic_in_where_test() ->
-    ?sql_comp_fail("select * from dual where 1 + 2 * 3 > 4").
 
 no_functions_in_where_test() ->
     ?sql_comp_fail("select * from dual where sin(4) > 4").

@@ -255,13 +255,14 @@ select_col_to_string_avg_funcall_test() ->
        col_names_from_select(SQL)
       ).
 
-select_col_to_string_avg_funcall_with_nested_maths_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select avg(10+5) from bendy")),
-    ?assertEqual(
-       ["AVG((10+5))"],
-       col_names_from_select(SQL)
-      ).
+% mixed aggregate and arithmetic are not in 1.1
+%% select_col_to_string_avg_funcall_with_nested_maths_test() ->
+%%     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
+%%                                        "select avg(10+5) from bendy")),
+%%     ?assertEqual(
+%%        ["AVG((10+5))"],
+%%        col_names_from_select(SQL)
+%%       ).
 
 select_col_to_string_negated_test() ->
     test_col_names("select - 1.0, - 1, -asdf, - asdf from dual",
