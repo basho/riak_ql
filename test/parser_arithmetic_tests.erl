@@ -109,7 +109,7 @@ arithmetic_precedence_test() ->
 parens_precedence_test() ->
     ?sql_comp_assert("select 1 * (2 + 3) / (4 - 5) * 6 from dual",
                      ?SQL_SELECT{
-                        'SELECT' = 
+                        'SELECT' =
                             #riak_sel_clause_v1{
                                clause = [{'*',
                                           {'/',
@@ -124,10 +124,10 @@ parens_precedence_test() ->
 negated_parens_test() ->
         ?sql_comp_assert("select - (2 + 3) from dual",
                      ?SQL_SELECT{
-                        'SELECT' = 
+                        'SELECT' =
                             #riak_sel_clause_v1{
                                clause = [{negate,
-                                          {expr, 
+                                          {expr,
                                            {'+', {integer,2}, {integer,3}}}}
                                         ]},
                                   'FROM' = <<"dual">>,
