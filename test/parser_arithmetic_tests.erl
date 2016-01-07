@@ -22,6 +22,11 @@ fix(?SQL_SELECT{'FROM' = F} = Expected) ->
 fix(Other) ->
     Other.
 
+-define(sql_comp_fail(QL_string),
+        Toks = riak_ql_lexer:get_tokens(QL_string),
+        Got = riak_ql_parser:parse(Toks),
+        ?assertMatch({error, _}, Got)).
+
 select_arithmetic_test() ->
     ?sql_comp_assert("select temperature + 1 from details",
                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
@@ -36,22 +41,7 @@ select_arithmetic_test() ->
 
 
 window_aggregate_fn_arithmetic_1_test() ->
-    ?sql_comp_assert("select aVg(temperature) + 1 - 2 * 3 / 4 from details",
-                     ?SQL_SELECT{'SELECT' =
-                                      #riak_sel_clause_v1{clause = [
-                                       {'-',
-                                        {'+',
-                                         {{window_agg_fn,'AVG'},
-                                          [{identifier,[<<"temperature">>]}]},
-                                         {integer,1}},
-                                        {'/',
-                                         {'*',
-                                          {integer,2},{integer,3}},
-                                         {integer,4}}}
-                                      ]},
-                                  'FROM'    = <<"details">>,
-                                  'WHERE'   = []
-                                 }).
+    ?sql_comp_fail("select aVg(temperature) + 1 - 2 * 3 / 4 from details").
 
 arithmetic_precedence_test() ->
     ?sql_comp_assert("select 1 * 2 + 3 / 4 - 5 * 6 from dual",
@@ -69,7 +59,7 @@ arithmetic_precedence_test() ->
 parens_precedence_test() ->
     ?sql_comp_assert("select 1 * (2 + 3) / (4 - 5) * 6 from dual",
                      ?SQL_SELECT{
-                        'SELECT' = 
+                        'SELECT' =
                             #riak_sel_clause_v1{
                                clause = [{'*',
                                           {'/',
@@ -84,10 +74,10 @@ parens_precedence_test() ->
 negated_parens_test() ->
         ?sql_comp_assert("select - (2 + 3) from dual",
                      ?SQL_SELECT{
-                        'SELECT' = 
+                        'SELECT' =
                             #riak_sel_clause_v1{
                                clause = [{negate,
-                                          {expr, 
+                                          {expr,
                                            {'+', {integer,2}, {integer,3}}}}
                                         ]},
                                   'FROM' = <<"dual">>,
