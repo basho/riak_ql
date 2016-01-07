@@ -373,12 +373,45 @@ make_select({select, _SelectBytes},
                        false -> [Select]
                    end,
     FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
+    validate_no_mixed_aggregate_arith(FieldsWithoutExprs),
     FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
     _O = #outputs{type    = select,
                   fields  = FieldsWrappedIdentifiers,
                   buckets = Bucket,
                   where   = E
                  }.
+
+validate_no_mixed_aggregate_arith(Fields) when is_list(Fields) ->
+    [validate_no_mixed_aggregate_arith(F) || F <- Fields];
+validate_no_mixed_aggregate_arith(SingleField) ->
+    case aggregate_or_arith(SingleField) of
+        aggregate -> SingleField;
+        arithmetic -> SingleField;
+        mixed -> return_error(0,
+                              <<"Mixing arithmetic and aggregate functions in "
+                                "a single field is not supported">>)
+    end.
+
+aggregate_or_arith({_Operation, LeftOperand, RightOperand}) ->
+    LeftSide = aggregate_or_arith(LeftOperand),
+    RightSide = aggregate_or_arith(RightOperand),
+    BothSides = if LeftSide =:= RightSide ->
+                        LeftSide;
+                   true ->
+                        mixed
+                end,
+    case BothSides of
+        arithmetic -> arithmetic;
+        aggregate -> mixed;
+        mixed -> mixed
+    end;
+aggregate_or_arith({negate, _NegateVal}) ->
+    arithmetic;
+aggregate_or_arith({{window_agg_fn, _FnName}, _AggFnArgs}) ->
+    aggregate;
+aggregate_or_arith({_Type, _Val}) ->
+    arithmetic.
+
 
 wrap_identifier({identifier, IdentifierName})
   when is_binary(IdentifierName) ->
