@@ -133,5 +133,9 @@ negated_parens_test() ->
                                   'FROM' = <<"dual">>,
                                   'WHERE' = []
                                  }).
+
+no_arithmetic_in_where_test() ->
+    ?sql_comp_fail("select * from dual where 1 + 2 * 3 > 4").
+
 no_functions_in_where_test() ->
     ?sql_comp_fail("select * from dual where sin(4) > 4").
