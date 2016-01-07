@@ -28,6 +28,8 @@
 -export([start_state/1]).
 -export([get_arity_and_type_sig/1]).
 
+-define(SQL_NULL, []).
+
 -type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDEV'.
 
 -include("riak_ql_ddl.hrl").
@@ -47,33 +49,31 @@ get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('STDEV')  -> {1, [{sint64, double}, {double, double}]};  %% ditto
 get_arity_and_type_sig('SUM')    -> {1, [{sint64, sint64}, {double, double}]}.
 
-
-
 %% Get the initial accumulator state for the aggregation.
 -spec start_state(aggregate_function()) ->
     any().
-start_state('AVG')   -> {0, 0.0};
+start_state('AVG')   -> ?SQL_NULL;
 start_state('MEAN')  -> start_state('AVG');
 start_state('COUNT') -> 0;
-start_state('MAX')   -> not_a_value;
-start_state('MIN')   -> not_a_value;
+start_state('MAX')   -> ?SQL_NULL;
+start_state('MIN')   -> ?SQL_NULL;
 start_state('STDEV') -> {0, 0.0, 0.0};
-start_state('SUM')   -> 0;
+start_state('SUM')   -> ?SQL_NULL;
 start_state(_)       -> stateless.
 
 %% Calculate the final results using the accumulated result.
 -spec finalise(aggregate_function(), any()) -> any().
-finalise('MEAN', {N, Acc}) ->
-    finalise('AVG', {N, Acc});
-%% TODO
-finalise('AVG', {0, _}) ->
-    exit('need to handle nulls boyo');
-finalise('AVG', {N, Acc}) ->
+finalise(_, ?SQL_NULL) ->
+    ?SQL_NULL;
+finalise('MEAN', State) ->
+    finalise('AVG', State);
+finalise('AVG', {N, Acc})  ->
     Acc / N;
-finalise('STDEV', {N, _A, Q}) ->
+finalise('STDEV', {N, _, _}) when N < 2 ->
+    % STDDEV must have two or more values to or return NULL
+    ?SQL_NULL;
+finalise('STDEV', {N, _, Q}) ->
     math:sqrt(Q / N);
-finalise(_, not_a_value) ->
-    exit('still need to handle nulls boyo');
 finalise(_Fn, Acc) ->
     Acc.
 
@@ -84,31 +84,37 @@ finalise(_Fn, Acc) ->
 %%
 %% Incrementally operates on chunks, needs to carry state.
 
-'COUNT'(_, N) when is_integer(N) ->
-    N + 1.
+'COUNT'(_, State) when is_integer(State) ->
+    State + 1.
 
-'SUM'(Arg, Total) when is_number(Arg) ->
-    Arg + Total;
-'SUM'(_, Total) ->
-    Total.
+'SUM'(Arg, State) when is_number(Arg), is_number(State) ->
+    Arg + State;
+'SUM'(?SQL_NULL, State) ->
+    State;
+'SUM'(Arg, ?SQL_NULL) ->
+    Arg.
 
 'MEAN'(Arg, State) ->
     'AVG'(Arg, State).
 
 'AVG'(Arg, {N, Acc}) when is_number(Arg) ->
     {N + 1, Acc + Arg};
-'AVG'(_Arg, {N, Acc}) ->
-    {N, Acc}.
+'AVG'(Arg, ?SQL_NULL) when is_number(Arg) ->
+    {1, Arg};
+'AVG'(?SQL_NULL, {_,_} = State) ->
+    State;
+'AVG'(?SQL_NULL, ?SQL_NULL) ->
+    ?SQL_NULL.
 
-'MIN'(Arg, not_a_value) when is_number(Arg) -> Arg;
-'MIN'(Arg, State)       when Arg < State andalso
-                             is_number(Arg) -> Arg;
-'MIN'(_, State)         -> State.
+'MIN'(Arg, ?SQL_NULL) -> Arg;
+'MIN'(Arg, State) when Arg < State -> Arg;
+'MIN'(_, State) -> State.
 
-'MAX'(Arg, not_a_value) when is_number(Arg) -> Arg;
-'MAX'(Arg, State)       when Arg > State andalso
-                             is_number(Arg) -> Arg;
-'MAX'(_, State)         -> State.
+'MAX'(Arg, ?SQL_NULL) when is_number(Arg) -> Arg;
+'MAX'(?SQL_NULL, Arg) when is_number(Arg) -> Arg;
+'MAX'(?SQL_NULL, ?SQL_NULL) -> ?SQL_NULL;
+'MAX'(Arg, State) when Arg > State -> Arg;
+'MAX'(_, State) -> State.
 
 'STDEV'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
@@ -140,7 +146,80 @@ stdev_test() ->
     Got = finalise('STDEV', State9),
     ?assertEqual(Expected, Got).
 
-min_1_test() ->
+stdev_no_value_test() ->
+    ?assertEqual(
+        [], 
+        finalise('STDEV', start_state('STDEV'))
+    ).
+stdev_one_value_test() ->
+    ?assertEqual(
+        ?SQL_NULL, 
+        finalise('STDEV', 'STDEV'(3, start_state('STDEV')))
+    ).
+stdev_two_value_test() ->
+    ?assertEqual(
+        0.5, 
+        finalise('STDEV', lists:foldl(fun 'STDEV'/2, start_state('STDEV'), [1.0,2.0]))
+    ).
+
+
+testing_fold_avg(InitialState, InputList) ->
+    finalise('AVG', lists:foldl(fun 'AVG'/2, InitialState, InputList)).
+
+avg_integer_test() ->
+    ?assertEqual(
+        10 / 4, 
+        testing_fold_avg(start_state('AVG'), [1,2,3,4])
+    ).
+avg_double_test() ->
+    ?assertEqual(
+        10 / 4, 
+        testing_fold_avg(start_state('AVG'), [1.0,2.0,3.0,4.0])
+    ).
+avg_null_right_test() ->
+    ?assertEqual(1.0, finalise('AVG', 'AVG'(1, ?SQL_NULL))).
+avg_null_null_test() ->
+    ?assertEqual(?SQL_NULL, 'AVG'(?SQL_NULL, ?SQL_NULL)).
+avg_finalise_null_test() ->
+    ?assertEqual(?SQL_NULL, finalise('AVG', start_state('AVG'))).
+
+sum_null_state_arg_integer_test() ->
+    ?assertEqual(1, 'SUM'(1, ?SQL_NULL)).
+sum_integer_state_arg_integer_test() ->
+    ?assertEqual(4, 'SUM'(1, 3)).
+sum_double_state_arg_double_test() ->
+    ?assertEqual(4.5, 'SUM'(1.2, 3.3)).
+sum_null_state_arg_double_test() ->
+    ?assertEqual(1.1, 'SUM'(1.1, ?SQL_NULL)).
+sum_null_null_test() ->
+    ?assertEqual(?SQL_NULL, 'SUM'(?SQL_NULL, ?SQL_NULL)).
+sum_finalise_null_test() ->
+    ?assertEqual(?SQL_NULL, finalise('SUM', start_state('SUM'))).
+
+min_integer_test() ->
+    ?assertEqual(erlang:min(1, 3), 'MIN'(1, 3)).
+min_double_test() ->
+    ?assertEqual(erlang:min(1.0, 3.0), 'MIN'(1.0, 3.0)).
+min_null_left_test() ->
+    ?assertEqual(3, 'MIN'(?SQL_NULL, 3)).
+min_null_right_test() ->
+    ?assertEqual(1, 'MIN'(1, ?SQL_NULL)).
+min_null_null_test() ->
+    ?assertEqual(?SQL_NULL, 'MIN'(?SQL_NULL, ?SQL_NULL)).
+min_finalise_null_test() ->
+    ?assertEqual(?SQL_NULL, finalise('MIN', start_state('MIN'))).
+
+max_test() ->
     ?assertEqual('MAX'(1, 3), erlang:max(1, 3)).
+max_double_test() ->
+    ?assertEqual(erlang:max(1.0, 3.0), 'MAX'(1.0, 3.0)).
+max_null_left_test() ->
+    ?assertEqual(3, 'MAX'(?SQL_NULL, 3)).
+max_null_right_test() ->
+    ?assertEqual(1, 'MAX'(1, ?SQL_NULL)).
+max_null_null_test() ->
+    ?assertEqual(?SQL_NULL, 'MAX'(?SQL_NULL, ?SQL_NULL)).
+max_finalise_null_test() ->
+    ?assertEqual(?SQL_NULL, finalise('MAX', start_state('MAX'))).
 
 -endif.
