@@ -630,14 +630,14 @@ canonicalise_expr({expr, X}) ->
     io:format("Expr to be canonicalised is ~p~n", [X]),
     {expr, [X]}.
 
-get_func_type(FuncName) when FuncName =:= 'AVG'   orelse
-                             FuncName =:= 'MEAN'  orelse
-                             FuncName =:= 'SUM'   orelse
-                             FuncName =:= 'COUNT' orelse
-                             FuncName =:= 'MIN'   orelse
-                             FuncName =:= 'MAX'   orelse
-                             FuncName =:= 'STDEV' -> window_aggregate_fn;
-get_func_type(FuncName) when is_atom(FuncName)    -> not_supported.
+get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
+                             FuncName =:= 'MEAN'   orelse
+                             FuncName =:= 'SUM'    orelse
+                             FuncName =:= 'COUNT'  orelse
+                             FuncName =:= 'MIN'    orelse
+                             FuncName =:= 'MAX'    orelse
+                             FuncName =:= 'STDDEV' -> window_aggregate_fn;
+get_func_type(FuncName) when is_atom(FuncName)     -> not_supported.
 
 %% TODO
 %% this list to atom needs to change to list to existing atom

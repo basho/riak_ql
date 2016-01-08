@@ -335,7 +335,7 @@ select_col_to_string_negated_parens_test() ->
 
 %% "select aVg(temp) from details",
 
-%% "select avg(temp), sum(counts), count(counts), min(counts) "max(counts), stdev(counts) from details",
+%% "select avg(temp), sum(counts), count(counts), min(counts) "max(counts), stddev(counts) from details",
 
 %% "select aVg(temperature) + 1 - 2 * 3 / 4 from details",
 
@@ -360,7 +360,7 @@ select_multiple_simple_test() ->
       "select a, a1 from b where a < 11 and a > 33").
 %% select_multiple_ffa_test() ->
 %%     roundtrip_ok(
-%%       "select avg((a+4)), (avg((a)+4))+2, stdev(x/2 + 2),"
+%%       "select avg((a+4)), (avg((a)+4))+2, stddev(x/2 + 2),"
 %%       " 3*23+2, 3+23*2,"
 %%       " 3+(23*2), (3+23)*2, 3*(23+2), (3*23)+2,"
 %%       " (4), (((2))), 5*5, a*2, -8, 8, (8), -8 - 4,-8+3,-8*2, d, (e)"
