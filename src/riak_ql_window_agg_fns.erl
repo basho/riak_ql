@@ -84,7 +84,9 @@ finalise(_Fn, Acc) ->
 %%
 %% Incrementally operates on chunks, needs to carry state.
 
-'COUNT'(_, State) when is_integer(State) ->
+'COUNT'(?SQL_NULL, State) ->
+    State;
+'COUNT'(_, State) ->
     State + 1.
 
 'SUM'(Arg, State) when is_number(Arg), is_number(State) ->
@@ -222,4 +224,37 @@ max_null_null_test() ->
 max_finalise_null_test() ->
     ?assertEqual(?SQL_NULL, finalise('MAX', start_state('MAX'))).
 
+testing_fold_agg(FnName, InitialState, InputList) ->
+    finalise(FnName, lists:foldl(
+        fun(E, Acc) ->
+            ?MODULE:FnName(E, Acc) 
+        end, InitialState, InputList)).
+
+count_no_values_test() ->
+    ?assertEqual(0, finalise('COUNT', start_state('COUNT'))).
+count_all_null_values_test() ->
+    ?assertEqual(
+        0,
+        testing_fold_agg('COUNT', start_state('COUNT'), [?SQL_NULL, ?SQL_NULL])
+    ).
+count_some_null_values_test() ->
+    ?assertEqual(
+        2, 
+        testing_fold_agg('COUNT', start_state('COUNT'), [?SQL_NULL, <<"bob">>, ?SQL_NULL, <<"boris">>])
+    ).
+count_values_test() ->
+    ?assertEqual(
+        4, 
+        testing_fold_agg('COUNT', start_state('COUNT'), [1,2,3,4])
+    ).
+count_rows_test() ->
+    ?assertEqual(
+        4, 
+        testing_fold_agg('COUNT', start_state('COUNT'), [[1,2,3,4],[1,2,3,4],[1,2,3,4],[1,2,3,4]])
+    ).
+count_rows_with_nulls_test() ->
+    ?assertEqual(
+        3, 
+        testing_fold_agg('COUNT', start_state('COUNT'), [[1,2,3,4],?SQL_NULL,[1,2,3,4],[1,2,3,4]])
+    ).
 -endif.
