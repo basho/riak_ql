@@ -128,7 +128,7 @@ finalise(_Fn, Acc) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-stdev_test() ->
+stddev_test() ->
     State0 = start_state('STDDEV'),
     Data = [
             1.0, 2.0, 3.0, 4.0, 2.0,
@@ -146,17 +146,17 @@ stdev_test() ->
     Got = finalise('STDDEV', State9),
     ?assertEqual(Expected, Got).
 
-stdev_no_value_test() ->
+stddev_no_value_test() ->
     ?assertEqual(
         [], 
         finalise('STDDEV', start_state('STDDEV'))
     ).
-stdev_one_value_test() ->
+stddev_one_value_test() ->
     ?assertEqual(
         ?SQL_NULL, 
         finalise('STDDEV', 'STDDEV'(3, start_state('STDDEV')))
     ).
-stdev_two_value_test() ->
+stddev_two_value_test() ->
     ?assertEqual(
         0.5, 
         finalise('STDDEV', lists:foldl(fun 'STDDEV'/2, start_state('STDDEV'), [1.0,2.0]))
