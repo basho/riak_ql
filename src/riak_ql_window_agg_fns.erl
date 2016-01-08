@@ -23,14 +23,14 @@
 -module(riak_ql_window_agg_fns).
 
 
--export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDEV'/2]).
+-export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDDEV'/2]).
 -export([finalise/2]).
 -export([start_state/1]).
 -export([get_arity_and_type_sig/1]).
 
 -define(SQL_NULL, []).
 
--type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDEV'.
+-type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDDEV'.
 
 -include("riak_ql_ddl.hrl").
 
@@ -46,20 +46,20 @@ get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  
 get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG');
 get_arity_and_type_sig('MAX')    -> {1, [{sint64, sint64}, {double, double}]};
 get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
-get_arity_and_type_sig('STDEV')  -> {1, [{sint64, double}, {double, double}]};  %% ditto
+get_arity_and_type_sig('STDDEV') -> {1, [{sint64, double}, {double, double}]};  %% ditto
 get_arity_and_type_sig('SUM')    -> {1, [{sint64, sint64}, {double, double}]}.
 
 %% Get the initial accumulator state for the aggregation.
 -spec start_state(aggregate_function()) ->
     any().
-start_state('AVG')   -> ?SQL_NULL;
-start_state('MEAN')  -> start_state('AVG');
-start_state('COUNT') -> 0;
-start_state('MAX')   -> ?SQL_NULL;
-start_state('MIN')   -> ?SQL_NULL;
-start_state('STDEV') -> {0, 0.0, 0.0};
-start_state('SUM')   -> ?SQL_NULL;
-start_state(_)       -> stateless.
+start_state('AVG')    -> ?SQL_NULL;
+start_state('MEAN')   -> start_state('AVG');
+start_state('COUNT')  -> 0;
+start_state('MAX')    -> ?SQL_NULL;
+start_state('MIN')    -> ?SQL_NULL;
+start_state('STDDEV') -> {0, 0.0, 0.0};
+start_state('SUM')    -> ?SQL_NULL;
+start_state(_)        -> stateless.
 
 %% Calculate the final results using the accumulated result.
 -spec finalise(aggregate_function(), any()) -> any().
@@ -69,10 +69,10 @@ finalise('MEAN', State) ->
     finalise('AVG', State);
 finalise('AVG', {N, Acc})  ->
     Acc / N;
-finalise('STDEV', {N, _, _}) when N < 2 ->
+finalise('STDDEV', {N, _, _}) when N < 2 ->
     % STDDEV must have two or more values to or return NULL
     ?SQL_NULL;
-finalise('STDEV', {N, _, Q}) ->
+finalise('STDDEV', {N, _, Q}) ->
     math:sqrt(Q / N);
 finalise(_Fn, Acc) ->
     Acc.
@@ -116,20 +116,20 @@ finalise(_Fn, Acc) ->
 'MAX'(Arg, State) when Arg > State -> Arg;
 'MAX'(_, State) -> State.
 
-'STDEV'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
+'STDDEV'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
     N = N_old + 1,
     A = A_old + (Arg - A_old) / N,
     Q = Q_old + (Arg - A_old) * (Arg - A),
     {N, A, Q};
-'STDEV'(_, State) ->
+'STDDEV'(_, State) ->
     State.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
 stdev_test() ->
-    State0 = start_state('STDEV'),
+    State0 = start_state('STDDEV'),
     Data = [
             1.0, 2.0, 3.0, 4.0, 2.0,
             3.0, 4.0, 4.0, 4.0, 3.0,
@@ -142,24 +142,24 @@ stdev_test() ->
     %% need to run python on that arch to figure out what Expected
     %% value can be then.  Or, introduce an epsilon and check that the
     %% delta is small enough.
-    State9 = lists:foldl(fun 'STDEV'/2, State0, Data),
-    Got = finalise('STDEV', State9),
+    State9 = lists:foldl(fun 'STDDEV'/2, State0, Data),
+    Got = finalise('STDDEV', State9),
     ?assertEqual(Expected, Got).
 
 stdev_no_value_test() ->
     ?assertEqual(
         [], 
-        finalise('STDEV', start_state('STDEV'))
+        finalise('STDDEV', start_state('STDDEV'))
     ).
 stdev_one_value_test() ->
     ?assertEqual(
         ?SQL_NULL, 
-        finalise('STDEV', 'STDEV'(3, start_state('STDEV')))
+        finalise('STDDEV', 'STDDEV'(3, start_state('STDDEV')))
     ).
 stdev_two_value_test() ->
     ?assertEqual(
         0.5, 
-        finalise('STDEV', lists:foldl(fun 'STDEV'/2, start_state('STDEV'), [1.0,2.0]))
+        finalise('STDDEV', lists:foldl(fun 'STDDEV'/2, start_state('STDDEV'), [1.0,2.0]))
     ).
 
 

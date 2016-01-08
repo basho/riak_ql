@@ -5,7 +5,6 @@
         Exp2 = fix(Expected),
         Toks = riak_ql_lexer:get_tokens(String),
         Got = parse(Toks),
-        %% io:format(standard_error, "~p~n~p~n", [Exp2, Got]),
         ?assertEqual({ok, Exp2}, Got)).
 
 -define(where_test(Uncanonical, Expected),
@@ -460,7 +459,7 @@ window_aggregate_fn_capitalisation_test() ->
 
 window_aggregate_fn_all_funs_test() ->
     ?sql_comp_assert("select avg(temp), sum(counts), count(counts), min(counts), " ++
-                         "max(counts), stdev(counts) from details",
+                         "max(counts), stddev(counts) from details",
                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
                                                                           {{window_agg_fn, 'AVG'},
                                                                            [{identifier, [<<"temp">>]}]},
@@ -472,7 +471,7 @@ window_aggregate_fn_all_funs_test() ->
                                                                            [{identifier, [<<"counts">>]}]},
                                                                           {{window_agg_fn, 'MAX'},
                                                                            [{identifier, [<<"counts">>]}]},
-                                                                          {{window_agg_fn, 'STDEV'},
+                                                                          {{window_agg_fn, 'STDDEV'},
                                                                            [{identifier, [<<"counts">>]}]}
                                                                          ]},
                                  'FROM'    = <<"details">>,
