@@ -65,8 +65,6 @@ start_state(_)       -> stateless.
 -spec finalise(aggregate_function(), any()) -> any().
 finalise(_, ?SQL_NULL) ->
     ?SQL_NULL;
-finalise('COUNT', 0) ->
-    ?SQL_NULL;
 finalise('MEAN', State) ->
     finalise('AVG', State);
 finalise('AVG', {N, Acc})  ->
@@ -233,10 +231,10 @@ testing_fold_agg(FnName, InitialState, InputList) ->
         end, InitialState, InputList)).
 
 count_no_values_test() ->
-    ?assertEqual(?SQL_NULL, finalise('COUNT', start_state('COUNT'))).
+    ?assertEqual(0, finalise('COUNT', start_state('COUNT'))).
 count_all_null_values_test() ->
     ?assertEqual(
-        ?SQL_NULL, 
+        0,
         testing_fold_agg('COUNT', start_state('COUNT'), [?SQL_NULL, ?SQL_NULL])
     ).
 count_some_null_values_test() ->
