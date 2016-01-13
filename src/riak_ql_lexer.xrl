@@ -134,8 +134,6 @@ Erlang code.
          get_tokens/1
         ]).
 
--include("riak_ql.xrl.tests").
-
 get_tokens(X) ->
     Toks = lex(X),
     post_process(Toks).
