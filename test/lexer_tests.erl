@@ -369,12 +369,12 @@ timeseries_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
-unquoted_identifiers_test() ->
+unquoted_identifiers_test_() ->
     String = "cats = be a st",
     Got = riak_ql_lexer:get_tokens(String),
     Expected = [
                 {identifier, <<"cats">>},
-                {eq, <<"=">>},
+                {equals_operator, <<"=">>},
                 {identifier, <<"be">>},
                 {identifier, <<"a">>},
                 {identifier, <<"st">>}
