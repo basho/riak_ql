@@ -298,6 +298,11 @@ arithmatic_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+semicolon_test_() ->
+    Expected = [{semicolon, <<";">>}],
+    Got = riak_ql_lexer:get_tokens(";"),
+    ?_assertEqual(Expected, Got).
+
 general_test_() ->
     Got = riak_ql_lexer:get_tokens("select v from r_t where time > '23 April 63 1:2:3'"),
     Expected = [
