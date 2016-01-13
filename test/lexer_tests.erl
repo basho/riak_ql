@@ -381,8 +381,8 @@ unquoted_identifiers_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
-symbols_in_identifier_1_test() ->
-    ?assertError(
+symbols_in_identifier_1_test_() ->
+    ?_assertError(
         <<"Unexpected token '^'.">>,
         riak_ql_lexer:get_tokens(
             "CREATE TABLE ^ ("
@@ -393,14 +393,14 @@ symbols_in_identifier_1_test() ->
             " ((family, series, quantum(time, 15, 's')), family, series, time))")
     ).
 
-symbols_in_identifier_2_test() ->
-    ?assertError(
+symbols_in_identifier_2_test_() ->
+    ?_assertError(
         <<"Unexpected token '&'.">>,
         riak_ql_lexer:get_tokens("klsdafj kljfd (*((*& 89& 8KHH kJHkj hKJH K K")
     ).
 
-symbols_in_identifier_3_test() ->
-    ?assertError(
+symbols_in_identifier_3_test_() ->
+    ?_assertError(
         <<"Unexpected token '$'.">>,
         riak_ql_lexer:get_tokens(
             "CREATE TABLE mytable ("
@@ -411,8 +411,8 @@ symbols_in_identifier_3_test() ->
             " ((family, series, quantum(time, 15, 's')), family, series, time))")
     ).
 
-symbols_in_identifier_4_test() ->
-    ?assertError(
+symbols_in_identifier_4_test_() ->
+    ?_assertError(
         <<"Unexpected token ']'.">>,
         riak_ql_lexer:get_tokens("select ] from a")
     ).
