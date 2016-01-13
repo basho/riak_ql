@@ -60,6 +60,7 @@ ASTERISK = (\*)
 SOLIDUS  = (/)
 
 COMMA = (,)
+SEMICOLON = (\;)
 
 Rules.
 
@@ -118,6 +119,7 @@ Rules.
 {REGEX} : {token, {regex, list_to_binary(TokenChars)}}.
 
 {COMMA} : {token, {comma, list_to_binary(TokenChars)}}.
+{SEMICOLON} : {token, {semicolon, list_to_binary(TokenChars)}}.
 
 {WHITESPACE} : skip_token.
 
