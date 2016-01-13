@@ -321,6 +321,8 @@ Erlang code.
          return_error/2
          ]).
 
+-import(riak_ql_ops_flipper, [maybe_flip_op/1]).
+
 -ifdef(TEST).
 -include("riak_ql.yrl.tests").
 -endif.
@@ -481,11 +483,7 @@ make_where({where, A}, {expr, B}) ->
     NewB = remove_exprs(B),
     {A, [canonicalise_where(NewB)]}.
 
-maybe_flip_op(less_than_operator)    -> greater_than_operator;
-maybe_flip_op(greater_than_operator) -> less_than_operator;
-maybe_flip_op(lte)                   -> gte;
-maybe_flip_op(gte)                   -> lte;
-maybe_flip_op(Op)                    -> Op.
+
 
 %%
 %% rewrite the where clause to have a canonical form
