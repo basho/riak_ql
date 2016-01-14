@@ -1,0 +1,18 @@
+leexinc.hrl:49: The pattern <Rest, Line, {'token', T, Push}, Ts> can never match the type <_,_,'error' | 'skip_token' | {'end_token',{'$end'}},[{'$end'} | {atom(),binary() | maybe_improper_list(any(),binary() | []) | integer()}]>
+leexinc.hrl:54: The pattern <Rest, Line, {'end_token', T, Push}, Ts> can never match the type <_,_,'error' | 'skip_token',[{'$end'} | {atom(),binary() | maybe_improper_list(any(),binary() | []) | integer()}]>
+leexinc.hrl:59: The pattern <Rest, Line, {'skip_token', Push}, Ts> can never match the type <_,_,'error',[{'$end'} | {atom(),binary() | maybe_improper_list(any(),binary() | []) | integer()}]>
+leexinc.hrl:62: The pattern <_Rest, Line, {'error', S}, _Ts> can never match the type <_,_,'error',[{'$end'} | {atom(),binary() | maybe_improper_list(any(),binary() | []) | integer()}]>
+leexinc.hrl:118: The pattern <Rest, Line, {'token', T, Push}> can never match the type <_,_,'error' | 'skip_token' | {'end_token',{'$end'}}>
+leexinc.hrl:123: The pattern <Rest, Line, {'end_token', T, Push}> can never match the type <_,_,'error' | 'skip_token'>
+leexinc.hrl:128: The pattern <Rest, Line, {'skip_token', Push}> can never match the type <_,_,'error'>
+leexinc.hrl:131: The pattern <Rest, Line, {'error', S}> can never match the type <_,_,'error'>
+leexinc.hrl:192: The pattern <Rest, Line, {'token', T, Push}, Ts> can never match the type <_,_,'error' | 'skip_token' | {'end_token',{'$end'}},_>
+leexinc.hrl:197: The pattern <Rest, Line, {'end_token', T, Push}, Ts> can never match the type <_,_,'error' | 'skip_token',_>
+leexinc.hrl:202: The pattern <Rest, Line, {'skip_token', Push}, Ts> can never match the type <_,_,'error',_>
+leexinc.hrl:205: The pattern <Rest, Line, {'error', S}, _Ts> can never match the type <_,_,'error',_>
+leexinc.hrl:243: The pattern <Rest, Line, {'token', _T, Push}, Error> can never match the type <_,_,'error' | 'skip_token' | {'end_token',{'$end'}},_>
+leexinc.hrl:248: The pattern <Rest, Line, {'end_token', _T, Push}, Error> can never match the type <_,_,'error' | 'skip_token',_>
+leexinc.hrl:253: The pattern <Rest, Line, {'skip_token', Push}, Error> can never match the type <_,_,'error',_>
+leexinc.hrl:256: The pattern <Rest, Line, {'error', _S}, Error> can never match the type <_,_,'error',_>
+Unknown types:
+riak_kv_qry_compiler:compiled_select/0
