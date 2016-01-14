@@ -1,7 +1,7 @@
 -module(parser_select_tests).
 
 -include_lib("eunit/include/eunit.hrl").
--include("riak_ql_parser_test.hrl").
+-include("parser_test_utils.hrl").
 
 select_sql_test() ->
     ?sql_comp_assert("select * from argle",
