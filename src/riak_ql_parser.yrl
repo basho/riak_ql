@@ -378,58 +378,12 @@ make_select({select, _SelectBytes},
                        false -> [Select]
                    end,
     FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
-    validate_no_mixed_aggregate_arith(FieldsWithoutExprs),
     FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
     _O = #outputs{type    = select,
                   fields  = FieldsWrappedIdentifiers,
                   buckets = Bucket,
                   where   = E
                  }.
-
-validate_no_mixed_aggregate_arith(Fields) when is_list(Fields) ->
-    [validate_no_mixed_aggregate_arith(F) || F <- Fields];
-validate_no_mixed_aggregate_arith(SingleField) ->
-    case aggregate_or_arith(SingleField) of
-        aggregate -> SingleField;
-        arithmetic -> SingleField;
-        either -> SingleField;
-        mixed -> return_error(0,
-                              <<"Mixing arithmetic and aggregate functions in "
-                                "a single field is not supported">>)
-    end.
-
-aggregate_or_arith({_Operation, LeftOperand, RightOperand}) ->
-    LeftSide = aggregate_or_arith(LeftOperand),
-    RightSide = aggregate_or_arith(RightOperand),
-    BothSides = merge_aggregate_or_arith(LeftSide, RightSide),
-    case BothSides of
-        arithmetic -> arithmetic;
-        aggregate -> mixed;
-        either -> either;
-        mixed -> mixed
-    end;
-aggregate_or_arith({negate, _NegateVal}) ->
-    arithmetic;
-aggregate_or_arith({{window_agg_fn, _FnName}, AggFnArgs}) ->
-    ArgFlavor = lists:foldl(
-                  fun(Arg, AccumFlavor) ->
-                          ArgFlavor = aggregate_or_arith(Arg),
-                          merge_aggregate_or_arith(AccumFlavor, ArgFlavor)
-                  end, either, AggFnArgs),
-    merge_aggregate_or_arith(aggregate, ArgFlavor);
-aggregate_or_arith({identifier, _IdentName}) ->
-    either;
-aggregate_or_arith({_Type, _Val}) ->
-    arithmetic.
-
-merge_aggregate_or_arith(SameFlavor, SameFlavor) ->
-    SameFlavor;
-merge_aggregate_or_arith(either, SomeFlavor) ->
-    SomeFlavor;
-merge_aggregate_or_arith(SomeFlavor, either) ->
-    SomeFlavor;
-merge_aggregate_or_arith(_LeftFlavor, _RightFlavor) ->
-    mixed.
 
 
 wrap_identifier({identifier, IdentifierName})
@@ -452,10 +406,6 @@ make_expr({LiteralFlavor, Literal},
     make_expr({identifier, IdentifierName},
               {FlippedComparison, <<"flipped">>},
               {LiteralFlavor, Literal});
-make_expr({identifier, _LeftIdentifier},
-          {_ComparisonType, _ComparisonBin},
-          {identifier, _RightIdentifier}) ->
-    return_error(0, <<"Comparing or otherwise operating on two fields is not supported">>);
 make_expr({TypeA, A}, {B, _}, {Type, C}) ->
     B1 = case B of
              and_                   -> and_;
@@ -632,8 +582,7 @@ make_funcall(_, _) ->
 canonicalise_expr({identifier, X}) ->
     {identifier, [X]};
 canonicalise_expr({expr, X}) ->
-    io:format("Expr to be canonicalised is ~p~n", [X]),
-    {expr, [X]}.
+    X.
 
 get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
                              FuncName =:= 'MEAN'   orelse

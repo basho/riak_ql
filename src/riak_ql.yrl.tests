@@ -444,17 +444,31 @@ window_aggregate_fn_all_funs_test() ->
                                 }).
 
 window_aggregate_fn_arithmetic_2_test() ->
-    ?sql_comp_fail("select aVg(temperature) + count(temperature) from details").
+    ?sql_comp_assert("select aVg(temperature) + count(temperature) from details",
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {'+',
+                                                                           {{window_agg_fn, 'AVG'},
+                                                                            [{identifier, [<<"temperature">>]}]},
+                                                                           {{window_agg_fn, 'COUNT'},
+                                                                            [{identifier, [<<"temperature">>]}]}}
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
 
-%% window_aggregate_fn_arithmetic_3_test() ->
-%%     ?sql_comp_assert("select aVg(temperature + 1) + count(temperature / distance) from details",
-%%                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-%%                                               {{window_agg_fn, 'AVG'},
-%%                                                [{identifier, [<<"Temperature">>]}]}
-%%                                  ],
-%%                      'FROM'    = <<"details">>,
-%%                      'WHERE'   = []
-%%                     }).
+window_aggregate_fn_arithmetic_3_test() ->
+    ?sql_comp_assert(
+        "select aVg(temperature + 1) + count(temperature / distance) from details",
+        ?SQL_SELECT{
+             'SELECT' = #riak_sel_clause_v1{ clause = [
+                  {'+',
+                      {{window_agg_fn, 'AVG'}, [{'+', {identifier, <<"temperature">>}, {integer, 1}}]},
+                      {{window_agg_fn, 'COUNT'}, [{'/', {identifier, <<"temperature">>}, {identifier, <<"distance">>}}]}
+                  }]
+                },
+             'FROM'    = <<"details">>,
+             'WHERE'   = []
+    }).
 
 %%
 %% TS 1.1 fail tests
