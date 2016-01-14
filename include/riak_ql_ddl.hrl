@@ -60,13 +60,16 @@
          }).
 
 %% TODO these types will be improved over the duration of the time series project
+-type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
 -type selection()  :: {identifier, [binary()]}
                     | {integer, integer()}
                     | {float, float()}
                     | {boolean, boolean()}
                     | {binary, binary()}
-                    | {{window_agg_fn, FunctionName::atom()}, [any()]}
-                    | {expr, selection()}.
+                    | selection_function()
+                    | {expr, selection()}
+                    | {negate, selection()}
+                    | {relational_op(), selection(), selection()}.
 
 -type filter()     :: term().
 -type operator()   :: [binary()].
@@ -86,7 +89,7 @@
           col_names        = []   :: [binary()],
           clause           = []   :: [riak_kv_qry_compiler:compiled_select()],
           is_valid         = true :: true | {error, [any()]},
-          finalisers       = []   :: [function()]
+          finalisers       = []   :: [skip | function()]
         }).
 
 -record(riak_select_v1,

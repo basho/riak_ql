@@ -39,16 +39,6 @@ select_arithmetic_test() ->
                                   'WHERE'   = []
                                  }).
 
-
-window_aggregate_fn_arithmetic_1_test() ->
-    ?sql_comp_fail("select aVg(temperature) + 1 - 2 * 3 / 4 from details").
-
-arith_inside_aggregate_fn_test() ->
-    ?sql_comp_fail("select aVg((temperature * 2) + 32) from details").
-
-arith_with_multiple_agg_fn_test() ->
-    ?sql_comp_fail("select count(x) + 1 / avg(y) from details").
-
 arithmetic_precedence_test() ->
     ?sql_comp_assert("select 1 * 2 + 3 / 4 - 5 * 6 from dual",
                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{'-',
