@@ -23,6 +23,9 @@ select_sql_with_semicolons_in_quotes_test() ->
 select_sql_semicolon_second_statement_test() ->
     ?sql_comp_fail("select * from asdf; select * from asdf").
 
+select_sql_multiple_semicolon_test() ->
+    ?sql_comp_fail("select * from asdf;;").
+
 select_quoted_sql_test() ->
     ?sql_comp_assert("select * from \"argle\"",
                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
