@@ -3,10 +3,10 @@
 -include("riak_ql_ddl.hrl").
 
 -define(sql_comp_assert(String, Expected),
-        Exp2 = fix(Expected),
+        Exp2 = {ok, fix(Expected)},
         Toks = riak_ql_lexer:get_tokens(String),
         Got = riak_ql_parser:parse(Toks),
-        ?assertEqual({ok, Exp2}, Got)).
+        ?assertEqual(Exp2, Got)).
 
 -define(where_test(Uncanonical, Expected),
         Got = riak_ql_parser:canonicalise_where(Uncanonical),
