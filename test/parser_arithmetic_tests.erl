@@ -8,9 +8,8 @@
 -define(sql_comp_assert(String, Expected),
         Exp2 = fix(Expected),
         Toks = riak_ql_lexer:get_tokens(String),
-        Got = riak_ql_parser:parse(Toks),
  %% io:format(standard_error, "~p~n~p~n", [Exp2, Got]),
-        ?assertEqual({ok, Exp2}, Got)).
+        ?assertEqual({ok, Exp2},  riak_ql_parser:parse(Toks))).
 
 fix(?SQL_SELECT{'FROM' = F} = Expected) ->
     case F of
@@ -82,3 +81,37 @@ negated_parens_test() ->
 
 no_functions_in_where_test() ->
     ?sql_comp_fail("select * from dual where sin(4) > 4").
+
+window_aggregate_fn_arithmetic_1_test() ->
+    ?sql_comp_assert(
+        "SELECT AVG(temperature) + 1 - 2 * 3 / 4 FROM details",
+        ?SQL_SELECT{
+            'SELECT' =
+                #riak_sel_clause_v1{
+                  clause = [{'-',{'+',{{window_agg_fn,'AVG'},[{identifier,[<<"temperature">>]}]},{integer,1}},
+                                             {'/',{'*',{integer,2},{integer,3}},{integer,4}}}]
+                },
+            'FROM' = <<"details">>
+    }).
+
+window_aggregate_fn_arithmetic_2_test() ->
+    ?sql_comp_assert(
+        "SELECT AVG((temperature * 2) + 32) FROM details",
+        ?SQL_SELECT{
+           'SELECT' =
+               #riak_sel_clause_v1{
+                  clause = [{{window_agg_fn,'AVG'},[{'+',{expr,{'*',{identifier,<<"temperature">>},{integer,2}}},{integer,32}}]}]
+                                             },
+                     'FROM' = <<"details">>
+                    }).
+
+window_aggregate_fn_arithmetic_3_test() ->
+    ?sql_comp_assert(
+        "SELECT COUNT(x) + 1 / AVG(y) FROM details",
+        ?SQL_SELECT{
+           'SELECT' =
+               #riak_sel_clause_v1{
+                  clause = [{'+',{{window_agg_fn,'COUNT'},[{identifier,[<<"x">>]}]},{'/',{integer,1},{{window_agg_fn,'AVG'},[{identifier,[<<"y">>]}]}}}]
+                                             },
+                     'FROM' = <<"details">>
+                    }).
