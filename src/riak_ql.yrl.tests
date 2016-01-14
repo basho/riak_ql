@@ -478,6 +478,19 @@ window_aggregate_fn_all_funs_test() ->
                                  'WHERE'   = []
                                 }).
 
+window_aggregate_fn_arithmetic_2_test() ->
+    ?sql_comp_assert("select aVg(temperature) + count(temperature) from details",
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
+                                                                          {'+',
+                                                                           {{window_agg_fn, 'AVG'},
+                                                                            [{identifier, [<<"temperature">>]}]},
+                                                                           {{window_agg_fn, 'COUNT'},
+                                                                            [{identifier, [<<"temperature">>]}]}}
+                                                                         ]},
+                                 'FROM'    = <<"details">>,
+                                 'WHERE'   = []
+                                }).
+
 window_aggregate_fn_arithmetic_3_test() ->
     ?sql_comp_assert(
         "select aVg(temperature + 1) + count(temperature / distance) from details",
