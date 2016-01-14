@@ -132,9 +132,7 @@ Rules.
 
 Erlang code.
 
--export([
-         get_tokens/1
-        ]).
+-compile([export_all]).
 
 get_tokens(X) ->
     Toks = lex(X),
