@@ -13,6 +13,13 @@ select_sql_with_semicolon_test() ->
                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
                                  'FROM'   = <<"argle">>}).
 
+select_sql_with_semicolons_in_quotes_test() ->
+    ?sql_comp_assert("select * from \"table;name\" where ';' = asdf;",
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"table;name">>,
+                                 'WHERE'  = [{'=', <<"asdf">>, {binary, <<";">>}}]
+                                }).
+
 select_quoted_sql_test() ->
     ?sql_comp_assert("select * from \"argle\"",
                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
