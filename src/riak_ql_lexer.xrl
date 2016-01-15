@@ -60,6 +60,7 @@ ASTERISK = (\*)
 SOLIDUS  = (/)
 
 COMMA = (,)
+SEMICOLON = (\;)
 
 Rules.
 
@@ -118,6 +119,7 @@ Rules.
 {REGEX} : {token, {regex, list_to_binary(TokenChars)}}.
 
 {COMMA} : {token, {comma, list_to_binary(TokenChars)}}.
+{SEMICOLON} : {token, {semicolon, list_to_binary(TokenChars)}}.
 
 {WHITESPACE} : skip_token.
 
@@ -130,11 +132,7 @@ Rules.
 
 Erlang code.
 
--export([
-         get_tokens/1
-        ]).
-
--include("riak_ql.xrl.tests").
+-compile([export_all]).
 
 get_tokens(X) ->
     Toks = lex(X),

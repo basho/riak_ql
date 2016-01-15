@@ -6,6 +6,7 @@
 Nonterminals
 
 Statement
+StatementWithoutSemicolon
 Query
 Select
 Describe
@@ -93,6 +94,7 @@ quantum
 regex
 right_paren
 select
+semicolon
 sint64
 solidus
 table
@@ -105,9 +107,12 @@ where
 Rootsymbol Statement.
 Endsymbol '$end'.
 
-Statement -> Query           : convert('$1').
-Statement -> TableDefinition : fix_up_keys('$1').
-Statement -> Describe : '$1'.
+Statement -> StatementWithoutSemicolon : '$1'.
+Statement -> StatementWithoutSemicolon semicolon : '$1'.
+
+StatementWithoutSemicolon -> Query           : convert('$1').
+StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
+StatementWithoutSemicolon -> Describe : '$1'.
 
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
