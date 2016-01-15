@@ -323,12 +323,9 @@ Erlang code.
 %% unused/but not to be exported in the yecc source
 %% no way to stop rebar borking on it AFAIK
 -export([
-         return_error/2
+         return_error/2,
+         canonicalise_where/1
          ]).
-
--ifdef(TEST).
--include("riak_ql.yrl.tests").
--endif.
 
 %% if no partition key is specified hash on the local key
 fix_up_keys(#ddl_v1{partition_key = none, local_key = LK} = DDL) ->

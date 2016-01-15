@@ -57,3 +57,25 @@ select_fields_from_lists_sql_test() ->
                                                                          ]},
                                  'FROM'   = <<"events">>
                                 }).
+
+select_quoted_spaces_sql_test() ->
+    ?sql_comp_assert("select * from \"table with spaces\"",
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"table with spaces">>}).
+
+
+
+
+select_quoted_escape_sql_test() ->
+    ?sql_comp_assert("select * from \"table with spaces\" where "
+                     "\"co\"\"or\" = 'klingon''name' or "
+                     "\"co\"\"or\" = '\"'",
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"table with spaces">>,
+                                 'WHERE' = [
+                                            {or_,
+                                             {'=', <<"co\"or">>, {binary, <<"\"">>}},
+                                             {'=', <<"co\"or">>, {binary, <<"klingon'name">>}}
+                                            }
+                                           ]
+                                }).
