@@ -1,121 +1,23 @@
 -module(parser_tests).
 
--compile([export_all]).
-
 -include_lib("eunit/include/eunit.hrl").
--include("riak_ql_ddl.hrl").
+-include("parser_test_utils.hrl").
 
-not_null_white_space_test() ->
-    Table_def =
-        "CREATE TABLE temperatures ("
-        "family VARCHAR NOT NULL, "
-        "series VARCHAR NOT NULL, "
-        "time TIMESTAMP NOT                NULL, "
-        "PRIMARY KEY "
-        " ((family, series, quantum(time, 15, 's')), family, series, time))",
-    ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
 
-create_table_white_space_test() ->
-    Table_def =
-        "CREATE               \tTABLE temperatures ("
-        "family VARCHAR NOT NULL, "
-        "series VARCHAR NOT NULL, "
-        "time TIMESTAMP NOT NULL, "
-        "PRIMARY KEY "
-        " ((family, series, quantum(time, 15, 's')), family, series, time))",
-    ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+select_sql_case_insensitive_1_test() ->
+    ?sql_comp_assert_match("SELECT * from argle",
+                           ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
 
-primary_key_white_space_test() ->
-    Table_def =
-        "CREATE TABLE temperatures ("
-        "family VARCHAR NOT NULL, "
-        "series VARCHAR NOT NULL, "
-        "time TIMESTAMP NOT NULL, "
-        "PRIMARY               \t  KEY "
-        " ((family, series, quantum(time, 15, 's')), family, series, time))",
-    ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+select_sql_case_insensitive_2_test() ->
+    ?sql_comp_assert_match("seLEct * from argle",
+                           ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
 
-function_arity_0_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun() = a"))
-      ).
 
-function_identifier_arity_1_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun(a) = a"))
-      ).
+sql_first_char_is_newline_test() ->
+    ?sql_comp_assert_match("\nselect * from argle",
+                           ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
 
-function_identifier_arity_2_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun(a, b) = a"))
-      ).
 
-function_val_arity_1_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a') = a"))
-      ).
-
-function_val_arity_2_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 'b') = a"))
-      ).
-
-function_val_arity_3_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 'b', 'c') = a"))
-      ).
-
-function_val_arity_10_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b') = a"))
-      ).
-
-function_val_and_identifier_mix_1_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 10, b, 3.5) = a"))
-      ).
-
-function_val_and_identifier_mix_2_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 10, b, 3.5, true) = a"))
-      ).
-
-function_val_and_identifier_mix_3_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<_/binary>>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a', 10, b, 3.5, false) = a"))
-      ).
-
-function_call_error_message_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<"Function not supported - 'myfun'.">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun('a') = a"))
-      ).
-
-function_as_arg_test() ->
-    ?assertMatch(
-       {error, {0, riak_ql_parser,
-                <<"Function not supported - 'herfun'.">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens("select f from a WHERE myfun(hisfun(herfun(a))) = 'a'"))
-      ).
 
 %% RTS-645
 flubber_test() ->
@@ -128,40 +30,7 @@ flubber_test() ->
                               "AND s='s' AND ts > 0 AND ts < 100"))
       ).
 
-key_fields_must_exist_1_test() ->
-    Table_def =
-        "CREATE TABLE temperatures ("
-        "time TIMESTAMP NOT NULL, "
-        "series VARCHAR NOT NULL, "
-        "PRIMARY KEY "
-        " ((family, series, quantum(time, 15, 's')), family, series, time))",
-    ?assertEqual(
-       {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family).">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
 
-key_fields_must_exist_2_test() ->
-    Table_def =
-        "CREATE TABLE temperatures ("
-        "time TIMESTAMP NOT NULL, "
-        "PRIMARY KEY "
-        " ((family, series, quantum(time, 15, 's')), family, series, time))",
-    ?assertEqual(
-       {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family, series).">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
-
-key_fields_must_exist_3_test() ->
-    Table_def =
-        "CREATE TABLE temperatures ("
-        "family VARCHAR NOT NULL, "
-        "series VARCHAR NOT NULL, "
-        "PRIMARY KEY "
-        " ((family, series, quantum(time, 15, 's')), family, series, time))",
-    ?assertMatch(
-       {error, {0, riak_ql_parser, <<"Primary key fields do not exist (time).">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
 
 time_unit_seconds_test() ->
     ?assertMatch(
@@ -340,3 +209,38 @@ remove_duplicate_clauses_4_test() ->
 %%             "AND weather = 'raining' "
 %%             "AND time > 1234567 "))
 %%     ).
+
+concatenated_unquoted_strings_test() ->
+    String = "select * from response_times where cats = be a st",
+    Expected = error,
+    Got = case riak_ql_parser:parse(riak_ql_lexer:get_tokens(String)) of
+              {error, _Err} ->
+                  error;
+              {ok, Other} -> {should_not_compile, Other}
+          end,
+    ?assertEqual(Expected, Got).
+
+%%
+%% Regression tests
+%%
+
+rts_433_regression_test() ->
+    ?sql_comp_assert("select * from HardDrivesV14 where date >= 123 " ++
+                         "and date <= 567 " ++
+                         "and family = 'Hitachi HDS5C4040ALE630' " ++
+                         "and series = 'true'",
+                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
+                                 'FROM'   = <<"HardDrivesV14">>,
+                                 'WHERE'  = [
+                                             {and_,
+                                              {'=', <<"series">>, {binary, <<"true">>}},
+                                              {and_,
+                                               {'=', <<"family">>, {binary, <<"Hitachi HDS5C4040ALE630">>}},
+                                               {and_,
+                                                {'<=', <<"date">>, {integer, 567}},
+                                                {'>=', <<"date">>, {integer, 123}}
+                                               }
+                                              }
+                                             }
+                                            ]
+                                }).

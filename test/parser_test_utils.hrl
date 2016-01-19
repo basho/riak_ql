@@ -2,6 +2,8 @@
 
 -include("riak_ql_ddl.hrl").
 
+-compile([export_all]).
+
 -define(sql_comp_assert(String, Expected),
         Exp2 = {ok, fix(Expected)},
         Toks = riak_ql_lexer:get_tokens(String),
