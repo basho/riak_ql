@@ -828,7 +828,7 @@ assert_param_is_quantum(_KeyComponent) ->
 assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primary},
                                             local_key = #key_v1{ast = Local}}) ->
     PrimaryList = [query_field_name(F) || F <- Primary],
-    LocalList = [query_field_name(F) || F <- Local],
+    LocalList = [query_field_name(F) || F <- lists:sublist(Local, 3)],
     case PrimaryList == LocalList of
         true ->
             ok;
