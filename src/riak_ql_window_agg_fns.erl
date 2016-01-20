@@ -144,6 +144,7 @@ add(A, B)         -> A + B.
 divide(?SQL_NULL, _) -> ?SQL_NULL;
 divide(_, ?SQL_NULL) -> ?SQL_NULL;
 divide(_, 0)         -> error(divide_by_zero);
+divide(_, 0.0)       -> error(divide_by_zero);
 divide(A, B) when is_integer(A) andalso is_integer(B)
                      -> A div B;
 divide(A, B)         -> A / B.
