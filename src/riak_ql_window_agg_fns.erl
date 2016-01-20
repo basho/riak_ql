@@ -24,9 +24,11 @@
 
 
 -export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDDEV'/2]).
+-export([add/2, divide/2, multiply/2, subtract/2]).
 -export([finalise/2]).
 -export([start_state/1]).
--export([get_arity_and_type_sig/1]).
+-export([fn_arity/1]).
+-export([fn_type_signature/2]).
 
 -define(SQL_NULL, []).
 
@@ -34,20 +36,26 @@
 
 -include("riak_ql_ddl.hrl").
 
--spec get_arity_and_type_sig(aggregate_function()) ->
-                                    {Arity::non_neg_integer(),
-                                     field_type() | [{field_type(), field_type()}]}.
-%% Functions used in expression type validation for each Function, the
-%% returned tuple gives the arity and arg-type to return-type pairs.
-%% For functions accepting '*' (such as COUNT), arguments are the entire row, passed
-%% as a list, and no type checking is done on the elements
-get_arity_and_type_sig('COUNT')  -> {1, sint64};
-get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  %% double promotion
-get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG');
-get_arity_and_type_sig('MAX')    -> {1, [{sint64, sint64}, {double, double}]};
-get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
-get_arity_and_type_sig('STDDEV') -> {1, [{sint64, double}, {double, double}]};  %% ditto
-get_arity_and_type_sig('SUM')    -> {1, [{sint64, sint64}, {double, double}]}.
+
+-spec fn_type_signature(aggregate_function(), Args::[simple_field_type()]) ->
+        simple_field_type().
+fn_type_signature('AVG', [double]) -> double;
+fn_type_signature('AVG', [sint64]) -> double;
+fn_type_signature('COUNT', [_]) -> sint64;
+fn_type_signature('MAX', [double]) -> double;
+fn_type_signature('MAX', [sint64]) -> sint64;
+fn_type_signature('MEAN', Args) -> fn_type_signature('AVG', Args);
+fn_type_signature('MIN', [double]) -> double;
+fn_type_signature('MIN', [sint64]) -> sint64;
+fn_type_signature('STDDEV', [double]) -> double;
+fn_type_signature('STDDEV', [sint64]) -> double;
+fn_type_signature('SUM', [double]) -> double;
+fn_type_signature('SUM', [sint64]) -> sint64;
+fn_type_signature(Fn, Args) ->
+    {error, {invalid_function_call, Fn, Args}}.
+
+%%
+fn_arity(_FnName) -> 1.
 
 %% Get the initial accumulator state for the aggregation.
 -spec start_state(aggregate_function()) ->
@@ -126,6 +134,30 @@ finalise(_Fn, Acc) ->
     {N, A, Q};
 'STDDEV'(_, State) ->
     State.
+
+%%
+add(?SQL_NULL, _) -> ?SQL_NULL;
+add(_, ?SQL_NULL) -> ?SQL_NULL;
+add(A, B)         -> A + B.
+
+%%
+divide(?SQL_NULL, _) -> ?SQL_NULL;
+divide(_, ?SQL_NULL) -> ?SQL_NULL;
+divide(_, 0)         -> error(divide_by_zero);
+divide(_, 0.0)       -> error(divide_by_zero);
+divide(A, B) when is_integer(A) andalso is_integer(B)
+                     -> A div B;
+divide(A, B)         -> A / B.
+
+%%
+multiply(?SQL_NULL, _) -> ?SQL_NULL;
+multiply(_, ?SQL_NULL) -> ?SQL_NULL;
+multiply(A, B)         -> A * B.
+
+%%
+subtract(?SQL_NULL, _) -> ?SQL_NULL;
+subtract(_, ?SQL_NULL) -> ?SQL_NULL;
+subtract(A, B)         -> A - B.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

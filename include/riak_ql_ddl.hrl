@@ -88,7 +88,7 @@
           col_return_types = []   :: [field_type()],
           col_names        = []   :: [binary()],
           clause           = []   :: [riak_kv_qry_compiler:compiled_select()],
-          is_valid         = true :: true | {error, [any()]},
+          % is_valid         = true :: true | {error, [any()]},
           finalisers       = []   :: [skip | function()]
         }).
 
