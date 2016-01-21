@@ -21,10 +21,10 @@ This document contains the following sections (marked as to their completeness)
    - [X] 4.iii Time Quantiser Fn
    - [X] 4.iv DDL Compiler
    - [X] 4.v Runtime Query Fns
-- [] 5 The Query Toolchain
-   - [] 5.i Introduction
-   - [] 5.ii Compiling and Decompiling
-   - [] 5.iii Generated DDL Modules
+- [ ] 5 The Query Toolchain
+   - [ ] 5.i Introduction
+   - [ ] 5.ii Compiling and Decompiling
+   - [ ] 5.iii Generated DDL Modules
 
 ## 3 Repository Contents
 
