@@ -424,7 +424,7 @@ window_aggregate_fn_capitalisation_test() ->
 
 window_aggregate_fn_all_funs_test() ->
     ?sql_comp_assert("select avg(temp), sum(counts), count(counts), min(counts), " ++
-                         "max(counts), stddev(counts) from details",
+                         "max(counts), STDDEV_POP(counts) from details",
                      ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
                                                                           {{window_agg_fn, 'AVG'},
                                                                            [{identifier, [<<"temp">>]}]},
@@ -436,7 +436,7 @@ window_aggregate_fn_all_funs_test() ->
                                                                            [{identifier, [<<"counts">>]}]},
                                                                           {{window_agg_fn, 'MAX'},
                                                                            [{identifier, [<<"counts">>]}]},
-                                                                          {{window_agg_fn, 'STDDEV'},
+                                                                          {{window_agg_fn, 'STDDEV_POP'},
                                                                            [{identifier, [<<"counts">>]}]}
                                                                          ]},
                                  'FROM'    = <<"details">>,
