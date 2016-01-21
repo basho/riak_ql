@@ -1,20 +1,44 @@
+%% -------------------------------------------------------------------
+%%
+%% riak_ql_quanta.erl - a library for quantising time for Time Series
+%%
 %% @doc This module serves to generate time quanta on multi - (day, hour, minute,
-%% second) boundaries. The quantum are based on an origin time of Jan 1, 1970 00:00:00 (Unix Epoch).
-%% The function <em>quantum/3</em> takes a time in milliseconds to bucketize, a size of the quantum, and the
-%% units of said quantum. For instance, the following call would create buckets for timestamps on 15
-%% minute boundaries: <em>quantum(Time, 15, m)</em>. The quantum time is returned in milliseconds since the
-%% Unix epoch.
-%% the function <em>quanta/4</em> takes 2 times in milliseconds and size of the quantum
+%% second) boundaries. The quantum are based on an origin time of Jan 1, 1970 
+%% 00:00:00 (Unix Epoch).
+%% The function <em>quantum/3</em> takes a time in milliseconds to bucketize, 
+%% a size of the quantum, and the units of said quantum.
+%% For instance, the following call would create buckets for timestamps on 15
+%% minute boundaries: <em>quantum(Time, 15, m)</em>. The quantum time is returned in 
+%% milliseconds since the Unix epoch.
+%% The function <em>quanta/4</em> takes 2 times in milliseconds and size of the quantum
 %% and the of units of said quantum and returns a list of quantum boundaries that span the time
+%%
+%% Copyright (c) 2007-2016 Basho Technologies, Inc.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(riak_ql_quanta).
 
 -export([
-	 quantum/3,
-	 quanta/4,
+         quantum/3,
+         quanta/4,
          timestamp_to_ms/1,
          ms_to_timestamp/1,
          unit_to_millis/2
-	]).
+        ]).
 
 -type time_ms() :: non_neg_integer().
 %% A timestamp in millisconds representing number of millisconds from Unix epoch
@@ -234,7 +258,4 @@ quantum_gen() ->
            {choose(1, 60), m}]).
 
 -endif.
-
-
-
 -endif.
