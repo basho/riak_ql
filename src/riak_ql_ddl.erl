@@ -997,15 +997,16 @@ timeseries_filter_test() ->
     ?assertEqual(Expected, Res).
 
 test_parse(SQL) ->
-    element(2,
-            riak_ql_parser:parse(
-              riak_ql_lexer:get_tokens(SQL))).
+    {ok, Parsed} =
+        riak_ql_parser:parse(
+          riak_ql_lexer:get_tokens(SQL)),
+    Parsed.
 
 is_query_valid_test_helper(Table_name, Table_def, Query) ->
     Mod_name = make_module_name(iolist_to_binary(Table_name)),
     catch code:purge(Mod_name),
     catch code:purge(Mod_name),
-    DDL = test_parse(Table_def),
+    {DDL, _Props} = test_parse(Table_def),
     %% ?debugFmt("QUERY is ~p", [test_parse(Query)]),
     {module,Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     is_query_valid(Mod, DDL, test_parse(Query)).
@@ -1211,7 +1212,7 @@ fold_where_tree_test() ->
                    "myfamily = 'fam1' " ++
                    "and myseries = 'ser1' " ++
                    "and time > 1 and time < 10",
-               DDL = test_parse(CreateTab),
+               {DDL, _Props} = test_parse(CreateTab),
                {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
                Q = test_parse(SQL),
                ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = Selections}} = Q,

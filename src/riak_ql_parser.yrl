@@ -1,7 +1,7 @@
 %% -*- erlang -*-
 %%% @doc       Parser for the riak Time Series Query Language.
 %%% @author    gguthrie@basho.com
-%%% @copyright (C) 2015 Basho
+%%% @copyright (C) 2015, 2016 Basho
 
 Nonterminals
 
@@ -28,6 +28,10 @@ TableContentsSource
 TableElementList
 TableElements
 TableElement
+TableProperties
+TablePropertyList
+TableProperty
+TablePropertyValue
 ColumnDefinition
 ColumnConstraint
 KeyDefinition
@@ -102,6 +106,7 @@ timestamp
 true
 varchar
 where
+with
 .
 
 Rootsymbol Statement.
@@ -256,6 +261,9 @@ BooleanPredicand ->
 TableDefinition ->
     CreateTable Bucket TableContentsSource :
         make_table_definition('$2', '$3').
+TableDefinition ->
+    CreateTable Bucket TableContentsSource with TableProperties :
+        make_table_definition('$2', '$3', '$5').
 
 TableContentsSource -> TableElementList : '$1'.
 TableElementList -> left_paren TableElements right_paren : '$2'.
@@ -303,6 +311,21 @@ KeyFieldArg -> float   : '$1'.
 KeyFieldArg -> CharacterLiteral    : '$1'.
 KeyFieldArg -> Identifier : '$1'.
 %% KeyFieldArg -> atom left_paren Word right_paren : make_atom('$3').
+
+TableProperties ->
+    left_paren TablePropertyList right_paren : '$2'.
+
+TablePropertyList ->
+    TableProperty : prepend_table_proplist([], '$1').
+TablePropertyList ->
+    TableProperty comma TablePropertyList : prepend_table_proplist('$3', '$1').
+
+TableProperty ->
+    identifier equals_operator TablePropertyValue :
+        make_table_property('$1', '$3').
+
+TablePropertyValue -> integer : '$1'.
+TablePropertyValue -> character_literal : '$1'.
 
 Erlang code.
 
@@ -678,13 +701,16 @@ extract_key_field_list({list, [Field | Rest]}, Extracted) ->
     [#param_v1{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
-make_table_definition({identifier, Table}, Contents) ->
-    validate_ddl(
-      #ddl_v1{
-         table = Table,
-         partition_key = find_partition_key(Contents),
-         local_key = find_local_key(Contents),
-         fields = find_fields(Contents)}).
+make_table_definition(TableName, Contents) ->
+    make_table_definition(TableName, Contents, []).
+make_table_definition({identifier, Table}, Contents, Properties) ->
+    {validate_ddl(
+       #ddl_v1{
+          table = Table,
+          partition_key = find_partition_key(Contents),
+          local_key = find_local_key(Contents),
+          fields = find_fields(Contents)}),
+     validate_table_properties(Properties)}.
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
@@ -723,6 +749,19 @@ find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
     find_fields(Count + 1, Rest, [PositionedField | Elements]);
 find_fields(Count, [_Head | Rest], Elements) ->
     find_fields(Count, Rest, Elements).
+
+prepend_table_proplist(L, P) ->
+    [P | L].
+
+make_table_property({identifier, K}, {Type, V})
+  when Type == integer;
+       Type == character_literal ->
+    {K, V}.
+
+validate_table_properties(Properties) ->
+    %% We let all k=v in: there's more substantial validation and
+    %% enrichment happening in riak_kv_wm_utils:erlify_bucket_prop
+    Properties.
 
 
 %% DDL validation
