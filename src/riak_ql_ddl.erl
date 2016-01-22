@@ -181,9 +181,10 @@ syntax_error_to_msg(E) ->
 
 %%
 syntax_error_to_msg2({type_check_failed, Fn, Arity, ExprTypes}) ->
-    {"Function ~p/~p called with arguments of the wrong type ~p.", [Fn, Arity, ExprTypes]};
-syntax_error_to_msg2({fn_called_with_wrong_arity, Fn, Arity, NoArgs}) ->
-    {"Function ~p/~p called with ~p arguments.", [Fn, Arity, NoArgs]};
+    {"Function ~s/~p called with arguments of the wrong type ~p.", 
+      [unquote_fn(Fn), Arity, ExprTypes]};
+syntax_error_to_msg2({fn_called_with_wrong_arity, Fn, Arity, NumArgs}) ->
+    {"Function ~s/~p called with ~p arguments.", [unquote_fn(Fn), Arity, NumArgs]};
 syntax_error_to_msg2({bucket_type_mismatch, B1, B2}) ->
     {"bucket_type_mismatch: DDL bucket type was ~s "
      "but query selected from bucket type ~s.", [B1, B2]};
@@ -206,6 +207,10 @@ syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
 syntax_error_to_msg2({unknown_column_type, Other}) ->
     {"Unexpected select column type ~p.", [Other]}.
 
+%% An atom with upper case chars gets printed as 'COUNT' so remove the
+%% quotes to make the error message more reable.
+unquote_fn(Fn) when is_atom(Fn) ->
+    string:strip(atom_to_list(Fn), both, $').
 
 -spec is_query_valid(module(), #ddl_v1{}, ?SQL_SELECT{}) ->
                             true | {false, [query_syntax_error()]}.
@@ -330,35 +335,26 @@ are_selections_valid(Mod, Selections, _) ->
         fun(E, Acc) ->
                 is_selection_column_valid(Mod, E, Acc)
         end,
-    case lists:foldl(CheckFn, {[], true}, Selections) of
-        {[],   true}  -> true;
-        {Msgs, false} -> {false, lists:reverse(Msgs)}
+    case lists:foldl(CheckFn, [], Selections) of
+        []     -> true;
+        Errors -> {false, lists:reverse(Errors)}
     end.
 
 %% Reported error types must be supported by the function syntax_error_to_msg2
-is_selection_column_valid(Mod, {identifier, X}, {Acc, Status}) ->
+is_selection_column_valid(Mod, {identifier, X}, Acc) ->
     case Mod:is_field_valid(X) of
         true  ->
-            {Acc, Status};
+            Acc;
         false ->
-            Msg = {unexpected_select_field, hd(X)},
-            {[Msg | Acc], false}
+            [{unexpected_select_field, hd(X)} | Acc]
     end;
-is_selection_column_valid(Mod, {{window_agg_fn, Fn}, Args}, {Acc, Status}) ->
-    %% if the field is not an identifier, it should already be validated
-    {Arity, FnTypeSig} = riak_ql_window_agg_fns:get_arity_and_type_sig(Fn),
-    case length(Args) of
-        Arity when is_atom(FnTypeSig) ->
-            %% function takes args of any type
-            {Acc, Status};
-        Arity -> ExprTypes = type(Args, Mod, []),
-                 case do_types_match(FnTypeSig, ExprTypes) of
-                     true  -> {Acc, Status};
-                     false -> Msg1 = {type_check_failed, Fn, Arity, ExprTypes},
-                              {[Msg1 | Acc], false}
-                 end;
-        N     -> Msg2 = {fn_called_with_wrong_arity, Fn, Arity, N},
-                 {[Msg2 | Acc], false}
+is_selection_column_valid(_, {{window_agg_fn, Fn}, Args}, Acc) ->
+    ArgLen = length(Args),
+    case riak_ql_window_agg_fns:fn_arity(Fn) == ArgLen of
+        false ->
+            [{fn_called_with_wrong_arity, Fn, 1, length(Args)} | Acc];
+        true ->
+            Acc
     end;
 is_selection_column_valid(_, {Type, _}, Acc) when is_atom(Type) ->
     %% literal types, integer double etc.
@@ -366,23 +362,8 @@ is_selection_column_valid(_, {Type, _}, Acc) when is_atom(Type) ->
 is_selection_column_valid(_, {Op, _, _}, Acc) when is_atom(Op) ->
     %% arithmetic
     Acc;
-is_selection_column_valid(_, Other, {Acc, _}) ->
-    {[{unknown_column_type, Other} | Acc], false}.
-
-do_types_match(FnTypeSig, ExprTypes) ->
-    CheckFn = fun(X, Acc) ->
-                      case lists:keymember(X, 1, FnTypeSig) of
-                          true  -> Acc;
-                          false -> false
-                      end
-              end,
-    lists:foldl(CheckFn, true, ExprTypes).
-
-type([], _Mod, Acc) ->
-    lists:reverse(Acc);
-type([{identifier, I} | T], Mod, Acc) ->
-    NewAcc = Mod:get_field_type(I),
-    type(T, Mod, [NewAcc | Acc]).
+is_selection_column_valid(_, Other, Acc) ->
+    [{unknown_column_type, Other} | Acc].
 
 %% Fold over the syntax tree for a where clause.
 fold_where_tree([], Acc, _) ->
@@ -1241,17 +1222,10 @@ fold_where_tree_test() ->
 
 ?select_test(simple_agg_fn_select_2_test, "count(mysint64), avg(mydouble)", true).
 
-?select_test(simple_agg_fn_select_fail_1_test, "count(mysint64), avg(myvarchar)",
-             {false, [
-                      {type_check_failed, 'AVG', 1, [varchar]}
-                     ]
-             }).
-
 ?select_test(simple_agg_fn_select_fail_2_test, "count(mysint64, myboolean), avg(mysint64)",
              {false, [
                       {fn_called_with_wrong_arity, 'COUNT', 1, 2}
                      ]
              }).
-
 
 -endif.
