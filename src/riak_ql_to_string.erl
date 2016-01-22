@@ -378,9 +378,12 @@ roundtrip_ok(Text) ->
        SQL, string_to_sql(Text2)).
 
 string_to_sql(Text) ->
-    {ok, SQL} =
-        riak_ql_parser:parse(
-          riak_ql_lexer:get_tokens(Text)),
-    SQL.
+    case riak_ql_parser:parse(
+           riak_ql_lexer:get_tokens(Text)) of
+        {ok, ?SQL_SELECT{} = SQL} ->
+            SQL;
+        {ok, {#ddl_v1{} = DDL, _Props}} ->
+            DDL
+    end.
 
 -endif.
