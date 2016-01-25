@@ -556,6 +556,7 @@ make_funcall({identifier, FuncName}, Args) ->
     Fn = canonicalise_window_aggregate_fn(FuncName),
     case get_func_type(Fn) of
         window_aggregate_fn ->
+            %% FIXME this should be in the type checker in riak_kv_qry_compiler
             {Fn2, Args2} = case {Fn, Args} of
                                {'COUNT', [{asterisk, _Asterisk}]} ->
                                    {'COUNT', [{identifier, <<"*">>}]};
@@ -579,6 +580,8 @@ make_funcall(_, _) ->
 canonicalise_expr({identifier, X}) ->
     {identifier, [X]};
 canonicalise_expr({expr, X}) ->
+    X;
+canonicalise_expr(X) ->
     X.
 
 get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
@@ -587,8 +590,12 @@ get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
                              FuncName =:= 'COUNT'  orelse
                              FuncName =:= 'MIN'    orelse
                              FuncName =:= 'MAX'    orelse
-                             FuncName =:= 'STDDEV' -> window_aggregate_fn;
-get_func_type(FuncName) when is_atom(FuncName)     -> not_supported.
+                             FuncName =:= 'STDDEV' orelse
+                             FuncName =:= 'STDDEV_SAMP' orelse
+                             FuncName =:= 'STDDEV_POP' ->
+    window_aggregate_fn;
+get_func_type(FuncName) when is_atom(FuncName) ->
+    not_supported.
 
 %% TODO
 %% this list to atom needs to change to list to existing atom
