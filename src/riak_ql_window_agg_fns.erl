@@ -23,7 +23,7 @@
 -module(riak_ql_window_agg_fns).
 
 
--export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDDEV_POP'/2, 'STDDEV_SAMP'/2]).
+-export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDDEV'/2, 'STDDEV_POP'/2, 'STDDEV_SAMP'/2]).
 -export([add/2, divide/2, multiply/2, subtract/2]).
 -export([finalise/2]).
 -export([start_state/1]).
@@ -68,10 +68,15 @@ start_state('MEAN')   -> start_state('AVG');
 start_state('COUNT')  -> 0;
 start_state('MAX')    -> ?SQL_NULL;
 start_state('MIN')    -> ?SQL_NULL;
-start_state('STDDEV_POP') -> {0, 0.0, 0.0};
-start_state('STDDEV_SAMP') -> {0, 0.0, 0.0};
+start_state('STDDEV') -> start_state_stddev();
+start_state('STDDEV_POP') -> start_state_stddev();
+start_state('STDDEV_SAMP') -> start_state_stddev();
 start_state('SUM')    -> ?SQL_NULL;
 start_state(_)        -> stateless.
+
+%%
+start_state_stddev() ->
+    {0, 0.0, 0.0}.
 
 %% Calculate the final results using the accumulated result.
 -spec finalise(aggregate_function(), any()) -> any().
@@ -81,9 +86,11 @@ finalise('MEAN', State) ->
     finalise('AVG', State);
 finalise('AVG', {N, Acc})  ->
     Acc / N;
-finalise(Stddev, {N, _, _}) when (Stddev == 'STDDEV_POP' orelse Stddev == 'STDDEV_SAMP')  andalso N < 2 ->
+finalise(Stddev, {N, _, _}) when (Stddev == 'STDDEV' orelse Stddev == 'STDDEV_POP' orelse Stddev == 'STDDEV_SAMP')  andalso N < 2 ->
     % STDDEV_POP must have two or more values to or return NULL
     ?SQL_NULL;
+finalise('STDDEV', State) ->
+    finalise('STDDEV_SAMP', State);
 finalise('STDDEV_POP', {N, _, Q}) ->
     math:sqrt(Q / N);
 finalise('STDDEV_SAMP', {N, _, Q}) ->
@@ -131,6 +138,9 @@ finalise(_Fn, Acc) ->
 'MAX'(?SQL_NULL, ?SQL_NULL) -> ?SQL_NULL;
 'MAX'(Arg, State) when Arg > State -> Arg;
 'MAX'(_, State) -> State.
+
+'STDDEV'(Arg, State) ->
+    'STDDEV_POP'(Arg, State).
 
 'STDDEV_POP'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
