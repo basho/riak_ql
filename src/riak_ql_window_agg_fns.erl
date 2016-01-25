@@ -23,7 +23,7 @@
 -module(riak_ql_window_agg_fns).
 
 
--export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDDEV'/2]).
+-export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDDEV'/2, 'STDDEV_POP'/2, 'STDDEV_SAMP'/2]).
 -export([add/2, divide/2, multiply/2, subtract/2]).
 -export([finalise/2]).
 -export([start_state/1]).
@@ -32,7 +32,7 @@
 
 -define(SQL_NULL, []).
 
--type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDDEV'.
+-type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDDEV' | 'STDDEV_POP' | 'STDDEV_SAMP'.
 
 -include("riak_ql_ddl.hrl").
 
@@ -47,8 +47,11 @@ fn_type_signature('MAX', [sint64]) -> sint64;
 fn_type_signature('MEAN', Args) -> fn_type_signature('AVG', Args);
 fn_type_signature('MIN', [double]) -> double;
 fn_type_signature('MIN', [sint64]) -> sint64;
-fn_type_signature('STDDEV', [double]) -> double;
-fn_type_signature('STDDEV', [sint64]) -> double;
+fn_type_signature('STDDEV', Args) -> fn_type_signature('STDDEV_SAMP', Args);
+fn_type_signature('STDDEV_POP', [double]) -> double;
+fn_type_signature('STDDEV_POP', [sint64]) -> double;
+fn_type_signature('STDDEV_SAMP', [double]) -> double;
+fn_type_signature('STDDEV_SAMP', [sint64]) -> double;
 fn_type_signature('SUM', [double]) -> double;
 fn_type_signature('SUM', [sint64]) -> sint64;
 fn_type_signature(Fn, Args) ->
@@ -65,9 +68,15 @@ start_state('MEAN')   -> start_state('AVG');
 start_state('COUNT')  -> 0;
 start_state('MAX')    -> ?SQL_NULL;
 start_state('MIN')    -> ?SQL_NULL;
-start_state('STDDEV') -> {0, 0.0, 0.0};
+start_state('STDDEV') -> start_state_stddev();
+start_state('STDDEV_POP') -> start_state_stddev();
+start_state('STDDEV_SAMP') -> start_state_stddev();
 start_state('SUM')    -> ?SQL_NULL;
 start_state(_)        -> stateless.
+
+%%
+start_state_stddev() ->
+    {0, 0.0, 0.0}.
 
 %% Calculate the final results using the accumulated result.
 -spec finalise(aggregate_function(), any()) -> any().
@@ -77,11 +86,15 @@ finalise('MEAN', State) ->
     finalise('AVG', State);
 finalise('AVG', {N, Acc})  ->
     Acc / N;
-finalise('STDDEV', {N, _, _}) when N < 2 ->
-    % STDDEV must have two or more values to or return NULL
+finalise(Stddev, {N, _, _}) when (Stddev == 'STDDEV' orelse Stddev == 'STDDEV_POP' orelse Stddev == 'STDDEV_SAMP')  andalso N < 2 ->
+    % STDDEV_POP must have two or more values to or return NULL
     ?SQL_NULL;
-finalise('STDDEV', {N, _, Q}) ->
+finalise('STDDEV', State) ->
+    finalise('STDDEV_SAMP', State);
+finalise('STDDEV_POP', {N, _, Q}) ->
     math:sqrt(Q / N);
+finalise('STDDEV_SAMP', {N, _, Q}) ->
+    math:sqrt(Q / (N-1));
 finalise(_Fn, Acc) ->
     Acc.
 
@@ -126,14 +139,20 @@ finalise(_Fn, Acc) ->
 'MAX'(Arg, State) when Arg > State -> Arg;
 'MAX'(_, State) -> State.
 
-'STDDEV'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
+'STDDEV'(Arg, State) ->
+    'STDDEV_POP'(Arg, State).
+
+'STDDEV_POP'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
     N = N_old + 1,
     A = A_old + (Arg - A_old) / N,
     Q = Q_old + (Arg - A_old) * (Arg - A),
     {N, A, Q};
-'STDDEV'(_, State) ->
+'STDDEV_POP'(_, State) ->
     State.
+
+'STDDEV_SAMP'(Arg, State) ->
+    'STDDEV_POP'(Arg, State).
 
 %%
 add(?SQL_NULL, _) -> ?SQL_NULL;
@@ -162,8 +181,8 @@ subtract(A, B)         -> A - B.
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-stddev_test() ->
-    State0 = start_state('STDDEV'),
+stddev_pop_test() ->
+    State0 = start_state('STDDEV_POP'),
     Data = [
             1.0, 2.0, 3.0, 4.0, 2.0,
             3.0, 4.0, 4.0, 4.0, 3.0,
@@ -176,24 +195,38 @@ stddev_test() ->
     %% need to run python on that arch to figure out what Expected
     %% value can be then.  Or, introduce an epsilon and check that the
     %% delta is small enough.
-    State9 = lists:foldl(fun 'STDDEV'/2, State0, Data),
-    Got = finalise('STDDEV', State9),
+    State9 = lists:foldl(fun 'STDDEV_POP'/2, State0, Data),
+    Got = finalise('STDDEV_POP', State9),
     ?assertEqual(Expected, Got).
 
-stddev_no_value_test() ->
+stddev_samp_test() ->
+    State0 = start_state('STDDEV_SAMP'),
+    Data = [
+            1.0, 2.0, 3.0, 4.0, 2.0,
+            3.0, 4.0, 4.0, 4.0, 3.0,
+            2.0, 3.0, 2.0, 1.0, 1.0
+           ],
+    State9 = lists:foldl(fun 'STDDEV_SAMP'/2, State0, Data),
+    %% expected value calulated usingpostgres STDDEV_SAMP
+    ?assertEqual(
+        1.1212238211627762,
+        finalise('STDDEV_SAMP', State9)
+    ).
+
+stddev_pop_no_value_test() ->
     ?assertEqual(
         [], 
-        finalise('STDDEV', start_state('STDDEV'))
+        finalise('STDDEV_POP', start_state('STDDEV_POP'))
     ).
-stddev_one_value_test() ->
+stddev_pop_one_value_test() ->
     ?assertEqual(
         ?SQL_NULL, 
-        finalise('STDDEV', 'STDDEV'(3, start_state('STDDEV')))
+        finalise('STDDEV_POP', 'STDDEV_POP'(3, start_state('STDDEV_POP')))
     ).
-stddev_two_value_test() ->
+stddev_pop_two_value_test() ->
     ?assertEqual(
         0.5, 
-        finalise('STDDEV', lists:foldl(fun 'STDDEV'/2, start_state('STDDEV'), [1.0,2.0]))
+        finalise('STDDEV_POP', lists:foldl(fun 'STDDEV_POP'/2, start_state('STDDEV_POP'), [1.0,2.0]))
     ).
 
 

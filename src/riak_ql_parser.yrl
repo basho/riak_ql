@@ -590,8 +590,12 @@ get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
                              FuncName =:= 'COUNT'  orelse
                              FuncName =:= 'MIN'    orelse
                              FuncName =:= 'MAX'    orelse
-                             FuncName =:= 'STDDEV' -> window_aggregate_fn;
-get_func_type(FuncName) when is_atom(FuncName)     -> not_supported.
+                             FuncName =:= 'STDDEV' orelse
+                             FuncName =:= 'STDDEV_SAMP' orelse
+                             FuncName =:= 'STDDEV_POP' ->
+    window_aggregate_fn;
+get_func_type(FuncName) when is_atom(FuncName) ->
+    not_supported.
 
 %% TODO
 %% this list to atom needs to change to list to existing atom
