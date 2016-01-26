@@ -28,7 +28,7 @@
 
 -include("riak_ql_ddl.hrl").
 
--spec sql_to_string(?SQL_SELECT{} | #ddl_v1{}) ->
+-spec sql_to_string(?SQL_SELECT{} | ?DDL{}) ->
                            string().
 sql_to_string(?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = S},
                           'FROM'   = F,
@@ -45,10 +45,10 @@ sql_to_string(?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = S},
           ],
     string:join(SQL, " ");
 
-sql_to_string(#ddl_v1{table         = T,
-                      fields        = FF,
-                      partition_key = PK,
-                      local_key     = LK}) ->
+sql_to_string(?DDL{table         = T,
+                   fields        = FF,
+                   partition_key = PK,
+                   local_key     = LK}) ->
     flat_format(
       "CREATE TABLE ~s (~s, PRIMARY KEY ((~s), ~s))",
       [T, make_fields(FF), make_key(PK), make_key(LK)]).
@@ -378,9 +378,12 @@ roundtrip_ok(Text) ->
        SQL, string_to_sql(Text2)).
 
 string_to_sql(Text) ->
-    {ok, SQL} =
-        riak_ql_parser:parse(
-          riak_ql_lexer:get_tokens(Text)),
-    SQL.
+    case riak_ql_parser:parse(
+           riak_ql_lexer:get_tokens(Text)) of
+        {ok, ?SQL_SELECT{} = SQL} ->
+            SQL;
+        {ok, ?DDL{} = DDL} ->
+            DDL
+    end.
 
 -endif.

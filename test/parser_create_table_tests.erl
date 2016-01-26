@@ -25,10 +25,10 @@ create_timeseries_sql_test() ->
         " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))",
     Toks = riak_ql_lexer:get_tokens(String),
     Got = case riak_ql_parser:parse(Toks) of
-              {ok, G} -> G;
+              {ok, DDL} -> DDL;
               _WC     -> wont_compile
           end,
-    Expected = #ddl_v1{
+    Expected = ?DDL{
                   table = <<"GeoCheckin">>,
                   fields = [
                             #riak_field_v1{
@@ -96,10 +96,10 @@ create_all_types_sql_test() ->
         " user, geohash, time))",
     Toks = riak_ql_lexer:get_tokens(String),
     Got = case riak_ql_parser:parse(Toks) of
-              {ok, G} -> G;
-              WC     -> WC
+              {ok, DDL} -> DDL;
+              WC -> WC
           end,
-    Expected = #ddl_v1{
+    Expected = ?DDL{
                   table = <<"GeoCheckin">>,
                   fields = [
                             #riak_field_v1{
@@ -251,7 +251,7 @@ create_table_white_space_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
+       {ok, ?DDL{}},
        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
@@ -264,7 +264,7 @@ primary_key_white_space_test() ->
         "PRIMARY               \t  KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
+       {ok, ?DDL{}},
        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
@@ -277,6 +277,34 @@ not_null_white_space_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
+       {ok, ?DDL{}},
+       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+create_with_1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "family VARCHAR NOT NULL, "
+        "series VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT NULL, "
+        "PRIMARY KEY "
+        " ((family, series, quantum(time, 15, 's')), family, series, time))"
+        " with (a='2a')",
+    ?assertMatch(
+       {ok, ?DDL{properties = [{<<"a">>, <<"2a">>}]}},
+       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+create_with_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "family VARCHAR NOT NULL, "
+        "series VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT NULL, "
+        "PRIMARY KEY "
+        " ((family, series, quantum(time, 15, 's')), family, series, time))"
+        " with (a ='2a', c= 3)",
+    ?assertMatch(
+       {ok, ?DDL{properties = [{<<"a">>, <<"2a">>}, {<<"c">>, 3}]}},
        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
