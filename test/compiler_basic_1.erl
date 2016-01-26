@@ -34,13 +34,13 @@
 
 %%
 %% this test calls into the PRIVATE interface
-%% mk_helper_m2/1
+%% compile_and_load_from_tmp/1
 %%
 -define(passing_test(Name, Query, Val, ExpectedPK, ExpectedLK),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+               case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
                        GotPK = riak_ql_ddl:get_partition_key(DDL, Val),
@@ -57,7 +57,7 @@
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+               case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
                        ?assertEqual(?VALID, Result);
@@ -69,13 +69,13 @@
 
 %%
 %% this test calls into the PRIVATE interface
-%% mk_helper_m2/1
+%% compile_and_load_from_tmp/1
 %%
 -define(failing_test(Name, Query, Val),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+               case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
                        ?assertEqual(?INVALID, Result);
@@ -86,13 +86,13 @@
 
 %%
 %% this test calls in the PUBLIC interface
-%% make_helper_mod/1
+%% compile_and_load_from_tmp/1
 %%
 -define(not_valid_test(Name, Query),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
-               case riak_ql_ddl_compiler:make_helper_mod(DDL) of
+               case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {error, _} ->
                        ?assertEqual(?VALID, true);
                    Other ->
@@ -109,7 +109,7 @@
                Lexed = riak_ql_lexer:get_tokens(Query),
                {ok, DDL} = riak_ql_parser:parse(Lexed),
                %% ?debugFmt("in ~p~n- DDL is:~n -~p~n", [Name, DDL]),
-               {module, Module} = riak_ql_ddl_compiler:mk_helper_m2(DDL),
+               {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
                Got = Module:get_ddl(),
                %% ?debugFmt("in ~p~n- Got is:~n -~p~n", [Name, Got]),
                ?assertEqual(DDL, Got)).
@@ -118,70 +118,51 @@
 %% round trip passing tests
 %%
 
+-define(GOOD_DDL,
+        "create table temperatures ("
+        " user_id varchar not null,"
+        " user_di varchar not null,"
+        " time timestamp not null,"
+        " primary key ((user_id, user_di, quantum(time, 1, 'm')), user_id, user_di, time))").
+-define(GOOD_DDL_INT,
+        "create table temperatures ("
+        " user_id varchar not null,"
+        " counter sint64 not null, "
+        " time timestamp not null,"
+        " primary key ((user_id, counter, quantum(time, 1, 'm')), user_id, counter, time))").
+-define(GOOD_DDL_DOUBLE,
+        "create table temperatures ("
+        " user_id varchar not null,"
+        " bouble double not null, "
+        " time timestamp not null,"
+        " primary key ((user_id, bouble, quantum(time, 1, 'm')), user_id, bouble, time))").
+
 ?passing_test(round_trip_test,
-              "create table temperatures " ++
-                  "(time timestamp not null, " ++
-                  "user_id varchar not null, " ++
-                  "primary key (time, user_id))",
-              {12345, <<"beeees">>},
-              [{timestamp, 12345}, {varchar, <<"beeees">>}],
-              [{timestamp, 12345}, {varchar, <<"beeees">>}]).
+              ?GOOD_DDL,
+              {<<"beeees">>, <<"boooos">>, 12345},
+              [{varchar, <<"beeees">>}, {varchar, <<"boooos">>}, {timestamp, 0}],
+              [{varchar, <<"beeees">>}, {varchar, <<"boooos">>}, {timestamp, 12345}]).
 
 ?passing_short_test(sint64_type_test,
-                    "create table temperatures "
-                    "(counter sint64 not null, "
-                    "primary key (counter))",
-              {12345}).
+                    ?GOOD_DDL_INT,
+                    { <<"boooos">>, 12345, 222222222}).
 
-?passing_short_test(double_test,
-                    "create table temperatures "
-                    "(real_counter double not null, "
-                    "primary key (real_counter))",
-              {12345.6}).
+?passing_short_test(double_type_test,
+                    ?GOOD_DDL_DOUBLE,
+                    { <<"boooos">>, 12345.6, 222222222}).
 
 ?failing_test(round_trip_fail_test,
-              "create table temperatures " ++
-                  "(time timestamp not null, " ++
-                  "user_id varchar not null, " ++
-                  "primary key (time, user_id))",
+              ?GOOD_DDL,
               {<<"banjette">>, <<"beeees">>}).
-
-?passing_test(no_partition_key_test,
-              "create table temperatures " ++
-                  "(time timestamp not null, " ++
-                  "user_id varchar not null, " ++
-                  "primary key (time, user_id))",
-              {12345, <<"beeees">>},
-              [{timestamp, 12345}, {varchar, <<"beeees">>}],
-              [{timestamp, 12345}, {varchar, <<"beeees">>}]).
 
 %%
 %% roundtrip DDL tests
 %%
 ?ddl_roundtrip_assert(round_trip_ddl_test,
-              "create table temperatures " ++
-                  "(time timestamp not null, " ++
-                  "user_id varchar not null, " ++
-                  "primary key (time, user_id))").
+                      ?GOOD_DDL).
 
 ?ddl_roundtrip_assert(sint64_type_ddl_test,
-                    "create table temperatures "
-                    "(counter sint64 not null, "
-                    "primary key (counter))").
+                      ?GOOD_DDL_INT).
 
 ?ddl_roundtrip_assert(double_ddl_test,
-                    "create table temperatures "
-                    "(real_counter double not null, "
-                    "primary key (real_counter))").
-
-?ddl_roundtrip_assert(round_trip_ddl_2_test,
-              "create table temperatures " ++
-                  "(time timestamp not null, " ++
-                  "user_id varchar not null, " ++
-                  "primary key (time, user_id))").
-
-?ddl_roundtrip_assert(no_partition_key_ddl_test,
-              "create table temperatures " ++
-                  "(time timestamp not null, " ++
-                  "user_id varchar not null, " ++
-                  "primary key (time, user_id))").
+                      ?GOOD_DDL_DOUBLE).

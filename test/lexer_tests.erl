@@ -1,6 +1,9 @@
-%% -*- erlang -*-
+-module(lexer_tests).
+
+-compile([export_all]).
+
 -include_lib("eunit/include/eunit.hrl").
--compile(export_all).
+-include("riak_ql_ddl.hrl").
 
 %% Tests
 keywords_1_test_() ->
@@ -14,56 +17,35 @@ keywords_2_test_() ->
     ?_assertEqual([{select, <<"seLEct">>}], Got).
 
 keywords_3_test_() ->
-    Got = riak_ql_lexer:get_tokens("from LiMit Where anD oR delETe DROP Groupby MeRge InneR JOIn As"),
+    Got = riak_ql_lexer:get_tokens("from LiMit Where anD oR"),
     Expected = [
                 {from,    <<"from">>},
                 {limit,   <<"LiMit">>},
                 {where,   <<"Where">>},
                 {and_,    <<"anD">>},
-                {or_,     <<"oR">>},
-                {delete,  <<"delETe">>},
-                {drop,    <<"DROP">>},
-                {groupby, <<"Groupby">>},
-                {merge,   <<"MeRge">>},
-                {inner,   <<"InneR">>},
-                {join,    <<"JOIn">>},
-                {as,      <<"As">>}
+                {or_,     <<"oR">>}
                ],
     ?_assertEqual(Expected, Got).
 
 keywords_3a_test_() ->
-    Got = riak_ql_lexer:get_tokens("from limit where and or delete drop groupby merge inner join as"),
+    Got = riak_ql_lexer:get_tokens("from limit where and or"),
     Expected = [
                 {from,    <<"from">>},
                 {limit,   <<"limit">>},
                 {where,   <<"where">>},
                 {and_,    <<"and">>},
-                {or_,     <<"or">>},
-                {delete,  <<"delete">>},
-                {drop,    <<"drop">>},
-                {groupby, <<"groupby">>},
-                {merge,   <<"merge">>},
-                {inner,   <<"inner">>},
-                {join,    <<"join">>},
-                {as,      <<"as">>}
+                {or_,     <<"or">>}
                ],
     ?_assertEqual(Expected, Got).
 
 keywords_3b_test_() ->
-    Got = riak_ql_lexer:get_tokens("FROM LIMIT WHERE AND OR DELETE DROP GROUPBY MERGE INNER JOIN AS"),
+    Got = riak_ql_lexer:get_tokens("FROM LIMIT WHERE AND OR"),
     Expected = [
                 {from,    <<"FROM">>},
                 {limit,   <<"LIMIT">>},
                 {where,   <<"WHERE">>},
                 {and_,    <<"AND">>},
-                {or_,     <<"OR">>},
-                {delete,  <<"DELETE">>},
-                {drop,    <<"DROP">>},
-                {groupby, <<"GROUPBY">>},
-                {merge,   <<"MERGE">>},
-                {inner,   <<"INNER">>},
-                {join,    <<"JOIN">>},
-                {as,      <<"AS">>}
+                {or_,     <<"OR">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -72,12 +54,9 @@ keyword_general_test_() ->
        [
         {boolean, <<"boolean">>},
         {boolean, <<"BOOLEAN">>},
-        {boolean, <<"booLEan">>},
-        {any, <<"any">>},
-        {any, <<"ANY">>},
-        {any, <<"Any">>}
+        {boolean, <<"booLEan">>}
        ],
-       riak_ql_lexer:get_tokens("boolean BOOLEAN booLEan any ANY Any")
+       riak_ql_lexer:get_tokens("boolean BOOLEAN booLEan ")
       ).
 
 
@@ -182,21 +161,21 @@ negative_sci_floats_in_character_literals_test_() ->
 ops_test_() ->
     Got = riak_ql_lexer:get_tokens("> < <> != !~ = =~"),
     Expected = [
-                {gt,        <<">">>},
-                {lt,        <<"<">>},
-                {ne,        <<"<>">>},
-                {nomatch,   <<"!=">>},
-                {notapprox, <<"!~">>},
-                {eq,        <<"=">>},
-                {approx,    <<"=~">>}
+                {greater_than_operator, <<">">>},
+                {less_than_operator,    <<"<">>},
+                {ne,                    <<"<>">>},
+                {nomatch,               <<"!=">>},
+                {notapprox,             <<"!~">>},
+                {equals_operator,       <<"=">>},
+                {approx,                <<"=~">>}
                ],
     ?_assertEqual(Expected, Got).
 
 brackets_test_() ->
     Got = riak_ql_lexer:get_tokens(" ( )"),
     Expected = [
-                {openb,  <<"(">>},
-                {closeb, <<")">>}
+                {left_paren,  <<"(">>},
+                {right_paren, <<")">>}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -238,35 +217,6 @@ keywords_in_words_test_() ->
                 {identifier, <<"myboolean">>},
                 {identifier, <<"mycreate">>},
                 {identifier, <<"myany">>}
-               ],
-    ?_assertEqual(Expected, Got).
-
-datetime_1a_test_() ->
-    Got = riak_ql_lexer:get_tokens("'23 April 1963 8:00 AM'"),
-    Expected = [
-                {datetime, {{1963, 4, 23}, {8, 0, 0}}}
-               ],
-    ?_assertEqual(Expected, Got).
-
-datetime_1b_test_() ->
-    Got = riak_ql_lexer:get_tokens("'  23   April 1963 8:00 AM  '"),
-    Expected = [
-                {datetime, {{1963, 4, 23}, {8, 0, 0}}}
-               ],
-    ?_assertEqual(Expected, Got).
-
-%% this test can never pass becuz the date parser substitutes the H:M:s from now() if there is not time in the string
-%% datetime_1c_test_() ->
-%%     Got = riak_ql_lexer:get_tokens("'2013-08-13'"),
-%%     Expected = [
-%%              {datetime, {{2013, 8, 13}, {0, 0, 0}}}
-%%             ],
-%%     ?_assertEqual(Expected, Got).
-
-datetime_1d_test_() ->
-    Got = riak_ql_lexer:get_tokens("'2013-08-12 23:32:01'"),
-    Expected = [
-                {datetime, {{2013, 8, 12}, {23, 32, 1}}}
                ],
     ?_assertEqual(Expected, Got).
 
@@ -341,11 +291,16 @@ chars_test_() ->
 arithmatic_test_() ->
     Got = riak_ql_lexer:get_tokens(" + - * / "),
     Expected = [
-                {plus,       <<"+">>},
-                {minus,      <<"-">>},
-                {maybetimes, <<"*">>},
-                {div_,       <<"/">>}
+                {plus_sign,     <<"+">>},
+                {minus_sign,    <<"-">>},
+                {asterisk, <<"*">>},
+                {solidus,       <<"/">>}
                ],
+    ?_assertEqual(Expected, Got).
+
+semicolon_test_() ->
+    Expected = [{semicolon, <<";">>}],
+    Got = riak_ql_lexer:get_tokens(";"),
     ?_assertEqual(Expected, Got).
 
 general_test_() ->
@@ -357,8 +312,8 @@ general_test_() ->
                 {identifier, <<"r_t">>},
                 {where, <<"where">>},
                 {identifier, <<"time">>},
-                {gt, <<">">>},
-                {datetime, {{63, 4, 23}, {1, 2, 3}}}
+                {greater_than_operator, <<">">>},
+                {character_literal, <<"23 April 63 1:2:3">>}
                ],
     io:format("Expected is ~p~n", [Expected]),
     io:format("Got is ~p~n", [Got]),
@@ -376,7 +331,7 @@ timeseries_test_() ->
                 {create, <<"CREATE">>},
                 {table, <<"TABLE">>},
                 {identifier,<<"Geo">>},
-                {openb, <<"(">>},
+                {left_paren, <<"(">>},
                 {identifier,<<"geohash">>},
                 {varchar, <<"varchar">>},
                 {identifier,<<"not_null">>},
@@ -399,34 +354,70 @@ timeseries_test_() ->
                 {comma, <<",">>},
                 {primary, <<"PRIMARY">>},
                 {key, <<"KEY">>},
-                {openb, <<"(">>},
-                {openb, <<"(">>},
+                {left_paren, <<"(">>},
+                {left_paren, <<"(">>},
                 {identifier,<<"geohash">>},
                 {comma, <<",">>},
                 {quantum, <<"quantum">>},
-                {openb, <<"(">>},
+                {left_paren, <<"(">>},
                 {identifier,<<"time">>},
                 {comma, <<",">>},
                 {integer,15},
                 {comma, <<",">>},
                 {identifier,<<"m">>},
-                {closeb, <<")">>},
+                {right_paren, <<")">>},
                 {comma, <<",">>},
                 {identifier,<<"time">>},
                 {comma, <<",">>},
                 {identifier,<<"user">>},
-                {closeb, <<")">>}
+                {right_paren, <<")">>}
                ],
     ?_assertEqual(Expected, Got).
 
-unquoted_identifiers_test() ->
+unquoted_identifiers_test_() ->
     String = "cats = be a st",
     Got = riak_ql_lexer:get_tokens(String),
     Expected = [
                 {identifier, <<"cats">>},
-                {eq, <<"=">>},
+                {equals_operator, <<"=">>},
                 {identifier, <<"be">>},
                 {identifier, <<"a">>},
                 {identifier, <<"st">>}
                ],
     ?_assertEqual(Expected, Got).
+
+symbols_in_identifier_1_test_() ->
+    ?_assertError(
+        <<"Unexpected token '^'.">>,
+        riak_ql_lexer:get_tokens(
+            "CREATE TABLE ^ ("
+            "time TIMESTAMP NOT NULL, "
+            "family VARCHAR NOT NULL, "
+            "series VARCHAR NOT NULL, "
+            "PRIMARY KEY "
+            " ((family, series, quantum(time, 15, 's')), family, series, time))")
+    ).
+
+symbols_in_identifier_2_test_() ->
+    ?_assertError(
+        <<"Unexpected token '&'.">>,
+        riak_ql_lexer:get_tokens("klsdafj kljfd (*((*& 89& 8KHH kJHkj hKJH K K")
+    ).
+
+symbols_in_identifier_3_test_() ->
+    ?_assertError(
+        <<"Unexpected token '$'.">>,
+        riak_ql_lexer:get_tokens(
+            "CREATE TABLE mytable ("
+            "time TIMESTAMP NOT NULL, "
+            "family $ NOT NULL, "
+            "series VARCHAR NOT NULL, "
+            "PRIMARY KEY "
+            " ((family, series, quantum(time, 15, 's')), family, series, time))")
+    ).
+
+symbols_in_identifier_4_test_() ->
+    ?_assertError(
+        <<"Unexpected token ']'.">>,
+        riak_ql_lexer:get_tokens("select ] from a")
+    ).

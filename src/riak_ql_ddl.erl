@@ -40,9 +40,10 @@
 %% so this function can be called out to to pick
 %% apart the DDL records
 
--export([get_local_key/2]).
--export([get_partition_key/2]).
+-export([get_local_key/2, get_local_key/3]).
+-export([get_partition_key/2, get_partition_key/3]).
 -export([is_query_valid/3]).
+%%-export([get_return_types_and_col_names/2]).
 -export([make_key/3]).
 -export([syntax_error_to_msg/1]).
 
@@ -51,7 +52,8 @@
         {incompatible_type, Field::binary(), simple_field_type(), atom()} |
         {incompatible_operator, Field::binary(), simple_field_type(), relational_op()}  |
         {unexpected_where_field, Field::binary()} |
-        {unexpected_select_field, Field::binary()}.
+        {unexpected_select_field, Field::binary()} |
+        {selections_cant_be_blank, []}.
 
 -export_type([query_syntax_error/0]).
 
@@ -65,14 +67,14 @@
 -define(CANTBEBLANK, false).
 
 -spec make_module_name(Table::binary()) ->
-            module().
+                              module().
 %% @doc Generate a unique module name for Table at version 1. @see
 %%      make_module_name/2.
 make_module_name(Table) ->
     make_module_name(Table, 1).
 
 -spec make_module_name(Table::binary(), Version::integer()) ->
-            module().
+                              module().
 %% @doc Generate a unique, but readable and recognizable, module name
 %%      for Table at a certain Version, by 'escaping' non-ascii chars
 %%      in Table a la C++.
@@ -90,19 +92,29 @@ maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
 
--spec get_partition_key(#ddl_v1{}, tuple()) -> term().
-get_partition_key(#ddl_v1{table = T, partition_key = PK}, Obj)
+-spec get_partition_key(#ddl_v1{}, tuple(), module()) -> term().
+get_partition_key(#ddl_v1{partition_key = PK}, Obj, Mod)
   when is_tuple(Obj) ->
-    Mod = make_module_name(T),
     #key_v1{ast = Params} = PK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_local_key(#ddl_v1{}, tuple()) -> term().
-get_local_key(#ddl_v1{table = T, local_key = LK}, Obj)
+-spec get_partition_key(#ddl_v1{}, tuple()) -> term().
+get_partition_key(#ddl_v1{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
+    get_partition_key(DDL, Obj, Mod).
+
+-spec get_local_key(#ddl_v1{}, tuple(), module()) -> term().
+get_local_key(#ddl_v1{local_key = LK}, Obj, Mod)
+  when is_tuple(Obj) ->
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
+
+-spec get_local_key(#ddl_v1{}, tuple()) -> term().
+get_local_key(#ddl_v1{table = T}=DDL, Obj)
+  when is_tuple(Obj) ->
+    Mod = make_module_name(T),
+    get_local_key(DDL, Obj, Mod).
 
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
 make_key(_Mod, none, _Vals) -> [];
@@ -162,12 +174,17 @@ convert([Constant | T], Obj, Mod, Acc) ->
 %% Convert an error emmitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
 -spec syntax_error_to_msg(query_syntax_error()) ->
-            Msg::binary().
+                                 Msg::binary().
 syntax_error_to_msg(E) ->
-        {Fmt, Args} = syntax_error_to_msg2(E),
-        iolist_to_binary(io_lib:format(Fmt, Args)).
+    {Fmt, Args} = syntax_error_to_msg2(E),
+    iolist_to_binary(io_lib:format(Fmt, Args)).
 
 %%
+syntax_error_to_msg2({type_check_failed, Fn, Arity, ExprTypes}) ->
+    {"Function ~s/~p called with arguments of the wrong type ~p.", 
+      [unquote_fn(Fn), Arity, ExprTypes]};
+syntax_error_to_msg2({fn_called_with_wrong_arity, Fn, Arity, NumArgs}) ->
+    {"Function ~s/~p called with ~p arguments.", [unquote_fn(Fn), Arity, NumArgs]};
 syntax_error_to_msg2({bucket_type_mismatch, B1, B2}) ->
     {"bucket_type_mismatch: DDL bucket type was ~s "
      "but query selected from bucket type ~s.", [B1, B2]};
@@ -182,38 +199,49 @@ syntax_error_to_msg2({unexpected_where_field, Field}) ->
      [Field]};
 syntax_error_to_msg2({unexpected_select_field, Field}) ->
     {"unexpected_select_field: unexpected field ~s in select clause.",
-     [Field]}.
+     [Field]};
+syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
+    {"subexpressions_not_supported: expressions in where clause operators"
+     " (~s ~s ...) are not supported.",
+     [Field, Op]};
+syntax_error_to_msg2({unknown_column_type, Other}) ->
+    {"Unexpected select column type ~p.", [Other]}.
 
--spec is_query_valid(module(), #ddl_v1{}, #riak_sql_v1{}) ->
-        true | {false, [query_syntax_error()]}.
-is_query_valid(_,
-                   #ddl_v1{ table = T1 },
-               #riak_sql_v1{ 'FROM' = T2 }) when T1 =/= T2 ->
+%% An atom with upper case chars gets printed as 'COUNT' so remove the
+%% quotes to make the error message more reable.
+unquote_fn(Fn) when is_atom(Fn) ->
+    string:strip(atom_to_list(Fn), both, $').
+
+-spec is_query_valid(module(), #ddl_v1{}, ?SQL_SELECT{}) ->
+                            true | {false, [query_syntax_error()]}.
+is_query_valid(_, #ddl_v1{ table = T1 },
+               ?SQL_SELECT{ 'FROM' = T2 }) when T1 =/= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _,
-               #riak_sql_v1{'SELECT' = Selection,
-               'WHERE'  = Where}) ->
+               ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = Selection},
+                           'WHERE'  = Where}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
 
 %%
-is_query_valid_result(true,       true)        -> true;
-is_query_valid_result(true,       {false, L})  -> {false, L};
-is_query_valid_result({false,L},  true)        -> {false, L};
-is_query_valid_result({false,L1}, {false, L2}) -> {false, L1++L2}.
+is_query_valid_result(true,        true)        -> true;
+is_query_valid_result(true,        {false, L})  -> {false, L};
+is_query_valid_result({false, L},  true)        -> {false, L};
+is_query_valid_result({false, L1}, {false, L2}) -> {false, L1 ++ L2}.
 
+-spec check_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
 check_filters_valid(Mod, Where) ->
     Errors = fold_where_tree(Where, [],
-        fun(Clause, Acc) ->
-            is_filters_field_valid(Mod, Clause, Acc)
-        end),
+                             fun(Clause, Acc) ->
+                                     is_filters_field_valid(Mod, Clause, Acc)
+                             end),
     case Errors of
         [] -> true;
         _  -> {false, Errors}
     end.
 
-%%
+%% the terminal case of "a = 2"
 is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
     case Mod:is_field_valid([Field]) of
         true  ->
@@ -228,16 +256,55 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
             end;
         false ->
             [{unexpected_where_field, Field} | Acc1]
-    end.
+    end;
+%% the case where RHS is an expression on its own (LHS must still be a valid field)
+is_filters_field_valid(_Mod, {Op, Field, {_RHS_op, _RHS_lhs_bare_value, _RHS_rhs}}, Acc1) ->
+    [{subexpressions_not_supported, Field, Op} | Acc1].
+%% andreiz: The code below would check for type compatibility
+%% between field and expression, if subexpressions were
+%% supported. Currently (2015-12-03), the query rewrite code in
+%% riak_kv_qry_compiler cannot deal with subexpressions.  Uncomment
+%% and edit the following when it does.
+
+%% case Mod:is_field_valid([Field]) of
+%%     true  ->
+%%         ExpectedType = Mod:get_field_type([Field]),
+%%         %% the lexer happens to have no type attached to LHS, even
+%%         %% when it's not a field but an rvalue; just assume it is
+%%         %% the type of the field at the root of the expression
+%%         RHS_lhs = maybe_assign_type(RHS_lhs_bare_value, ExpectedType),
+
+%%         %% this is the case of "A = 3 + 2":
+%%         %% * check that A is compatible with 3 and 2 on '='
+%%         %% * check that A is compatible with 3 and 2 on '+'
+%%         lists:append(
+%%           [is_filters_field_valid(Mod, {Op,     Field, RHS_lhs}, []),
+%%            is_filters_field_valid(Mod, {Op,     Field, RHS_rhs}, []),
+%%            is_filters_field_valid(Mod, {RHS_op, Field, RHS_lhs}, []),
+%%            is_filters_field_valid(Mod, {RHS_op, Field, RHS_rhs}, []) | Acc1]);
+%%     false ->
+%%         [{unexpected_where_field, Field} | Acc1]
+%% end.
+%%
+%% maybe_assign_type({_Type, _Value} = AlreadyTyped, _AttributedType) ->
+%%     AlreadyTyped;
+%% maybe_assign_type(BareValue, FieldType) ->
+%%     {lexer_type_of(FieldType), BareValue}.
+%%
+%% lexer_type_of(timestamp) -> integer;
+%% lexer_type_of(boolean)   -> boolean;
+%% lexer_type_of(sint64)    -> integer;
+%% lexer_type_of(double)    -> float;
+%% lexer_type_of(varchar)   -> binary.
 
 normalise(Bin) when is_binary(Bin) ->
     string:to_lower(binary_to_list(Bin));
 normalise(X) -> X.
 
-%% Check if the column type and the value being being compared
+%% Check if the column type and the value being compared
 %% are comparable.
 -spec is_compatible_type(ColType::atom(), WhereType::atom(), any()) ->
-        boolean().
+                                boolean().
 is_compatible_type(timestamp, integer, _)       -> true;
 is_compatible_type(boolean,   boolean,  true)   -> true;
 is_compatible_type(boolean,   boolean,  false)  -> true;
@@ -249,8 +316,8 @@ is_compatible_type(_, _, _) -> false.
 %% Check that the operation being performed in a where clause, for example
 %% we cannot check if one binary is greated than another one in SQL.
 -spec is_compatible_operator(OP::relational_op(),
-                                 ExpectedType::simple_field_type(),
-                                 RHS_type::atom()) -> boolean().
+                             ExpectedType::simple_field_type(),
+                             RHS_type::atom()) -> boolean().
 is_compatible_operator('=',  varchar, binary) -> true;
 is_compatible_operator('!=', varchar, binary) -> true;
 is_compatible_operator(_,    varchar, binary) -> false;
@@ -259,20 +326,44 @@ is_compatible_operator('!=', boolean, boolean)-> true;
 is_compatible_operator(_,    boolean, boolean)-> false;
 is_compatible_operator(_,_,_)                 -> true.
 
+-spec are_selections_valid(module(), [selection()], boolean()) ->
+                                  true | {false, [query_syntax_error()]}.
 are_selections_valid(_, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
 are_selections_valid(Mod, Selections, _) ->
-    CheckFn = fun(X, {Acc, Status}) ->
-                      case Mod:is_field_valid(X) of
-                          true  -> {Acc, Status};
-                          false -> Msg = {unexpected_select_field, hd(X)},
-                                   {[Msg | Acc], false}
-                      end
-              end,
-    case lists:foldl(CheckFn, {[], true}, Selections) of
-        {[],   true}  -> true;
-        {Msgs, false} -> {false, lists:reverse(Msgs)}
+    CheckFn =
+        fun(E, Acc) ->
+                is_selection_column_valid(Mod, E, Acc)
+        end,
+    case lists:foldl(CheckFn, [], Selections) of
+        []     -> true;
+        Errors -> {false, lists:reverse(Errors)}
     end.
+
+%% Reported error types must be supported by the function syntax_error_to_msg2
+is_selection_column_valid(Mod, {identifier, X}, Acc) ->
+    case Mod:is_field_valid(X) of
+        true  ->
+            Acc;
+        false ->
+            [{unexpected_select_field, hd(X)} | Acc]
+    end;
+is_selection_column_valid(_, {{window_agg_fn, Fn}, Args}, Acc) ->
+    ArgLen = length(Args),
+    case riak_ql_window_agg_fns:fn_arity(Fn) == ArgLen of
+        false ->
+            [{fn_called_with_wrong_arity, Fn, 1, length(Args)} | Acc];
+        true ->
+            Acc
+    end;
+is_selection_column_valid(_, {Type, _}, Acc) when is_atom(Type) ->
+    %% literal types, integer double etc.
+    Acc;
+is_selection_column_valid(_, {Op, _, _}, Acc) when is_atom(Op) ->
+    %% arithmetic
+    Acc;
+is_selection_column_valid(_, Other, Acc) ->
+    [{unknown_column_type, Other} | Acc].
 
 %% Fold over the syntax tree for a where clause.
 fold_where_tree([], Acc, _) ->
@@ -334,7 +425,7 @@ simplest_partition_key_test() ->
                                    type     = varchar}
                    ],
                    PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {Name},
     Result = (catch get_partition_key(DDL, Obj)),
     ?assertEqual([{varchar, Name}], Result).
@@ -359,7 +450,7 @@ simple_partition_key_test() ->
                                    type     = varchar}
                    ],
                    PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {<<"one">>, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
     ?assertEqual([{varchar, <<"three">>}, {varchar, <<"one">>}], Result).
@@ -392,7 +483,7 @@ function_partition_key_test() ->
                                    type     = varchar}
                    ],
                    PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {1234567890, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
     %% Yes the mock partition function is actually computed
@@ -465,7 +556,7 @@ complex_partition_key_test() ->
                                    type     = Map1}
                    ],
                    PK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {{2, {3}, {4}}},
     Result = (catch get_partition_key(DDL, Obj)),
     Expected = [{sint64, 2}, {poodle, mock_result}, {wombat, mock_result}],
@@ -490,7 +581,7 @@ local_key_test() ->
                                    type     = varchar}
                    ],
                    PK, LK),
-    {module, _Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {Name},
     Result = (catch get_local_key(DDL, Obj)),
     ?assertEqual([{varchar, Name}], Result).
@@ -517,7 +608,7 @@ simple_valid_map_get_type_1_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Result = (catch Module:get_field_type([<<"erko">>, <<"yarple">>])),
     ?assertEqual(sint64, Result).
 
@@ -539,7 +630,7 @@ simple_valid_map_get_type_2_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Result = (catch Module:get_field_type([<<"erko">>])),
     ?assertEqual(map, Result).
 
@@ -571,7 +662,7 @@ complex_valid_map_get_type_test() ->
                                    position = 1,
                                    type     = Map1}
                    ]),
-    {module, Module} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Path = [<<"Top_Map">>, <<"Level_1_map1">>, <<"in_Map_1">>],
     Res = (catch Module:get_field_type(Path)),
     ?assertEqual(sint64, Res).
@@ -601,7 +692,7 @@ make_plain_key_test() ->
             {<<"user">>, <<"user_1">>},
             {<<"time">>, Time}
            ],
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Got = make_key(Mod, Key, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, Time}],
     ?assertEqual(Expected, Got).
@@ -635,18 +726,17 @@ make_functional_key_test() ->
             {<<"user">>, <<"user_1">>},
             {<<"time">>, Time}
            ],
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Got = make_key(Mod, Key, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
     ?assertEqual(Expected, Got).
-
 
 %%
 %% Validate Query Tests
 %%
 
 partial_wildcard_are_selections_valid_test() ->
-    Selections  = [[<<"*">>]],
+    Selections  = [{identifier, [<<"*">>]}],
     DDL = make_ddl(<<"partial_wildcard_are_selections_valid_test">>,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -656,13 +746,13 @@ partial_wildcard_are_selections_valid_test() ->
                                    position = 2,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
-        true,
-        are_selections_valid(Mod, Selections, ?CANTBEBLANK)
-    ).
+       true,
+       are_selections_valid(Mod, Selections, ?CANTBEBLANK)
+      ).
 
-% FIXME this cannot happen because SQL without selections cannot be lexed
+%% FIXME this cannot happen because SQL without selections cannot be lexed
 partial_are_selections_valid_fail_test() ->
     Selections  = [],
     DDL = make_ddl(<<"partial_are_selections_valid_fail_test">>,
@@ -674,11 +764,11 @@ partial_are_selections_valid_fail_test() ->
                                    position = 2,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
-        {false, [{selections_cant_be_blank, []}]},
-        are_selections_valid(Mod, Selections, ?CANTBEBLANK)
-    ).
+       {false, [{selections_cant_be_blank, []}]},
+       are_selections_valid(Mod, Selections, ?CANTBEBLANK)
+      ).
 
 %%
 %% Query Validation tests
@@ -686,9 +776,9 @@ partial_are_selections_valid_fail_test() ->
 
 simple_is_query_valid_test() ->
     Bucket = <<"simple_is_query_valid_test">>,
-    Selections  = [[<<"temperature">>], [<<"geohash">>]],
-    Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections},
+    Selections  = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
+    Query = ?SQL_SELECT{'FROM'   = Bucket,
+                        'SELECT' = #riak_sel_clause_v1{clause = Selections}},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -698,20 +788,21 @@ simple_is_query_valid_test() ->
                                    position = 2,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
-        true,
-        riak_ql_ddl:is_query_valid(Mod, DDL, Query)
-    ).
+       true,
+       riak_ql_ddl:is_query_valid(Mod, DDL, Query)
+      ).
 
 simple_is_query_valid_map_test() ->
     Bucket = <<"simple_is_query_valid_map_test">>,
     Name0 = <<"name">>,
     Name1 = <<"temp">>,
     Name2 = <<"geo">>,
-    Selections  = [[<<"temp">>, <<"geo">>], [<<"name">>]],
-    Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections},
+    Selections  = [{identifier, [<<"temp">>, <<"geo">>]},
+                   {identifier, [<<"name">>]}],
+    Query = ?SQL_SELECT{'FROM'   = Bucket,
+                        'SELECT' = #riak_sel_clause_v1{clause = Selections}},
     Map = {map, [
                  #riak_field_v1{name     = Name2,
                                 position = 1,
@@ -726,20 +817,20 @@ simple_is_query_valid_map_test() ->
                                    position = 2,
                                    type     = Map}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
-        true,
-        riak_ql_ddl:is_query_valid(Mod, DDL, Query)
-    ).
+       true,
+       riak_ql_ddl:is_query_valid(Mod, DDL, Query)
+      ).
 
 simple_is_query_valid_map_wildcard_test() ->
     Bucket = <<"simple_is_query_valid_map_wildcard_test">>,
     Name0 = <<"name">>,
     Name1 = <<"temp">>,
     Name2 = <<"geo">>,
-    Selections  = [[<<"temp">>, <<"*">>], [<<"name">>]],
-    Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections},
+    Selections  = [{identifier, [<<"temp">>, <<"*">>]}, {identifier, [<<"name">>]}],
+    Query = ?SQL_SELECT{'FROM'   = Bucket,
+                        'SELECT' = #riak_sel_clause_v1{clause = Selections}},
     Map = {map, [
                  #riak_field_v1{name     = Name2,
                                 position = 1,
@@ -754,27 +845,27 @@ simple_is_query_valid_map_wildcard_test() ->
                                    position = 2,
                                    type     = Map}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
-        true,
-        riak_ql_ddl:is_query_valid(Mod, DDL, Query)
-    ).
+       true,
+       riak_ql_ddl:is_query_valid(Mod, DDL, Query)
+      ).
 
 %%
 %% Tests for queries with non-null filters
 %%
 simple_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
-    Selections = [[<<"temperature">>], [<<"geohash">>]],
+    Selections = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
     Where = [
              {and_,
               {'>', <<"temperature">>, {integer, 1}},
               {'<', <<"temperature">>, {integer, 15}}
              }
             ],
-    Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections,
-                         'WHERE'  = Where},
+    Query = ?SQL_SELECT{'FROM'   = Bucket,
+                        'SELECT' = #riak_sel_clause_v1{clause = Selections},
+                        'WHERE'  = Where},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -784,13 +875,13 @@ simple_filter_query_test() ->
                                    position = 2,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
 
 full_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
-    Selections = [[<<"temperature">>]],
+    Selections = [{identifier, [<<"temperature">>]}],
     Where = [
              {and_,
               {'>', <<"temperature">>, {integer, 1}},
@@ -802,9 +893,9 @@ full_filter_query_test() ->
                  {'<=', <<"lte field">>,  {integer, 15}},
                  {'>=', <<"gte field">>,  {integer, 15}}}}}}
             ],
-    Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections,
-                         'WHERE'  = Where},
+    Query = ?SQL_SELECT{'FROM'   = Bucket,
+                        'SELECT' = #riak_sel_clause_v1{clause = Selections},
+                        'WHERE'  = Where},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -820,14 +911,14 @@ full_filter_query_test() ->
                                    position = 4,
                                    type     = sint64}
                    ]),
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     ?assertEqual(true, Res).
 
 
 timeseries_filter_test() ->
     Bucket = <<"timeseries_filter_test">>,
-    Selections = [[<<"weather">>]],
+    Selections = [{identifier, [<<"weather">>]}],
     Where = [
              {and_,
               {and_,
@@ -838,9 +929,9 @@ timeseries_filter_test() ->
               }
              }
             ],
-    Query = #riak_sql_v1{'FROM'   = Bucket,
-                         'SELECT' = Selections,
-                         'WHERE'  = Where},
+    Query = ?SQL_SELECT{'FROM'   = Bucket,
+                        'SELECT' = #riak_sel_clause_v1{clause = Selections},
+                        'WHERE'  = Where},
     Fields = [
               #riak_field_v1{name     = <<"geohash">>,
                              position = 1,
@@ -881,193 +972,260 @@ timeseries_filter_test() ->
                   partition_key = PK,
                   local_key     = LK
                  },
-    {module, Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     Expected = true,
     ?assertEqual(Expected, Res).
 
 test_parse(SQL) ->
     element(2,
-        riak_ql_parser:parse(
-            riak_ql_lexer:get_tokens(SQL))).
+            riak_ql_parser:parse(
+              riak_ql_lexer:get_tokens(SQL))).
 
 is_query_valid_test_helper(Table_name, Table_def, Query) ->
     Mod_name = make_module_name(iolist_to_binary(Table_name)),
     catch code:purge(Mod_name),
     catch code:purge(Mod_name),
     DDL = test_parse(Table_def),
-    % ?debugFmt("QUERY is ~p", [test_parse(Query)]),
-    {module,Mod} = riak_ql_ddl_compiler:make_helper_mod(DDL),
+    %% ?debugFmt("QUERY is ~p", [test_parse(Query)]),
+    {module,Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     is_query_valid(Mod, DDL, test_parse(Query)).
 
 -define(LARGE_TABLE_DEF,
-    "CREATE TABLE mytab"
-    "   (myfamily    VARCHAR   NOT NULL, "
-    "    myseries    VARCHAR   NOT NULL, "
-    "    time        TIMESTAMP NOT NULL, "
-    "    weather     VARCHAR   NOT NULL, "
-    "    temperature DOUBLE, "
-    "    PRIMARY KEY ((QUANTUM(time, 15, 'm'), myfamily, myseries), "
-    "    time, myfamily, myseries))"
-).
+        "CREATE TABLE mytab"
+        "   (myfamily    VARCHAR   NOT NULL, "
+        "    myseries    VARCHAR   NOT NULL, "
+        "    time        TIMESTAMP NOT NULL, "
+        "    weather     VARCHAR   NOT NULL, "
+        "    temperature DOUBLE, "
+        "    PRIMARY KEY ((myfamily, myseries, QUANTUM(time, 15, 'm')), "
+        "    myfamily, myseries, time))"
+       ).
 
 is_query_valid_1_test() ->
     ?assertEqual(
-        true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 10 AND time < 11")
-    ).
+       true,
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 10 AND time < 11")
+      ).
 
 is_query_valid_3_test() ->
     ?assertEqual(
-        true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 10 AND time < 11"
-            "AND myseries = 'bob'")
-    ).
+       true,
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 10 AND time < 11"
+                                  "AND myseries = 'bob'")
+      ).
 
 is_query_valid_4_test() ->
     ?assertEqual(
-        true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 10 AND time < 11"
-            "AND myseries != 'bob'")
-    ).
+       true,
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 10 AND time < 11"
+                                  "AND myseries != 'bob'")
+      ).
 
 is_query_valid_where_1_test() ->
     ?assertEqual(
-        {false, [
-            {unexpected_where_field, <<"locname">>}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 10 AND time < 11 AND locname = 1")
-    ).
+       {false, [
+                {unexpected_where_field, <<"locname">>}]},
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 10 AND time < 11 AND locname = 1")
+      ).
 
 is_query_valid_where_2_test() ->
     ?assertEqual(
-        {false, [
-            {incompatible_type, <<"myseries">>, varchar, integer}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 1 AND time < 10 "
-            "AND myfamily = 'family1' "
-            "AND myseries = 10 ")
-    ).
+       {false, [
+                {incompatible_type, <<"myseries">>, varchar, integer}]},
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 1 AND time < 10 "
+                                  "AND myfamily = 'family1' "
+                                  "AND myseries = 10 ")
+      ).
 
 is_query_valid_where_3_test() ->
     ?assertEqual(
-        {false, [
-            {incompatible_type, <<"myfamily">>, varchar, integer},
-            {incompatible_type, <<"myseries">>, varchar, integer}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 1 AND time < 10 "
-            "AND myfamily = 12 "
-            "AND myseries = 10 ")
-    ).
+       {false, [
+                {incompatible_type, <<"myfamily">>, varchar, integer},
+                {incompatible_type, <<"myseries">>, varchar, integer}]},
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 1 AND time < 10 "
+                                  "AND myfamily = 12 "
+                                  "AND myseries = 10 ")
+      ).
 
 is_query_valid_where_4_test() ->
     ?assertEqual(
-        true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 1 AND time < 10 "
-            "AND myfamily = 'bob' "
-            "OR myseries = 'bert' ")
-    ).
+       true,
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 1 AND time < 10 "
+                                  "AND myfamily = 'bob' "
+                                  "OR myseries = 'bert' ")
+      ).
 
 is_query_valid_where_5_test() ->
     ?assertEqual(
-        true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 1 AND time < 10 "
-            "AND myfamily = 'bob' "
-            "OR myfamily = 'bert' ")
-    ).
+       true,
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 1 AND time < 10 "
+                                  "AND myfamily = 'bob' "
+                                  "OR myfamily = 'bert' ")
+      ).
 
 is_query_valid_where_6_test() ->
     ?assertEqual(
-        true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 1 AND time < 10 "
-            "AND myfamily = 'bob' "
-            "AND myfamily = 'bert' ")
-            %% FIXME contradictory where clause, this will never match
-    ).
+       true,
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 1 AND time < 10 "
+                                  "AND myfamily = 'bob' "
+                                  "AND myfamily = 'bert' ")
+       %% FIXME contradictory where clause, this will never match
+      ).
 
 is_query_valid_selections_1_test() ->
     ?assertEqual(
-        true,
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT myseries FROM mytab "
-            "WHERE time > 1 AND time < 10 ")
-    ).
+       true,
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT myseries FROM mytab "
+                                  "WHERE time > 1 AND time < 10 ")
+      ).
 
 is_query_valid_selections_2_test() ->
     ?assertEqual(
-        {false, [{unexpected_select_field,<<"doge">>}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT doge FROM mytab "
-            "WHERE time > 1 AND time < 10 ")
-    ).
+       {false, [{unexpected_select_field,<<"doge">>}]},
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT doge FROM mytab "
+                                  "WHERE time > 1 AND time < 10 ")
+      ).
 
 is_query_valid_selections_3_test() ->
     ?assertEqual(
-        {false, [
-            {unexpected_select_field,<<"doge">>},
-            {unexpected_select_field,<<"nyan">>}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT doge, nyan FROM mytab "
-            "WHERE time > 1 AND time < 10 ")
-    ).
+       {false, [
+                {unexpected_select_field,<<"doge">>},
+                {unexpected_select_field,<<"nyan">>}]},
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT doge, nyan FROM mytab "
+                                  "WHERE time > 1 AND time < 10 ")
+      ).
 
 is_query_valid_select_and_where_1_test() ->
     ?assertEqual(
-        {false, [
-            {unexpected_select_field,<<"doge">>},
-            {unexpected_select_field,<<"nyan">>},
-            {unexpected_where_field,<<"monfamily">>}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT doge, nyan FROM mytab "
-            "WHERE time > 1 AND time < 10 "
-            "AND monfamily = 12 ")
-    ).
+       {false, [
+                {unexpected_select_field,<<"doge">>},
+                {unexpected_select_field,<<"nyan">>},
+                {unexpected_where_field,<<"monfamily">>}]},
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT doge, nyan FROM mytab "
+                                  "WHERE time > 1 AND time < 10 "
+                                  "AND monfamily = 12 ")
+      ).
 
 is_query_valid_compatible_op_1_test() ->
     ?assertEqual(
-        {false, [
-            {incompatible_operator, <<"myfamily">>, varchar, '>'}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 1 AND time < 10 "
-            "AND myfamily > 'bob' ")
-    ).
+       {false, [
+                {incompatible_operator, <<"myfamily">>, varchar, '>'}]},
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 1 AND time < 10 "
+                                  "AND myfamily > 'bob' ")
+      ).
 
 is_query_valid_compatible_op_2_test() ->
     ?assertEqual(
-        {false, [
-            {incompatible_operator, <<"myfamily">>, varchar, '>='}]},
-        is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
-            "SELECT * FROM mytab "
-            "WHERE time > 1 AND time < 10 "
-            "AND myfamily >= 'bob' ")
-    ).
+       {false, [
+                {incompatible_operator, <<"myfamily">>, varchar, '>='}]},
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 1 AND time < 10 "
+                                  "AND myfamily >= 'bob' ")
+      ).
+
+is_query_valid_no_subexpressions_1_test() ->
+    ?assertEqual(
+       {false, [
+                {subexpressions_not_supported, <<"time">>, '>'}]},
+       is_query_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+                                  "SELECT * FROM mytab "
+                                  "WHERE time > 1 + 2 AND time < 10 "
+                                  "AND myfamily = 'bob' ")
+      ).
 
 fold_where_tree_test() ->
-    #riak_sql_v1{ 'WHERE' = [Where] } = test_parse(
-        "SELECT * FROM mytab "
-        "WHERE time > 1 AND time < 10 "
-        "AND myfamily = 'family1' "
-        "AND myseries = 10 "),
+    ?SQL_SELECT{ 'WHERE' = [Where] } = test_parse(
+                                         "SELECT * FROM mytab "
+                                         "WHERE time > 1 AND time < 10 "
+                                         "AND myfamily = 'family1' "
+                                         "AND myseries = 10 "),
     ?assertEqual(
-        [<<"myseries">>, <<"myfamily">>, <<"time">>, <<"time">>],
-        lists:reverse(fold_where_tree(Where, [],
-                fun({_, Field, _}, Acc) -> [Field | Acc] end))
-    ).
+       [<<"myseries">>, <<"myfamily">>, <<"time">>, <<"time">>],
+       lists:reverse(fold_where_tree(Where, [],
+                                     fun({_, Field, _}, Acc) -> [Field | Acc] end))
+      ).
+
+%%
+%% selection validity tests
+%%
+
+-define(select_test(Name, SelectClause, Expected),
+        Name() ->
+               CreateTab = "CREATE TABLE mytab" ++
+                   "   (myfamily    VARCHAR   NOT NULL, " ++
+                   "    myseries    VARCHAR   NOT NULL, " ++
+                   "    time        TIMESTAMP NOT NULL, " ++
+                   "    mysint64    SINT64    NOT NULL, " ++
+                   "    mydouble    DOUBLE    NOT NULL, " ++
+                   "    mybolean    BOOLEAN   NOT NULL, " ++
+                   "    myvarchar   VARCHAR   NOT NULL, " ++
+                   "    PRIMARY KEY ((myfamily, myseries, QUANTUM(time, 15, 'm')), " ++
+                   "    myfamily, myseries, time))",
+               SQL = "SELECT " ++ SelectClause ++ " " ++
+                   "FROM mytab WHERE " ++
+                   "myfamily = 'fam1' " ++
+                   "and myseries = 'ser1' " ++
+                   "and time > 1 and time < 10",
+               DDL = test_parse(CreateTab),
+               {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
+               Q = test_parse(SQL),
+               ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = Selections}} = Q,
+               Got = are_selections_valid(Mod, Selections, ?CANTBEBLANK),
+               ?assertEqual(Expected, Got)).
+
+?select_test(simple_column_select_1_test, "*", true).
+
+?select_test(simple_column_select_2_test, "mysint64", true).
+
+?select_test(simple_column_select_3_test, "mysint64, mydouble", true).
+
+?select_test(simple_column_select_fail_1_test, "rootbeer",
+             {false, [
+                      {unexpected_select_field, <<"rootbeer">>}
+                     ]
+             }).
+
+?select_test(simple_column_select_fail_2_test, "mysint64, rootbeer, mydouble, deathsquad",
+             {false, [
+                      {unexpected_select_field, <<"rootbeer">>},
+                      {unexpected_select_field, <<"deathsquad">>}
+                     ]
+             }).
+
+?select_test(simple_agg_fn_select_1_test, "count(mysint64)", true).
+
+?select_test(simple_agg_fn_select_2_test, "count(mysint64), avg(mydouble)", true).
+
+?select_test(simple_agg_fn_select_fail_2_test, "count(mysint64, myboolean), avg(mysint64)",
+             {false, [
+                      {fn_called_with_wrong_arity, 'COUNT', 1, 2}
+                     ]
+             }).
 
 -endif.
