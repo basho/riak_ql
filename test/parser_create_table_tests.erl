@@ -280,3 +280,16 @@ not_null_white_space_test() ->
        {ok, #ddl_v1{}},
        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
+
+short_key_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "family VARCHAR NOT NULL, "
+        "series VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT                NULL, "
+        "PRIMARY KEY "
+        " ((quantum(time, 15, 's')), time))",
+    ?assertMatch(
+       {ok, #ddl_v1{}},
+       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).

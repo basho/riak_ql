@@ -771,10 +771,10 @@ assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
 
 %% @doc Verify that the primary key has three components
 %%      and the third element is a quantum
-assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) when length(Key) == 3 ->
-    assert_param_is_quantum(lists:nth(3, Key));
+assert_partition_key_length(#ddl_v1{partition_key = {key_v1, [_|_] = Key}}) ->
+    assert_param_is_quantum(lists:last(Key));
 assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) ->
-    return_error_flat("Primary key must consist of exactly 3 fields (has ~b)", [length(Key)]).
+    return_error_flat("Primary key must have one or more fields ~p", [Key]).
 
 %% @doc Verify that the key element is a quantum
 assert_param_is_quantum(#hash_fn_v1{mod = riak_ql_quanta, fn = quantum}) ->
@@ -786,7 +786,7 @@ assert_param_is_quantum(_KeyComponent) ->
 assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primary},
                                             local_key = #key_v1{ast = Local}}) ->
     PrimaryList = [query_field_name(F) || F <- Primary],
-    LocalList = [query_field_name(F) || F <- Local],
+    LocalList = [query_field_name(F) || F <- lists:sublist(Local, length(PrimaryList))],
     case PrimaryList == LocalList of
         true ->
             ok;
