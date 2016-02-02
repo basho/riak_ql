@@ -207,7 +207,9 @@ syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
 syntax_error_to_msg2({unknown_column_type, Other}) ->
     {"Unexpected select column type ~p.", [Other]};
 syntax_error_to_msg2({invalid_field_operation}) ->
-    {"Comparing or otherwise operating on two fields is not supported", []}.
+    {"Comparing or otherwise operating on two fields is not supported", []};
+syntax_error_to_msg2({argument_type_mismatch, Fn, Args}) ->
+    {"Function '~s'/1 called with arguments of the wrong type [~p].", [Fn] ++ Args}.
 
 %% An atom with upper case chars gets printed as 'COUNT' so remove the
 %% quotes to make the error message more reable.
