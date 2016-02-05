@@ -1,8 +1,8 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_kv_ddl: defines records used in the data description language
+%% riak_ql_ddl.hrl: defines records used in the data description language
 %%
-%% Copyright (c) 2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2015, 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -46,7 +46,7 @@
           fn        :: atom(),
           args = [] :: [#param_v1{} | any()],
           type      :: field_type()
-	 }).
+         }).
 
 -record(key_v1, {
           ast = [] :: [#hash_fn_v1{} | #param_v1{}]
@@ -57,6 +57,14 @@
           fields        = [] :: [#riak_field_v1{}],
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
+         }).
+
+-record(ddl_v2, {
+          table              :: binary(),
+          fields        = [] :: [#riak_field_v1{}],
+          partition_key      :: #key_v1{} | none,
+          local_key          :: #key_v1{},
+          properties    = [] :: proplists:proplist()
          }).
 
 %% TODO these types will be improved over the duration of the time series project
@@ -81,7 +89,7 @@
 %% returns one row calculated from the result set for the query.
 -type select_result_type() :: rows | aggregate.
 
--record(riak_sel_clause_v1, 
+-record(riak_sel_clause_v1,
         {
           calc_type        = rows :: select_result_type(),
           initial_state    = []   :: [any()],
@@ -115,5 +123,8 @@
 
 -define(SQL_SELECT, #riak_select_v1).
 -define(SQL_SELECT_RECORD_NAME, riak_select_v1).
+
+-define(DDL, #ddl_v2).
+-define(DDL_RECORD_NAME, ddl_v2).
 
 -endif.
