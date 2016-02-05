@@ -55,7 +55,7 @@ fn_type_signature('STDDEV_SAMP', [sint64]) -> double;
 fn_type_signature('SUM', [double]) -> double;
 fn_type_signature('SUM', [sint64]) -> sint64;
 fn_type_signature(Fn, Args) ->
-    {error, {invalid_function_call, Fn, Args}}.
+    {error, {argument_type_mismatch, Fn, Args}}.
 
 %%
 fn_arity(_FnName) -> 1.
