@@ -3,7 +3,7 @@
 %% riak_ql_window_agg_fns: implementation of Windows Aggregation Fns
 %%                         for the query runner
 %%
-%% Copyright (c) 2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -55,7 +55,7 @@ fn_type_signature('STDDEV_SAMP', [sint64]) -> double;
 fn_type_signature('SUM', [double]) -> double;
 fn_type_signature('SUM', [sint64]) -> sint64;
 fn_type_signature(Fn, Args) ->
-    {error, {invalid_function_call, Fn, Args}}.
+    {error, {argument_type_mismatch, Fn, Args}}.
 
 %%
 fn_arity(_FnName) -> 1.

@@ -2,8 +2,7 @@
 %%
 %% riak_ql_ddl: API module for the DDL
 %%
-%%
-%% Copyright (c) 2007-2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -171,7 +170,7 @@ convert([#param_v1{name = Nm} | T], Obj, Mod, Acc) ->
 convert([Constant | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Constant | Acc]).
 
-%% Convert an error emmitted from the :is_query_valid/3 function
+%% Convert an error emitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
 -spec syntax_error_to_msg(query_syntax_error()) ->
                                  Msg::binary().
@@ -205,7 +204,13 @@ syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
      " (~s ~s ...) are not supported.",
      [Field, Op]};
 syntax_error_to_msg2({unknown_column_type, Other}) ->
-    {"Unexpected select column type ~p.", [Other]}.
+    {"Unexpected select column type ~p.", [Other]};
+syntax_error_to_msg2({invalid_field_operation}) ->
+    {"Comparing or otherwise operating on two fields is not supported", []};
+syntax_error_to_msg2({argument_type_mismatch, Fn, Args}) ->
+    {"Function '~s' called with arguments of the wrong type ~p.", [Fn, Args]};
+syntax_error_to_msg2({operator_type_mismatch, Fn, Type1, Type2}) ->
+    {"Operator '~s' called with mismatched types [~p vs ~p].", [Fn, Type1, Type2]}.
 
 %% An atom with upper case chars gets printed as 'COUNT' so remove the
 %% quotes to make the error message more reable.
@@ -257,6 +262,9 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
         false ->
             [{unexpected_where_field, Field} | Acc1]
     end;
+%% the case where two fields are being operated on
+is_filters_field_valid(_Mod, {_Op, _Field1, _Field2}, Acc1) when is_binary(_Field1), is_binary(_Field2) ->
+    [{invalid_field_operation} | Acc1];
 %% the case where RHS is an expression on its own (LHS must still be a valid field)
 is_filters_field_valid(_Mod, {Op, Field, {_RHS_op, _RHS_lhs_bare_value, _RHS_rhs}}, Acc1) ->
     [{subexpressions_not_supported, Field, Op} | Acc1].

@@ -1,7 +1,7 @@
 %% -*- erlang -*-
 %%% @doc       Parser for the riak Time Series Query Language.
 %%% @author    gguthrie@basho.com
-%%% @copyright (C) 2015 Basho
+%%% @copyright (C) 2016 Basho
 
 Nonterminals
 
