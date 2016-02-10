@@ -779,7 +779,7 @@ assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) ->
 assert_param_is_quantum(#hash_fn_v1{mod = riak_ql_quanta, fn = quantum}) ->
     ok;
 assert_param_is_quantum(_KeyComponent) ->
-    return_error_flat("Third element of primary key must be a quantum").
+    return_error_flat("Last element of primary key must be a quantum").
 
 %% @doc Verify primary key and local partition have the same elements
 assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primary},
