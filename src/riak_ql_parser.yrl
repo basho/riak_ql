@@ -770,16 +770,10 @@ assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
 
 %% @doc Verify that the primary key has three components
 %%      and the third element is a quantum
-assert_partition_key_length(#ddl_v1{partition_key = {key_v1, [_|_] = Key}}) ->
-    assert_param_is_quantum(lists:last(Key));
+assert_partition_key_length(#ddl_v1{partition_key = {key_v1, [_|_]}}) ->
+    ok;
 assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) ->
     return_error_flat("Primary key must have one or more fields ~p", [Key]).
-
-%% @doc Verify that the key element is a quantum
-assert_param_is_quantum(#hash_fn_v1{mod = riak_ql_quanta, fn = quantum}) ->
-    ok;
-assert_param_is_quantum(_KeyComponent) ->
-    return_error_flat("Last element of primary key must be a quantum").
 
 %% @doc Verify primary key and local partition have the same elements
 assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primary},

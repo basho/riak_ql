@@ -31,12 +31,6 @@ create_no_key_sql_test() ->
                    " time timestamp not null, "
                    " temp_k double)").
 
-create_wrong_field_order_sql_test() ->
-    ?sql_comp_fail("create table consufed ("
-                   " a varchar not null, b varchar not null, c timestamp not null,"
-                   " PRIMARY KEY ((a, c, quantum(b, 15, 'm')), a, c, b))").
-
-
 create_timeseries_sql_test() ->
     String =
         "CREATE TABLE GeoCheckin ("
@@ -304,7 +298,7 @@ not_null_white_space_test() ->
        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
-short_key_test() ->
+short_key_1_test() ->
     Table_def =
         "CREATE TABLE temperatures ("
         "family VARCHAR NOT NULL, "
@@ -316,3 +310,43 @@ short_key_test() ->
        {ok, #ddl_v1{}},
        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
+
+short_key_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c))",
+    ?assertMatch(
+       {ok, #ddl_v1{}},
+       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+no_quanta_in_primary_key_is_ok_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c SINT64 NOT NULL, "
+        "PRIMARY KEY ((a,b), a,b,c))",
+    ?assertMatch(
+        {ok, #ddl_v1{
+                partition_key =
+                    #key_v1{
+                       ast = [
+                              #param_v1{name = [<<"a">>]},
+                              #param_v1{name = [<<"b">>]}
+                             ]},
+                local_key =
+                    #key_v1{
+                       ast = [
+                              #param_v1{name = [<<"a">>]},
+                              #param_v1{name = [<<"b">>]},
+                              #param_v1{name = [<<"c">>]}
+                             ]}}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+% multiple quanta returns an error (but why not?)
+% 
