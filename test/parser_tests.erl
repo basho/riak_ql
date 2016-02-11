@@ -29,18 +29,27 @@
 
 select_sql_case_insensitive_1_test() ->
     ?sql_comp_assert_match("SELECT * from argle",
-                           ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]}
+                           ]).
 
 select_sql_case_insensitive_2_test() ->
     ?sql_comp_assert_match("seLEct * from argle",
-                           ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
-
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]}
+                           ]).
 
 sql_first_char_is_newline_test() ->
     ?sql_comp_assert_match("\nselect * from argle",
-                           ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]}}).
-
-
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]}
+                           ]).
 
 %% RTS-645
 flubber_test() ->
@@ -53,62 +62,70 @@ flubber_test() ->
                               "AND s='s' AND ts > 0 AND ts < 100"))
       ).
 
-
-
 time_unit_seconds_test() ->
-    ?assertMatch(
-       {ok, ?SQL_SELECT{
-               'WHERE' = [{and_,
-                           {'<',<<"time">>,{integer,20 * 1000}},
-                           {'>',<<"time">>,{integer,10 * 1000}}}]
-              }},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                              "SELECT * FROM mytable WHERE time > 10s AND time < 20s"))
-      ).
+    ?sql_comp_assert_match("SELECT * FROM mytable WHERE time > 10s AND time < 20s",
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]},
+                            {where, [
+                                     {and_,
+                                      {'<',<<"time">>,{integer,20 * 1000}},
+                                      {'>',<<"time">>,{integer,10 * 1000}}}
+                                    ]}
+                           ]).
 
 time_unit_minutes_test() ->
-    ?assertMatch(
-       {ok, ?SQL_SELECT{
-               'WHERE' = [{and_,
-                           {'<',<<"time">>,{integer,20 * 60 * 1000}},
-                           {'>',<<"time">>,{integer,10 * 60 * 1000}}}]
-              }},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                              "SELECT * FROM mytable WHERE time > 10m AND time < 20m"))
-      ).
+    ?sql_comp_assert_match("SELECT * FROM mytable WHERE time > 10m AND time < 20m",
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]},
+                            {where, [
+                                     {and_,
+                                      {'<',<<"time">>,{integer,20 * 60 * 1000}},
+                                      {'>',<<"time">>,{integer,10 * 60 * 1000}}}
+                                    ]}
+                           ]).
 
 time_unit_seconds_and_minutes_test() ->
-    ?assertMatch(
-       {ok, ?SQL_SELECT{
-               'WHERE' = [{and_,
-                           {'<',<<"time">>,{integer,20 * 60 * 1000}},
-                           {'>',<<"time">>,{integer,10 * 1000}}}]
-              }},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                              "SELECT * FROM mytable WHERE time > 10s AND time < 20m"))
-      ).
+    ?sql_comp_assert_match("SELECT * FROM mytable WHERE time > 10s AND time < 20m",
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]},
+                            {where, [
+                                     {and_,
+                                      {'<',<<"time">>,{integer,20 * 60 * 1000}},
+                                      {'>',<<"time">>,{integer,10 * 1000}}}
+                                    ]}
+                           ]).
 
 time_unit_hours_test() ->
-    ?assertMatch(
-       {ok, ?SQL_SELECT{
-               'WHERE' = [{and_,
-                           {'<',<<"time">>,{integer,20 * 60 * 60 * 1000}},
-                           {'>',<<"time">>,{integer,10 * 60 * 60 * 1000}}}]
-              }},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                              "SELECT * FROM mytable WHERE time > 10h AND time < 20h"))
-      ).
+    ?sql_comp_assert_match("SELECT * FROM mytable WHERE time > 10h AND time < 20h",
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]},
+                            {where, [
+                                     {and_,
+                                      {'<',<<"time">>,{integer,20 * 60 * 60 * 1000}},
+                                      {'>',<<"time">>,{integer,10 * 60 * 60 * 1000}}}
+                                    ]}
+                           ]).
 
 time_unit_days_test() ->
-    ?assertMatch(
-       {ok, ?SQL_SELECT{
-               'WHERE' = [{and_,
-                           {'<',<<"time">>,{integer,20 * 60 * 60 * 24 * 1000}},
-                           {'>',<<"time">>,{integer,10 * 60 * 60 * 24 * 1000}}}]
-              }},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                              "SELECT * FROM mytable WHERE time > 10d AND time < 20d"))
-      ).
+    ?sql_comp_assert_match("SELECT * FROM mytable WHERE time > 10d AND time < 20d",
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]},
+                            {where, [
+                                     {and_,
+                                      {'<',<<"time">>,{integer,20 * 60 * 60 * 24 * 1000}},
+                                      {'>',<<"time">>,{integer,10 * 60 * 60 * 24 * 1000}}}
+                                    ]}
+                           ]).
 
 time_unit_invalid_1_test() ->
     ?assertMatch(
@@ -125,41 +142,47 @@ time_unit_invalid_2_test() ->
       ).
 
 time_unit_whitespace_test() ->
-    ?assertMatch(
-       {ok, ?SQL_SELECT{
-               'WHERE' = [{and_,
-                           {'<',<<"time">>,{integer,20 * 60 * 60 * 24 * 1000}},
-                           {'>',<<"time">>,{integer,10 * 60 * 60 * 24 * 1000}}}]
-              }},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                              "SELECT * FROM mytable WHERE time > 10   d AND time < 20\td"))
-      ).
+    ?sql_comp_assert_match("SELECT * FROM mytable WHERE time > 10   d AND time < 20\td",
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]},
+                            {where, [
+                                     {and_,
+                                      {'<',<<"time">>,{integer,20 * 60 * 60 * 24 * 1000}},
+                                      {'>',<<"time">>,{integer,10 * 60 * 60 * 24 * 1000}}}
+                                    ]}
+                           ]).
 
 time_unit_case_insensitive_test() ->
     ?assertMatch(
-       {ok, ?SQL_SELECT{ }},
+       {ok, _},
        riak_ql_parser:parse(riak_ql_lexer:get_tokens(
                               "SELECT * FROM mytable WHERE time > 10S "
                               "AND time < 20M AND time > 15H and time < 4D"))
       ).
 
 left_hand_side_literal_equals_test() ->
-    ?assertMatch(
-       {ok, ?SQL_SELECT{
-               'WHERE' = [{'=', <<"age">>, {integer, 10}}]
-              }},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                              "SELECT * FROM mytable WHERE 10 = age"))
-      ).
+    ?sql_comp_assert_match("SELECT * FROM mytable WHERE 10 = age",
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]},
+                            {where, [
+                                     {'=', <<"age">>, {integer, 10}}
+                                    ]}
+                           ]).
 
 left_hand_side_literal_not_equals_test() ->
-    ?assertMatch(
-       {ok, ?SQL_SELECT{
-               'WHERE' = [{'!=', <<"age">>, {integer, 10}}]
-              }},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                              "SELECT * FROM mytable WHERE 10 != age"))
-      ).
+    ?sql_comp_assert_match("SELECT * FROM mytable WHERE 10 != age",
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]},
+                            {where, [
+                                     {'!=', <<"age">>, {integer, 10}}
+                                    ]}
+                           ]).
 
 %% RTS-788
 %% an infinite loop was occurring when two where clauses were the same
@@ -248,22 +271,24 @@ concatenated_unquoted_strings_test() ->
 %%
 
 rts_433_regression_test() ->
-    ?sql_comp_assert("select * from HardDrivesV14 where date >= 123 " ++
-                         "and date <= 567 " ++
-                         "and family = 'Hitachi HDS5C4040ALE630' " ++
-                         "and series = 'true'",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [{identifier, [<<"*">>]}]},
-                                 'FROM'   = <<"HardDrivesV14">>,
-                                 'WHERE'  = [
-                                             {and_,
-                                              {'=', <<"series">>, {binary, <<"true">>}},
-                                              {and_,
-                                               {'=', <<"family">>, {binary, <<"Hitachi HDS5C4040ALE630">>}},
-                                               {and_,
-                                                {'<=', <<"date">>, {integer, 567}},
-                                                {'>=', <<"date">>, {integer, 123}}
-                                               }
-                                              }
-                                             }
-                                            ]
-                                }).
+    ?sql_comp_assert_match("select * from HardDrivesV14 where date >= 123 "
+                           "and date <= 567 "
+                           "and family = 'Hitachi HDS5C4040ALE630' "
+                           "and series = 'true'",
+                           [{type, select},
+                            {fields, [
+                                      {identifier, [<<"*">>]}
+                                     ]},
+                            {where, [
+                                     {and_,
+                                      {'=', <<"series">>, {binary, <<"true">>}},
+                                      {and_,
+                                       {'=', <<"family">>, {binary, <<"Hitachi HDS5C4040ALE630">>}},
+                                       {and_,
+                                        {'<=', <<"date">>, {integer, 567}},
+                                        {'>=', <<"date">>, {integer, 123}}
+                                       }
+                                      }
+                                     }
+                                    ]}
+                           ]).

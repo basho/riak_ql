@@ -27,104 +27,119 @@
 -include("parser_test_utils.hrl").
 
 window_aggregate_fn_1_test() ->
-    ?sql_comp_assert("select avg(temp) from details",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-                                                                          {{window_agg_fn, 'AVG'},
-                                                                           [{identifier, [<<"temp">>]}]}
-                                                                         ]},
-                                 'FROM'    = <<"details">>,
-                                 'WHERE'   = []
-                                }).
+    ?sql_comp_assert_match(
+       "select avg(temp) from details",
+       [{type, select},
+        {fields, [
+                  {{window_agg_fn, 'AVG'},
+                   [{identifier, [<<"temp">>]}]}
+                 ]},
+        {tables, <<"details">>}
+       ]
+      ).
 
 window_aggregate_fn_1a_test() ->
-    ?sql_comp_assert("select mean(temp) from details",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-                                                                          {{window_agg_fn, 'MEAN'},
-                                                                           [{identifier, [<<"temp">>]}]}
-                                                                         ]},
-                                 'FROM'    = <<"details">>,
-                                 'WHERE'   = []
-                                }).
+    ?sql_comp_assert_match(
+       "select mean(temp) from details",
+       [{type, select},
+        {fields, [
+                  {{window_agg_fn, 'MEAN'},
+                   [{identifier, [<<"temp">>]}]}
+                 ]},
+        {tables, <<"details">>}
+       ]
+      ).
 
 window_aggregate_fn_2_test() ->
-    ?sql_comp_assert("select avg(temp), sum(counts) from details",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-                                                                          {{window_agg_fn, 'AVG'},
-                                                                           [{identifier, [<<"temp">>]}]},
-                                                                          {{window_agg_fn, 'SUM'},
-                                                                           [{identifier, [<<"counts">>]}]}
-                                                                         ]},
-                                 'FROM'    = <<"details">>,
-                                 'WHERE'   = []
-                                }).
+    ?sql_comp_assert_match(
+       "select avg(temp), sum(counts) from details",
+       [{type, select},
+        {fields, [
+                  {{window_agg_fn, 'AVG'},
+                   [{identifier, [<<"temp">>]}]},
+                  {{window_agg_fn, 'SUM'},
+                   [{identifier, [<<"counts">>]}]}
+                 ]},
+        {tables, <<"details">>}
+       ]
+      ).
 
 window_aggregate_fn_wildcard_count_test() ->
-    ?sql_comp_assert("select count(*) from details",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-                                                                          {{window_agg_fn, 'COUNT'},
-                                                                           [{identifier, [<<"*">>]}]}
-                                                                         ]},
-                                 'FROM'    = <<"details">>,
-                                 'WHERE'   = []
-                                }).
+    ?sql_comp_assert_match(
+       "select count(*) from details",
+       [{type, select},
+        {fields, [
+                  {{window_agg_fn, 'COUNT'},
+                   [{identifier, [<<"*">>]}]}
+                 ]},
+        {tables, <<"details">>}
+       ]
+      ).
 
 window_aggregate_fn_capitalisation_test() ->
-    ?sql_comp_assert("select aVg(temp) from details",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-                                                                          {{window_agg_fn, 'AVG'},
-                                                                           [{identifier, [<<"temp">>]}]}
-                                                                         ]},
-                                 'FROM'    = <<"details">>,
-                                 'WHERE'   = []
-                                }).
+    ?sql_comp_assert_match(
+       "select aVg(temp) from details",
+       [{type, select},
+        {fields, [
+                  {{window_agg_fn, 'AVG'},
+                   [{identifier, [<<"temp">>]}]}
+                 ]},
+        {tables, <<"details">>}
+       ]
+      ).
 
 window_aggregate_fn_all_funs_test() ->
-    ?sql_comp_assert("select avg(temp), sum(counts), count(counts), min(counts), " ++
-                         "max(counts), stddev(counts) from details",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-                                                                          {{window_agg_fn, 'AVG'},
-                                                                           [{identifier, [<<"temp">>]}]},
-                                                                          {{window_agg_fn, 'SUM'},
-                                                                           [{identifier, [<<"counts">>]}]},
-                                                                          {{window_agg_fn, 'COUNT'},
-                                                                           [{identifier, [<<"counts">>]}]},
-                                                                          {{window_agg_fn, 'MIN'},
-                                                                           [{identifier, [<<"counts">>]}]},
-                                                                          {{window_agg_fn, 'MAX'},
-                                                                           [{identifier, [<<"counts">>]}]},
-                                                                          {{window_agg_fn, 'STDDEV'},
-                                                                           [{identifier, [<<"counts">>]}]}
-                                                                         ]},
-                                 'FROM'    = <<"details">>,
-                                 'WHERE'   = []
-                                }).
+    ?sql_comp_assert_match(
+       "select avg(temp), sum(counts), count(counts), min(counts), " ++
+           "max(counts), stddev(counts) from details",
+       [{type, select},
+        {fields, [
+                  {{window_agg_fn, 'AVG'},
+                   [{identifier, [<<"temp">>]}]},
+                  {{window_agg_fn, 'SUM'},
+                   [{identifier, [<<"counts">>]}]},
+                  {{window_agg_fn, 'COUNT'},
+                   [{identifier, [<<"counts">>]}]},
+                  {{window_agg_fn, 'MIN'},
+                   [{identifier, [<<"counts">>]}]},
+                  {{window_agg_fn, 'MAX'},
+                   [{identifier, [<<"counts">>]}]},
+                  {{window_agg_fn, 'STDDEV'},
+                   [{identifier, [<<"counts">>]}]}
+                 ]},
+        {tables, <<"details">>}
+       ]
+      ).
+
 
 window_aggregate_fn_arithmetic_2_test() ->
-    ?sql_comp_assert("select aVg(temperature) + count(temperature) from details",
-                     ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = [
-                                                                          {'+',
-                                                                           {{window_agg_fn, 'AVG'},
-                                                                            [{identifier, [<<"temperature">>]}]},
-                                                                           {{window_agg_fn, 'COUNT'},
-                                                                            [{identifier, [<<"temperature">>]}]}}
-                                                                         ]},
-                                 'FROM'    = <<"details">>,
-                                 'WHERE'   = []
-                                }).
+    ?sql_comp_assert_match(
+       "select aVg(temperature) + count(temperature) from details",
+       [{type, select},
+        {fields, [
+                  {'+',
+                   {{window_agg_fn, 'AVG'},
+                    [{identifier, [<<"temperature">>]}]},
+                   {{window_agg_fn, 'COUNT'},
+                    [{identifier, [<<"temperature">>]}]}}
+                 ]},
+        {tables, <<"details">>}
+       ]
+      ).
 
 window_aggregate_fn_arithmetic_3_test() ->
-    ?sql_comp_assert(
-        "select aVg(temperature + 1) + count(temperature / distance) from details",
-        ?SQL_SELECT{
-             'SELECT' = #riak_sel_clause_v1{ clause = [
+    ?sql_comp_assert_match(
+       "select aVg(temperature + 1) + count(temperature / distance) from details",
+       [{type, select},
+        {fields, [
                   {'+',
-                      {{window_agg_fn, 'AVG'}, [{'+', {identifier, <<"temperature">>}, {integer, 1}}]},
-                      {{window_agg_fn, 'COUNT'}, [{'/', {identifier, <<"temperature">>}, {identifier, <<"distance">>}}]}
+                   {{window_agg_fn, 'AVG'}, [{'+', {identifier, <<"temperature">>}, {integer, 1}}]},
+                   {{window_agg_fn, 'COUNT'}, [{'/', {identifier, <<"temperature">>}, {identifier, <<"distance">>}}]}
                   }]
-                },
-             'FROM'    = <<"details">>,
-             'WHERE'   = []
-    }).
+        },
+        {tables, <<"details">>}
+       ]
+      ).
 
 %%
 %% TS 1.1 fail tests

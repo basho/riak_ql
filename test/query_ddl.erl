@@ -48,7 +48,7 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
             Lexed2 = riak_ql_lexer:get_tokens(SQLQuery),
             Qry = riak_ql_parser:parse(Lexed2),
             case Qry of
-                {ok, Q} -> case riak_ql_ddl:is_query_valid(Module, DDL, Q) of
+                {ok, Q} -> case riak_ql_ddl:is_query_valid(Module, DDL, riak_ql_ddl:parsed_sql_to_query(Q)) of
                                true ->
                                    case IsValid of
                                        true ->
