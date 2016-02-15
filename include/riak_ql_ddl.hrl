@@ -23,6 +23,7 @@
 -ifndef(RIAK_QL_DDL_HRL).
 -define(RIAK_QL_DDL_HRL, included).
 
+-define(RIAK_QL_DDL_VERSION, <<"1.2">>).
 -record(riak_field_v1, {
           name     = <<>>  :: binary(),
           position         :: undefined | pos_integer(),
