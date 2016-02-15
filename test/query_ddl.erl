@@ -3,7 +3,7 @@
 %% query_ddl: a test suite for queries against DDLs
 %%
 %%
-%% Copyright (c) 2007-2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -43,7 +43,7 @@
 run_test(Name, CreateTable, SQLQuery, IsValid) ->
     Lexed = riak_ql_lexer:get_tokens(CreateTable),
     {ok, DDL} = riak_ql_parser:parse(Lexed),
-    case riak_ql_ddl_compiler:mk_helper_m2(DDL) of
+    case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
         {module, Module} ->
             Lexed2 = riak_ql_lexer:get_tokens(SQLQuery),
             Qry = riak_ql_parser:parse(Lexed2),

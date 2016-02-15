@@ -6,7 +6,7 @@
 %%   be used to verify that incoming data conforms to a schema at the boundary
 %%
 %%
-%% Copyright (c) 2007-2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -50,24 +50,10 @@
 
 -include("riak_ql_ddl.hrl").
 
--export([
-         compile/1,
-         compile/3,
-         make_helper_mod/1,
-         make_helper_mod/2
-        ]).
+-export([compile/1]).
+-export([compile_and_load_from_tmp/1]).
+-export([write_source_to_files/3]).
 
-%% Testing only
--export([
-         mk_helper_m2/2,
-         mk_helper_m2/1
-        ]).
-
--import(riak_ql_parser, [parse/1]).
--import(riak_ql_lexer, [get_tokens/1]).
-
--define(NODEBUGOUTPUT, false).
--define(DEBUGOUTPUT,   true).
 -define(IGNORE,        true).
 -define(DONTIGNORE,    false).
 -define(NOPREFIX,      []).
@@ -85,141 +71,13 @@
 -type maps()   :: {maps, [[#riak_field_v1{}]]}.
 -type map()    :: {map,  [#riak_field_v1{}]}.
 
--spec make_helper_mod(#ddl_v1{}) -> {module, atom()} | {'error', tuple()}.
-make_helper_mod(#ddl_v1{} = DDL) ->
-    make_helper_mod(DDL, "/tmp", ?NODEBUGOUTPUT).
-
--spec make_helper_mod(#ddl_v1{}, binary()) -> {module, atom()} | {'error', tuple()}.
-make_helper_mod(#ddl_v1{} = DDL, OutputDir) ->
-    make_helper_mod(DDL, OutputDir, ?DEBUGOUTPUT).
-
-make_helper_mod(#ddl_v1{partition_key = none}, _, _) ->
-    {error, ddl_type_not_supported};
-make_helper_mod(#ddl_v1{} = DDL, Dir, IsDebugOn) ->
-    mk_helper_m2(DDL, Dir, IsDebugOn).
-
-%%
-%% this entry point is used in the test suite
-%% when the query language is fully generalised these fns
-%% will merge with make_helper_mod/N
-%%
--spec mk_helper_m2(#ddl_v1{}) -> {module, atom()} | {'error', tuple()}.
-mk_helper_m2(#ddl_v1{} = DDL) ->
-    mk_helper_m2(DDL, "/tmp", ?NODEBUGOUTPUT).
-
--spec mk_helper_m2(#ddl_v1{}, OutputDir :: string()) -> {module, atom()} | {'error', tuple()}.
-mk_helper_m2(#ddl_v1{} = DDL, OutputDir) ->
-    mk_helper_m2(DDL, OutputDir, ?DEBUGOUTPUT).
-
--spec mk_helper_m2(#ddl_v1{}, OutputDir :: string(), boolean()) ->
-			  {module, atom()} | {'error', tuple()}.
-mk_helper_m2(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
-    case validate_ddl(DDL) of
-        true ->
-            {Module, AST} = compile(DDL, OutputDir, HasDebugOutput),
-            {ok, Module, Bin} = compile:forms(AST),
-            SpoofBeam = "/tmp/" ++ atom_to_list(Module) ++ ".beam",
-            {module, Module} = code:load_binary(Module, SpoofBeam, Bin);
-        {false, Errs} ->
-            {error, {invalid_ddl, Errs}}
-    end.
-
-%%
-%% Funs to validate if the DDL definition is correct
-%%
-
-validate_ddl(#ddl_v1{fields = Fields}) ->
-    Ret1 = validate_fields(Fields, []),
-    Ret2 = validate_positions(Fields),
-    case lists:merge(Ret1, Ret2) of
-        []   -> true;
-        Errs -> {false, Errs}
-    end.
-
-validate_positions(Fields) ->
-    SortFn = fun(#riak_field_v1{position = A}, #riak_field_v1{position = B}) ->
-		     if
-			 A =< B -> true;
-			 A >  B -> false
-		     end
-	     end,
-    Fs2 = lists:sort(SortFn, Fields),
-    validate_pos2(Fs2, ?POSNOSTART, []).
-
-validate_pos2([], _NPos, Acc) ->
-    lists:flatten(lists:reverse(Acc));
-validate_pos2([#riak_field_v1{type     = {map, MapFields},
-                              position = NPos} | T], NPos, Acc) ->
-    NewAcc = case validate_positions(MapFields) of
-                 [] -> Acc;
-                 A  -> [A | Acc]
-             end,
-    validate_pos2(T, NPos + 1, NewAcc);
-validate_pos2([#riak_field_v1{position = NPos} | T], NPos, Acc) ->
-    validate_pos2(T, NPos + 1, Acc);
-validate_pos2([H | T], NPos, Acc) ->
-    validate_pos2(T, NPos + 1, [{wrong_position, {expected, NPos}, H} | Acc]).
-
-validate_fields([], []) ->
-    [];
-validate_fields([], Acc) ->
-    lists:flatten(lists:reverse(Acc));
-validate_fields([#riak_field_v1{name     = N,
-                                position = P,
-                                type     = Ty,
-                                optional = O} | T], Acc)
-  when is_binary(N),
-       (is_integer(P)
-        andalso P > 0),
-       (Ty == varchar
-        orelse Ty =:= sint64
-        orelse Ty =:= double
-        orelse Ty =:= boolean
-        orelse Ty =:= set
-        orelse Ty =:= timestamp
-        orelse Ty =:= any),
-       is_boolean(O) ->
-    validate_fields(T, Acc);
-validate_fields([#riak_field_v1{name     = N,
-                                position = P,
-                                type     = {map, MapFields},
-                                optional = false} | T], Acc)
-  when is_binary(N),
-       (is_integer(P)
-        andalso P > 0)
-       ->
-    NewAcc = case validate_fields(MapFields, []) of
-                 [] -> Acc;
-                 A  -> [A | Acc]
-             end,
-    validate_fields(T, NewAcc);
-validate_fields([#riak_field_v1{name     = N,
-                                position = P,
-                                type     = {map, _MapFields},
-                                optional = true} = H | T], Acc)
-  when is_binary(N),
-       (is_integer(P)
-        andalso P > 0)
-       ->
-    validate_fields(T, [{maps_cant_be_optional, H} | Acc]);
-validate_fields([H | T], Acc) ->
-    validate_fields(T, [{invalid_field, H} | Acc]).
-
-%%
-%% funs to compile the DDL to its helper module AST
-%%
-
+%% Compile the DDL to its helper module AST.
 -spec compile(#ddl_v1{}) ->
-                     {module, ast()} | {'error', tuple()}.
-compile(DDL) ->
-    Debug = false,
-    compile(DDL, << >>, Debug).
-
--spec compile(#ddl_v1{}, binary(), boolean()) ->
-                     {module, ast()} | {'error', tuple()}.
-compile(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
-    #ddl_v1{table         = Table,
-            fields        = Fields} = DDL,
+        {module, ast()} | {error, tuple()}.
+compile({ok, #ddl_v1{} = DDL}) ->
+    % handle output directly from riak_ql_parser
+    compile(DDL);
+compile(#ddl_v1{ table = Table, fields = Fields } = DDL) ->
     {ModName, Attrs, LineNo} = make_attrs(Table, ?LINENOSTART),
     {VFns,  LineNo2} = build_validn_fns([Fields],   LineNo,  ?POSNOSTART, [], []),
     {ACFns, LineNo3} = build_add_cols_fns(Fields, LineNo2),
@@ -229,57 +87,61 @@ compile(#ddl_v1{} = DDL, OutputDir, HasDebugOutput) ->
     {GetDDLFn, LineNo7}  = build_get_ddl_fn(DDL, LineNo6, []),
     AST = Attrs
         ++ VFns
-	++ ACFns
-        ++ [ExtractFn]
-        ++ [GetTypeFn]
-        ++ [IsValidFn]
-	++ [GetDDLFn]
-        ++ [{eof, LineNo7}],
-    if HasDebugOutput ->
-            ASTFileName = filename:join([OutputDir, ModName]) ++ ".ast",
-            write_file(ASTFileName, io_lib:format("~p", [AST]));
-       el/=se ->
-            ok
-    end,
-    Lint = erl_lint:module(AST),
-    case Lint of
+        ++ ACFns
+        ++ [ExtractFn, GetTypeFn, IsValidFn, GetDDLFn, {eof, LineNo7}],
+    case erl_lint:module(AST) of
         {ok, []} ->
-            if
-                HasDebugOutput ->
-                    SrcFileName = filename:join([OutputDir, ModName]) ++ ".erl",
-                    write_src(AST, DDL, SrcFileName);
-                el/=se ->
-                    ok
-            end,
-            _Module = {ModName, AST};
-        Other  -> exit(Other)
+            {ModName, AST};
+        Other ->
+            exit(Other)
     end.
 
-write_src(AST, DDL, SrcFileName) ->
-    AST2 = filter_ast(AST, []),
-    Syntax = erl_syntax:form_list(AST2),
-    Header = io_lib:format("%%% Generated Module, DO NOT EDIT~n~n" ++
-                               "Validates the DDL~n~n" ++
-                               "Table         : ~s~n" ++
-                               "Fields        : ~p~n" ++
-                               "Partition_Key : ~p~n" ++
-			       "Local_Key     : ~p~n~n",
-                           [
-                            binary_to_list(DDL#ddl_v1.table),
-                            DDL#ddl_v1.fields,
-                            DDL#ddl_v1.partition_key,
-			    DDL#ddl_v1.local_key
-                           ]),
-    Header2 = re:replace(Header, "\\n", "\\\n%%% ", [global, {return, list}]),
-    Src = erl_prettypr:format(Syntax),
-    Contents  = [Header2 ++ "\n" ++ Src],
-    write_file(SrcFileName, Contents).
+%% Compile the module, write it to /tmp then load it into the VM.
+-spec compile_and_load_from_tmp(#ddl_v1{}) ->
+        {module, atom()} | {error, tuple()}.
+compile_and_load_from_tmp({ok, #ddl_v1{} = DDL}) ->
+    % handle output directly from riak_ql_parser
+    compile_and_load_from_tmp(DDL);
+compile_and_load_from_tmp(#ddl_v1{} = DDL) ->
+    {Module, AST} = compile(DDL),
+    {ok, Module, Bin} = compile:forms(AST),
+    BeamFileName = "/tmp/" ++ atom_to_list(Module) ++ ".beam",
+    {module, Module} = code:load_binary(Module, BeamFileName, Bin).
 
+%% Write the AST and erlang source derived from the AST to disk for debugging.
+-spec write_source_to_files(string(), #ddl_v1{}, ast()) -> ok.
+write_source_to_files(OutputDir, #ddl_v1{ table = Table } = DDL, AST) ->
+    ModName = riak_ql_ddl:make_module_name(Table),
+    ASTFileName = filename:join([OutputDir, ModName]) ++ ".ast",
+    SrcFileName = filename:join([OutputDir, ModName]) ++ ".erl",
+    ok = write_file(ASTFileName, io_lib:format("~p", [AST])),
+    ok = write_file(SrcFileName, [
+        build_debug_header_text(DDL), "\n",
+        build_erlang_source(AST)]).
+
+%%
+build_erlang_source(AST1) ->
+    AST2 = filter_ast(AST1, []),
+    Syntax = erl_syntax:form_list(AST2),
+    erl_prettypr:format(Syntax).
+
+%%
+build_debug_header_text(#ddl_v1{ table = Table, fields = Fields,
+                                 partition_key = PartitionKey,
+                                 local_key = LocalKey }) ->
+    io_lib:format(
+        "%%% Generated Module, DO NOT EDIT~n~n"
+        "%%% Validates the DDL~n~n"
+        "%%% Table         : ~s~n"
+        "%%% Fields        : ~p~n"
+        "%%% Partition_Key : ~p~n"
+        "%%% Local_Key     : ~p~n~n",
+        [Table, Fields, PartitionKey, LocalKey ]).
+
+%%
 write_file(FileName, Contents) ->
     ok = filelib:ensure_dir(FileName),
-    {ok, Fd} = file:open(FileName, [write]),
-    io:fwrite(Fd, "~s~n", [Contents]),
-    file:close(Fd).
+    ok = file:write_file(FileName, [Contents]).
 
 filter_ast([], Acc) ->
     lists:reverse(Acc);
@@ -758,7 +620,7 @@ make_export_attr(LineNo) ->
                                   {get_field_type,  1},
                                   {is_field_valid,  1},
                                   {extract,         2},
-				  {get_ddl,         0}
+                                  {get_ddl,         0}
                                  ]}, LineNo + 1}.
 
 -ifdef(TEST).
@@ -799,7 +661,7 @@ make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
 
 simplest_valid_test() ->
     DDL = make_simplest_valid_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>}),
     ?assertEqual(?VALID, Result).
 
@@ -813,7 +675,7 @@ make_simplest_valid_ddl() ->
 
 simple_valid_varchar_test() ->
     DDL = make_simple_valid_varchar_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, <<"werewr">>}),
     ?assertEqual(?VALID, Result).
 
@@ -830,7 +692,7 @@ make_simple_valid_varchar_ddl() ->
 
 simple_valid_sint64_test() ->
     DDL = make_simple_valid_sint64_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({999, -9999, 0}),
     ?assertEqual(?VALID, Result).
 
@@ -850,7 +712,7 @@ make_simple_valid_sint64_ddl() ->
 
 simple_valid_double_test() ->
     DDL = make_simple_valid_double_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({432.22, -23423.22, -0.0}),
     ?assertEqual(?VALID, Result).
 
@@ -870,7 +732,7 @@ make_simple_valid_double_ddl() ->
 
 simple_valid_boolean_test() ->
     DDL = make_simple_valid_boolean_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({true, false}),
     ?assertEqual(?VALID, Result).
 
@@ -887,7 +749,7 @@ make_simple_valid_boolean_ddl() ->
 
 simple_valid_timestamp_test() ->
     DDL = make_simple_valid_timestamp_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({234324, 23424, 34636}),
     ?assertEqual(?VALID, Result).
 
@@ -907,7 +769,7 @@ make_simple_valid_timestamp_ddl() ->
 
 simple_valid_map_1_test() ->
     DDL = make_simple_valid_map_1_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"erko">>}, 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -932,7 +794,7 @@ make_simple_valid_map_1_ddl() ->
 
 simple_valid_map_2_test() ->
     DDL = make_simple_valid_map_2_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"erko">>, -999}, 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -960,7 +822,7 @@ make_simple_valid_map_2_ddl() ->
 
 simple_valid_optional_1_test() ->
     DDL = make_simple_valid_optional_1_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({[]}),
     ?assertEqual(?VALID, Result).
 
@@ -975,7 +837,7 @@ make_simple_valid_optional_1_ddl() ->
 
 simple_valid_optional_2_test() ->
     DDL = make_simple_valid_optional_2_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({[], [], [], [], [], [], []}),
     ?assertEqual(?VALID, Result).
 
@@ -1014,7 +876,7 @@ make_simple_valid_optional_2_ddl() ->
 
 simple_valid_optional_3_test() ->
     DDL = make_simple_valid_optional_3_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({[], <<"edible">>}),
     ?assertEqual(?VALID, Result).
 
@@ -1033,7 +895,7 @@ make_simple_valid_optional_3_ddl() ->
 
 complex_valid_optional_1_test() ->
     DDL = make_complex_valid_optional_1_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({[], {1, []}}),
     ?assertEqual(?VALID, Result).
 
@@ -1062,7 +924,7 @@ make_complex_valid_optional_1_ddl() ->
 
 complex_valid_map_1_test() ->
     DDL = make_complex_valid_map_1_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({1, {1, {3, 4}, 1}, 1}),
     ?assertEqual(?VALID, Result).
 
@@ -1101,7 +963,7 @@ make_complex_valid_map_1_ddl() ->
 
 complex_valid_map_2_test() ->
     DDL = make_complex_valid_map_2_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({1, {1, {1, 1, {1, 1}}, 1}, 1}),
     ?assertEqual(?VALID, Result).
 
@@ -1151,7 +1013,7 @@ make_complex_valid_map_2_ddl() ->
 
 complex_valid_map_3_test() ->
     DDL = make_complex_valid_map_3_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({{2, {3}, {4}}}),
     ?assertEqual(?VALID, Result).
 
@@ -1186,7 +1048,7 @@ make_complex_valid_map_3_ddl() ->
 
 simple_valid_any_test() ->
     DDL = make_simple_valid_any_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [a, b, d], 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -1206,7 +1068,7 @@ make_simple_valid_any_ddl() ->
 
 simple_valid_set_test() ->
     DDL = make_simple_valid_set_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [a, b, d], 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -1226,7 +1088,7 @@ make_simple_valid_set_ddl() ->
 
 simple_valid_mixed_test() ->
     DDL = make_simple_valid_mixed_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, 99, 4.4, 5555}),
     ?assertEqual(?VALID, Result).
 
@@ -1261,7 +1123,7 @@ simple_invalid_varchar_test() ->
                                    position = 2,
                                    type     = varchar}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, 55}),
     ?assertEqual(?INVALID, Result).
 
@@ -1278,7 +1140,7 @@ simple_invalid_sint64_test() ->
                                    position = 3,
                                    type     = sint64}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({999, -9999, 0,0}),
     ?assertEqual(?INVALID, Result).
 
@@ -1295,7 +1157,7 @@ simple_invalid_double_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({432.22, -23423.22, [a, b, d]}),
     ?assertEqual(?INVALID, Result).
 
@@ -1312,7 +1174,7 @@ simple_invalid_boolean_test() ->
                                    position = 3,
                                    type     = boolean}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({true, false, [a, b, d]}),
     ?assertEqual(?INVALID, Result).
 
@@ -1329,7 +1191,7 @@ simple_invalid_set_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [444.44], 4.4}),
     ?assertEqual(?VALID, Result).
 
@@ -1346,7 +1208,7 @@ simple_invalid_timestamp_1_test() ->
                                    position = 3,
                                    type     = timestamp}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({234.324, 23424, 34636}),
     ?assertEqual(?INVALID, Result).
 
@@ -1363,7 +1225,7 @@ simple_invalid_timestamp_2_test() ->
                                    position = 3,
                                    type     = timestamp}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({234324, -23424, 34636}),
     ?assertEqual(?INVALID, Result).
 
@@ -1380,7 +1242,7 @@ simple_invalid_timestamp_3_test() ->
                                    position = 3,
                                    type     = timestamp}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({234324, 0, 34636}),
     ?assertEqual(?INVALID, Result).
 
@@ -1402,7 +1264,7 @@ simple_invalid_map_1_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {99}, 4.4}),
     ?assertEqual(?INVALID, Result).
 
@@ -1427,7 +1289,7 @@ simple_invalid_map_2_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"erer">>}, 4.4}),
     ?assertEqual(?INVALID, Result).
 
@@ -1452,7 +1314,7 @@ simple_invalid_map_3_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, {<<"bingo">>, <<"bango">>, <<"erk">>}, 4.4}),
     ?assertEqual(?INVALID, Result).
 
@@ -1474,7 +1336,7 @@ simple_invalid_map_4_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, [99], 4.4}),
     ?assertEqual(?INVALID, Result).
 
@@ -1510,7 +1372,7 @@ complex_invalid_map_1_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>,
 				  {<<"erko">>,
 				   {<<"yerk">>, 33.0}
@@ -1532,7 +1394,7 @@ too_small_tuple_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({432.22, -23423.22}),
     ?assertEqual(?INVALID, Result).
 
@@ -1549,90 +1411,9 @@ too_big_tuple_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({432.22, -23423.22, 44.44, 65.43}),
     ?assertEqual(?INVALID, Result).
-
-%% invalid DDL tests
-
-simple_invalid_position_test() ->
-    Duff = #riak_field_v1{name     = <<"erkle">>,
-                          position = 4,
-                          type     = double},
-    DDL = make_ddl(<<"simple_invalid_position_test">>,
-                   [
-                    #riak_field_v1{name     = <<"yando">>,
-                                   position = 1,
-                                   type     = double},
-                    #riak_field_v1{name     = <<"erko">>,
-                                   position = 2,
-                                   type     = double},
-                    Duff
-                   ]),
-    {error, Err} = mk_helper_m2(DDL),
-    Expected = {invalid_ddl, [{wrong_position, {expected, 3}, Duff}]},
-    ?assertEqual(Expected, Err).
-
-simple_invalid_vals_test() ->
-    Duff = #riak_field_v1{name     = oops_atom,
-                          position = 1.0,
-                          type     = random},
-    DDL = make_ddl(<<"simple_invalid_vals_test">>,
-                   [
-                    Duff
-                   ]),
-    {error, Err} = mk_helper_m2(DDL),
-    Expected = {invalid_ddl, [{invalid_field, Duff},
-                              {wrong_position, {expected, 1}, Duff}]},
-    ?assertEqual(Expected, Err).
-
-simple_invalid_optional_test() ->
-    Map = {map, [
-                 #riak_field_v1{name     = <<"yando">>,
-                                position = 1,
-                                type     = sint64,
-                                optional = true}
-                ]},
-    Duff = #riak_field_v1{name     = <<"ribbit">>,
-                          position = 1,
-                          type     = Map,
-                          optional = true},
-    DDL = make_ddl(<<"simple_invalid_optional_test">>,
-                   [
-                    Duff
-                   ]),
-    {error, Err} = mk_helper_m2(DDL),
-    Expected = {invalid_ddl, [{maps_cant_be_optional, Duff}]},
-    ?assertEqual(Expected, Err).
-
-
-complex_invalid_vals_test() ->
-    Duff =  #riak_field_v1{name     = bert,
-                           position = 33,
-                           type     = shubert,
-                           optional = true},
-    Map = {map, [
-                 #riak_field_v1{name     = <<"yando">>,
-                                position = 1,
-                                type     = sint64,
-                                optional = true},
-                 Duff
-                ]},
-    DDL = make_ddl(<<"complex_invalid_vals_test">>,
-                   [
-                    #riak_field_v1{name     = <<"yando">>,
-                                   position = 1,
-                                   type     = varchar,
-                                   optional = true},
-                    #riak_field_v1{name     = <<"yando">>,
-                                   position = 2,
-                                   type     = Map,
-                                   optional = false}
-                   ]),
-    {error, Err} = mk_helper_m2(DDL),
-    Expected = {invalid_ddl, [{invalid_field, Duff},
-                              {wrong_position, {expected, 2}, Duff}]},
-    ?assertEqual(Expected, Err).
 
 %%
 %% Extract tests
@@ -1645,7 +1426,7 @@ simplest_valid_extract_test() ->
                                    position = 1,
                                    type     = varchar}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Obj = {<<"yarble">>},
     Result = (catch Module:extract(Obj, [<<"yando">>])),
     ?assertEqual(<<"yarble">>, Result).
@@ -1660,7 +1441,7 @@ simple_valid_extract_test() ->
                                    position = 2,
                                    type     = varchar}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Obj = {44, <<"yarble">>},
     Result = (catch Module:extract(Obj, [<<"yando">>])),
     ?assertEqual(<<"yarble">>, Result).
@@ -1683,7 +1464,7 @@ simple_valid_map_extract_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Obj = {<<"erk">>, {<<"jibjib">>}, 3.0},
     Result = (catch Module:extract(Obj, [<<"erko">>, <<"yarple">>])),
     ?assertEqual(<<"jibjib">>, Result).
@@ -1716,7 +1497,7 @@ complex_valid_map_extract_test() ->
                                    position = 1,
                                    type     = Map1}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Obj = {{2, {3}, {4}}},
     Path = [<<"Top_Map">>, <<"Level_1_map1">>, <<"in_Map_1">>],
     Res = (catch Module:extract(Obj, Path)),
@@ -1724,7 +1505,7 @@ complex_valid_map_extract_test() ->
 
 complex_ddl_test() ->
     DDL = make_complex_ddl_ddl(),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({12345, <<"beeees">>}),
     ?assertEqual(?VALID, Result).
 
@@ -1790,7 +1571,7 @@ simple_valid_map_add_cols_test() ->
                                    position = 3,
                                    type     = double}
                    ]),
-    {module, Module} = mk_helper_m2(DDL),
+    {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:add_column_info({1, {2, 3}, 4}),
     Expected = [{<<"yando">>, 1}, {<<"erko">>, [
 						{<<"yarple">>, 2},
@@ -1805,7 +1586,7 @@ simple_valid_map_add_cols_test() ->
 
 -define(ddl_roundtrip_assert(MakeDDLFunName),
 	DDL = erlang:apply(?MODULE, MakeDDLFunName, []),
-	{module, Module} = mk_helper_m2(DDL),
+	{module, Module} = compile_and_load_from_tmp(DDL),
 	Got = Module:get_ddl(),
 	?assertEqual(DDL, Got)).
 
