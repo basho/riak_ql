@@ -60,6 +60,8 @@
 -include_lib("eunit/include/eunit.hrl").
 %% for debugging only
 -export([make_ddl/2]).
+%% for other testing modules
+-export([parsed_sql_to_query/1]).
 -endif.
 
 -define(CANBEBLANK,  true).
@@ -180,7 +182,7 @@ syntax_error_to_msg(E) ->
 
 %%
 syntax_error_to_msg2({type_check_failed, Fn, Arity, ExprTypes}) ->
-    {"Function ~s/~p called with arguments of the wrong type ~p.", 
+    {"Function ~s/~p called with arguments of the wrong type ~p.",
       [unquote_fn(Fn), Arity, ExprTypes]};
 syntax_error_to_msg2({fn_called_with_wrong_arity, Fn, Arity, NumArgs}) ->
     {"Function ~s/~p called with ~p arguments.", [unquote_fn(Fn), Arity, NumArgs]};
@@ -217,14 +219,12 @@ syntax_error_to_msg2({operator_type_mismatch, Fn, Type1, Type2}) ->
 unquote_fn(Fn) when is_atom(Fn) ->
     string:strip(atom_to_list(Fn), both, $').
 
--spec is_query_valid(module(), #ddl_v1{}, ?SQL_SELECT{}) ->
+-spec is_query_valid(module(), #ddl_v1{}, {term(), term(), term()}) ->
                             true | {false, [query_syntax_error()]}.
 is_query_valid(_, #ddl_v1{ table = T1 },
-               ?SQL_SELECT{ 'FROM' = T2 }) when T1 =/= T2 ->
+               {T2, _Select, _Where}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
-is_query_valid(Mod, _,
-               ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = Selection},
-                           'WHERE'  = Where}) ->
+is_query_valid(Mod, _, {_Table, Selection, Where}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
@@ -785,8 +785,7 @@ partial_are_selections_valid_fail_test() ->
 simple_is_query_valid_test() ->
     Bucket = <<"simple_is_query_valid_test">>,
     Selections  = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections}},
+    Query = {Bucket, Selections, []},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -809,8 +808,7 @@ simple_is_query_valid_map_test() ->
     Name2 = <<"geo">>,
     Selections  = [{identifier, [<<"temp">>, <<"geo">>]},
                    {identifier, [<<"name">>]}],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections}},
+    Query = {Bucket, Selections, []},
     Map = {map, [
                  #riak_field_v1{name     = Name2,
                                 position = 1,
@@ -837,8 +835,7 @@ simple_is_query_valid_map_wildcard_test() ->
     Name1 = <<"temp">>,
     Name2 = <<"geo">>,
     Selections  = [{identifier, [<<"temp">>, <<"*">>]}, {identifier, [<<"name">>]}],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections}},
+    Query = {Bucket, Selections, []},
     Map = {map, [
                  #riak_field_v1{name     = Name2,
                                 position = 1,
@@ -871,9 +868,7 @@ simple_filter_query_test() ->
               {'<', <<"temperature">>, {integer, 15}}
              }
             ],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections},
-                        'WHERE'  = Where},
+    Query = {Bucket, Selections, Where},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -901,9 +896,7 @@ full_filter_query_test() ->
                  {'<=', <<"lte field">>,  {integer, 15}},
                  {'>=', <<"gte field">>,  {integer, 15}}}}}}
             ],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections},
-                        'WHERE'  = Where},
+    Query = {Bucket, Selections, Where},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -937,9 +930,7 @@ timeseries_filter_test() ->
               }
              }
             ],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections},
-                        'WHERE'  = Where},
+    Query = {Bucket, Selections, Where},
     Fields = [
               #riak_field_v1{name     = <<"geohash">>,
                              position = 1,
@@ -985,6 +976,14 @@ timeseries_filter_test() ->
     Expected = true,
     ?assertEqual(Expected, Res).
 
+%% is_query_valid expects a 3-tuple: table name, fields, where clause
+parsed_sql_to_query(Proplist) ->
+    {
+      proplists:get_value(tables, Proplist, <<>>),
+      proplists:get_value(fields, Proplist, []),
+      proplists:get_value(where, Proplist, [])
+    }.
+
 test_parse(SQL) ->
     element(2,
             riak_ql_parser:parse(
@@ -997,7 +996,7 @@ is_query_valid_test_helper(Table_name, Table_def, Query) ->
     DDL = test_parse(Table_def),
     %% ?debugFmt("QUERY is ~p", [test_parse(Query)]),
     {module,Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    is_query_valid(Mod, DDL, test_parse(Query)).
+    is_query_valid(Mod, DDL, parsed_sql_to_query(test_parse(Query))).
 
 -define(LARGE_TABLE_DEF,
         "CREATE TABLE mytab"
@@ -1168,11 +1167,12 @@ is_query_valid_no_subexpressions_1_test() ->
       ).
 
 fold_where_tree_test() ->
-    ?SQL_SELECT{ 'WHERE' = [Where] } = test_parse(
-                                         "SELECT * FROM mytab "
-                                         "WHERE time > 1 AND time < 10 "
-                                         "AND myfamily = 'family1' "
-                                         "AND myseries = 10 "),
+    Parsed = test_parse(
+               "SELECT * FROM mytab "
+               "WHERE time > 1 AND time < 10 "
+               "AND myfamily = 'family1' "
+               "AND myseries = 10 "),
+    Where = proplists:get_value(where, Parsed),
     ?assertEqual(
        [<<"myseries">>, <<"myfamily">>, <<"time">>, <<"time">>],
        lists:reverse(fold_where_tree(Where, [],
@@ -1203,7 +1203,7 @@ fold_where_tree_test() ->
                DDL = test_parse(CreateTab),
                {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
                Q = test_parse(SQL),
-               ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = Selections}} = Q,
+               Selections = proplists:get_value(fields, Q),
                Got = are_selections_valid(Mod, Selections, ?CANTBEBLANK),
                ?assertEqual(Expected, Got)).
 
