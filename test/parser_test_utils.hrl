@@ -24,24 +24,23 @@
 
 -compile([export_all]).
 
--define(sql_comp_assert(String, Expected),
-        Exp2 = {ok, Expected},
+-define(sql_comp_assert(String, Type, Expected),
         Toks = riak_ql_lexer:get_tokens(String),
-        Got = riak_ql_parser:parse(Toks),
-        ?assertEqual(Exp2, Got)).
+        {Type, Got} = riak_ql_parser:ql_parse(Toks),
+        ?assertEqual(Expected, Got)).
 
 -define(where_test(Uncanonical, Expected),
         Got = riak_ql_parser:canonicalise_where(Uncanonical),
         ?assertEqual(Expected, Got)).
 
--define(sql_comp_assert_match(String, Expected),
+-define(sql_comp_assert_match(String, Type, Expected),
         Toks = riak_ql_lexer:get_tokens(String),
-        {ok, Got} = riak_ql_parser:parse(Toks),
+        {Type, Got} = riak_ql_parser:ql_parse(Toks),
         lists:foreach(
           fun({Key, Value}) -> ?assertEqual(Value, proplists:get_value(Key, Got)) end,
           Expected)).
 
 -define(sql_comp_fail(QL_string),
         Toks = riak_ql_lexer:get_tokens(QL_string),
-        Got = riak_ql_parser:parse(Toks),
+        Got = riak_ql_parser:ql_parse(Toks),
         ?assertMatch({error, _}, Got)).

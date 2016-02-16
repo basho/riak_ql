@@ -28,9 +28,8 @@
 
 select_sql_test() ->
     ?sql_comp_assert_match(
-       "select * from argle",
-       [{type, select},
-        {fields, [
+       "select * from argle", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"argle">>},
@@ -39,9 +38,8 @@ select_sql_test() ->
 
 select_sql_with_semicolon_test() ->
     ?sql_comp_assert_match(
-       "select * from argle;",
-       [{type, select},
-        {fields, [
+       "select * from argle;", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"argle">>},
@@ -50,9 +48,8 @@ select_sql_with_semicolon_test() ->
 
 select_sql_with_semicolons_in_quotes_test() ->
     ?sql_comp_assert_match(
-       "select * from \"table;name\" where ';' = asdf;",
-       [{type, select},
-        {fields, [
+       "select * from \"table;name\" where ';' = asdf;", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"table;name">>},
@@ -67,9 +64,8 @@ select_sql_multiple_semicolon_test() ->
 
 select_quoted_sql_test() ->
     ?sql_comp_assert_match(
-       "select * from \"argle\"",
-       [{type, select},
-        {fields, [
+       "select * from \"argle\"", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"argle">>},
@@ -78,9 +74,8 @@ select_quoted_sql_test() ->
 
 select_quoted_keyword_sql_test() ->
     ?sql_comp_assert_match(
-       "select * from \"select\"",
-       [{type, select},
-        {fields, [
+       "select * from \"select\"", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"select">>},
@@ -89,9 +84,8 @@ select_quoted_keyword_sql_test() ->
 
 select_nested_quotes_sql_test() ->
     ?sql_comp_assert_match(
-       "select * from \"some \"\"quotes\"\" in me\"",
-       [{type, select},
-        {fields, [
+       "select * from \"some \"\"quotes\"\" in me\"", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"some \"quotes\" in me">>},
@@ -100,9 +94,8 @@ select_nested_quotes_sql_test() ->
 
 select_from_lists_sql_test() ->
     ?sql_comp_assert_match(
-       "select * from events, errors",
-       [{type, select},
-        {fields, [
+       "select * from events, errors", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, {list, [<<"events">>, <<"errors">>]}},
@@ -111,9 +104,8 @@ select_from_lists_sql_test() ->
 
 select_fields_from_lists_sql_test() ->
     ?sql_comp_assert_match(
-       "select hip, hop, dont, stop from events",
-       [{type, select},
-        {fields, [
+       "select hip, hop, dont, stop from events", select,
+       [{fields, [
                   {identifier, [<<"hip">>]},
                   {identifier, [<<"hop">>]},
                   {identifier, [<<"dont">>]},
@@ -125,9 +117,8 @@ select_fields_from_lists_sql_test() ->
 
 select_quoted_spaces_sql_test() ->
     ?sql_comp_assert_match(
-       "select * from \"table with spaces\"",
-       [{type, select},
-        {fields, [
+       "select * from \"table with spaces\"", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"table with spaces">>},
@@ -138,9 +129,8 @@ select_quoted_escape_sql_test() ->
     ?sql_comp_assert_match(
        "select * from \"table with spaces\" where "
        "\"co\"\"or\" = 'klingon''name' or "
-       "\"co\"\"or\" = '\"'",
-       [{type, select},
-        {fields, [
+       "\"co\"\"or\" = '\"'", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"table with spaces">>},

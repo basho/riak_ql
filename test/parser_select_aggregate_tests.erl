@@ -28,9 +28,8 @@
 
 window_aggregate_fn_1_test() ->
     ?sql_comp_assert_match(
-       "select avg(temp) from details",
-       [{type, select},
-        {fields, [
+       "select avg(temp) from details", select,
+       [{fields, [
                   {{window_agg_fn, 'AVG'},
                    [{identifier, [<<"temp">>]}]}
                  ]},
@@ -40,9 +39,8 @@ window_aggregate_fn_1_test() ->
 
 window_aggregate_fn_1a_test() ->
     ?sql_comp_assert_match(
-       "select mean(temp) from details",
-       [{type, select},
-        {fields, [
+       "select mean(temp) from details", select,
+       [{fields, [
                   {{window_agg_fn, 'MEAN'},
                    [{identifier, [<<"temp">>]}]}
                  ]},
@@ -52,9 +50,8 @@ window_aggregate_fn_1a_test() ->
 
 window_aggregate_fn_2_test() ->
     ?sql_comp_assert_match(
-       "select avg(temp), sum(counts) from details",
-       [{type, select},
-        {fields, [
+       "select avg(temp), sum(counts) from details", select,
+       [{fields, [
                   {{window_agg_fn, 'AVG'},
                    [{identifier, [<<"temp">>]}]},
                   {{window_agg_fn, 'SUM'},
@@ -66,9 +63,8 @@ window_aggregate_fn_2_test() ->
 
 window_aggregate_fn_wildcard_count_test() ->
     ?sql_comp_assert_match(
-       "select count(*) from details",
-       [{type, select},
-        {fields, [
+       "select count(*) from details", select,
+       [{fields, [
                   {{window_agg_fn, 'COUNT'},
                    [{identifier, [<<"*">>]}]}
                  ]},
@@ -78,9 +74,8 @@ window_aggregate_fn_wildcard_count_test() ->
 
 window_aggregate_fn_capitalisation_test() ->
     ?sql_comp_assert_match(
-       "select aVg(temp) from details",
-       [{type, select},
-        {fields, [
+       "select aVg(temp) from details", select,
+       [{fields, [
                   {{window_agg_fn, 'AVG'},
                    [{identifier, [<<"temp">>]}]}
                  ]},
@@ -90,10 +85,9 @@ window_aggregate_fn_capitalisation_test() ->
 
 window_aggregate_fn_all_funs_test() ->
     ?sql_comp_assert_match(
-       "select avg(temp), sum(counts), count(counts), min(counts), " ++
-           "max(counts), stddev(counts) from details",
-       [{type, select},
-        {fields, [
+       "select avg(temp), sum(counts), count(counts), min(counts), "
+       "max(counts), stddev(counts) from details", select,
+       [{fields, [
                   {{window_agg_fn, 'AVG'},
                    [{identifier, [<<"temp">>]}]},
                   {{window_agg_fn, 'SUM'},
@@ -114,9 +108,8 @@ window_aggregate_fn_all_funs_test() ->
 
 window_aggregate_fn_arithmetic_2_test() ->
     ?sql_comp_assert_match(
-       "select aVg(temperature) + count(temperature) from details",
-       [{type, select},
-        {fields, [
+       "select aVg(temperature) + count(temperature) from details", select,
+       [{fields, [
                   {'+',
                    {{window_agg_fn, 'AVG'},
                     [{identifier, [<<"temperature">>]}]},
@@ -129,9 +122,8 @@ window_aggregate_fn_arithmetic_2_test() ->
 
 window_aggregate_fn_arithmetic_3_test() ->
     ?sql_comp_assert_match(
-       "select aVg(temperature + 1) + count(temperature / distance) from details",
-       [{type, select},
-        {fields, [
+       "select aVg(temperature + 1) + count(temperature / distance) from details", select,
+       [{fields, [
                   {'+',
                    {{window_agg_fn, 'AVG'}, [{'+', {identifier, <<"temperature">>}, {integer, 1}}]},
                    {{window_agg_fn, 'COUNT'}, [{'/', {identifier, <<"temperature">>}, {identifier, <<"distance">>}}]}

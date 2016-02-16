@@ -28,9 +28,8 @@
 
 select_where_1_sql_test() ->
     ?sql_comp_assert_match("select value from response_times "
-                           "where time > '2013-08-12 23:32:01' and time < '2013-08-13 12:34:56'",
-                           [{type, select},
-                            {fields, [
+                           "where time > '2013-08-12 23:32:01' and time < '2013-08-13 12:34:56'", select,
+                           [{fields, [
                                       {identifier, [<<"value">>]}
                                      ]},
                             {tables, <<"response_times">>},
@@ -44,9 +43,8 @@ select_where_1_sql_test() ->
 
 select_where_1_reverse_sql_test() ->
     ?sql_comp_assert_match("select value from response_times "
-                           "where '2013-08-12 23:32:01' < time and '2013-08-13 12:34:56' > time",
-                           [{type, select},
-                            {fields, [
+                           "where '2013-08-12 23:32:01' < time and '2013-08-13 12:34:56' > time", select,
+                           [{fields, [
                                       {identifier, [<<"value">>]}
                                      ]},
                             {tables, <<"response_times">>},
@@ -59,9 +57,8 @@ select_where_1_reverse_sql_test() ->
                            ]).
 
 select_where_3_sql_test() ->
-    ?sql_comp_assert_match("select value from response_times where time > 1388534400",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select value from response_times where time > 1388534400", select,
+                           [{fields, [
                                       {identifier, [<<"value">>]}
                                      ]},
                             {tables, <<"response_times">>},
@@ -71,9 +68,8 @@ select_where_3_sql_test() ->
                            ]).
 
 select_where_4_sql_test() ->
-    ?sql_comp_assert_match("select value from response_times where time > 1388534400s",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select value from response_times where time > 1388534400s", select,
+                           [{fields, [
                                       {identifier, [<<"value">>]}
                                      ]},
                             {tables, <<"response_times">>},
@@ -84,9 +80,8 @@ select_where_4_sql_test() ->
 
 select_where_5_sql_test() ->
     ?sql_comp_assert_match("select * from events where time = 1400497861762723 "
-                           "and sequence_number = 2321",
-                           [{type, select},
-                            {fields, [
+                           "and sequence_number = 2321", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"events">>},
@@ -99,9 +94,8 @@ select_where_5_sql_test() ->
                            ]).
 
 select_where_8_sql_test() ->
-    ?sql_comp_assert_match("select * from events where state = 'NY'",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select * from events where state = 'NY'", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"events">>},
@@ -114,9 +108,8 @@ select_where_approxmatch_sql_test() ->
     ?sql_comp_fail("select * from log_lines where line =~ /error/i").
 
 select_where_10_sql_test() ->
-    ?sql_comp_assert_match("select * from events where customer_id = 23 and type = 'click10'",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select * from events where customer_id = 23 and type = 'click10'", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"events">>},
@@ -129,9 +122,8 @@ select_where_10_sql_test() ->
                            ]).
 
 select_where_11_sql_test() ->
-    ?sql_comp_assert_match("select * from response_times where value > 500",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select * from response_times where value > 500", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"response_times">>},
@@ -141,9 +133,8 @@ select_where_11_sql_test() ->
                            ]).
 
 select_where_11a_sql_test() ->
-    ?sql_comp_assert_match("select * from response_times where value >= 500",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select * from response_times where value >= 500", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"response_times">>},
@@ -153,9 +144,8 @@ select_where_11a_sql_test() ->
                            ]).
 
 select_where_11b_sql_test() ->
-    ?sql_comp_assert_match("select * from response_times where value <= 500",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select * from response_times where value <= 500", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"response_times">>},
@@ -171,9 +161,8 @@ select_where_ne_sql_test() ->
     ?sql_comp_fail("select * from nagios_checks where status <> 0").
 
 select_where_14_sql_test() ->
-    ?sql_comp_assert_match("select * from events where signed_in = false",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select * from events where signed_in = false", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"events">>},
@@ -183,9 +172,8 @@ select_where_14_sql_test() ->
                            ]).
 
 select_where_15_sql_test() ->
-    ?sql_comp_assert_match("select * from events where signed_in = -3",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select * from events where signed_in = -3", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"events">>},
@@ -199,9 +187,8 @@ select_where_approx_or_approx_sql_test() ->
                        "email =~ /.*yahoo.*/) and state = 'ny'").
 
 select_where_letters_nos_in_strings_1a_test() ->
-    ?sql_comp_assert_match("select * from events where user = 'user 1'",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select * from events where user = 'user 1'", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"events">>},
@@ -212,9 +199,8 @@ select_where_letters_nos_in_strings_1a_test() ->
 
 select_where_letters_nos_in_strings_2a_test() ->
     ?sql_comp_assert_match(
-       "select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
-       [{type, select},
-        {fields, [
+       "select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'", select,
+       [{fields, [
                   {identifier, [<<"weather">>]}
                  ]},
         {tables, <<"GeoCheckin">>},
@@ -231,9 +217,8 @@ select_where_letters_nos_in_strings_2a_test() ->
 
 select_where_single_quotes_test() ->
     ?sql_comp_assert_match(
-       "select weather from GeoCheckin where user = 'user_1' and location = 'San Francisco'",
-       [{type, select},
-        {fields, [
+       "select weather from GeoCheckin where user = 'user_1' and location = 'San Francisco'", select,
+       [{fields, [
                   {identifier, [<<"weather">>]}
                  ]},
         {tables, <<"GeoCheckin">>},
@@ -249,9 +234,8 @@ select_where_ors_at_start_test() ->
     ?sql_comp_assert_match(
        "select * FROM tsall2 WHERE "
        "d3 = 1.0 OR d3 = 2.0 "
-       "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1",
-       [{type, select},
-        {fields, [
+       "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"tsall2">>},
@@ -276,9 +260,8 @@ select_where_ors_at_end_test() ->
        "select * FROM tsall2 WHERE "
        "d3 = 1.0 OR d3 = 2.0 "
        "AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1 "
-       "OR d3 = 3.0 OR d3 = 4.0",
-       [{type, select},
-        {fields, [
+       "OR d3 = 3.0 OR d3 = 4.0", select,
+       [{fields, [
                   {identifier, [<<"*">>]}
                  ]},
         {tables, <<"tsall2">>},
@@ -303,9 +286,8 @@ select_where_ors_at_end_test() ->
        ]).
 
 select_where_letters_nos_in_strings_2b_test() ->
-    ?sql_comp_assert_match("select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'", select,
+                           [{fields, [
                                       {identifier, [<<"weather">>]}
                                      ]},
                             {tables, <<"GeoCheckin">>},
@@ -321,9 +303,8 @@ select_where_letters_nos_in_strings_2b_test() ->
                            ]).
 
 select_where_brackets_1_test() ->
-    ?sql_comp_assert_match("select weather from GeoCheckin where (time > 2000 and time < 8000) and user = 'user_1'",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select weather from GeoCheckin where (time > 2000 and time < 8000) and user = 'user_1'", select,
+                           [{fields, [
                                       {identifier, [<<"weather">>]}
                                      ]},
                             {tables, <<"GeoCheckin">>},
@@ -339,9 +320,8 @@ select_where_brackets_1_test() ->
                            ]).
 
 select_where_brackets_2_test() ->
-    ?sql_comp_assert_match("select weather from GeoCheckin where user = 'user_1' and (time > 2000 and time < 8000)",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select weather from GeoCheckin where user = 'user_1' and (time > 2000 and time < 8000)", select,
+                           [{fields, [
                                       {identifier, [<<"weather">>]}
                                      ]},
                             {tables, <<"GeoCheckin">>},
@@ -357,9 +337,8 @@ select_where_brackets_2_test() ->
                            ]).
 
 select_where_brackets_2a_test() ->
-    ?sql_comp_assert_match("select weather from GeoCheckin where user = 'user_1' and (time > 2000 and (time < 8000))",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select weather from GeoCheckin where user = 'user_1' and (time > 2000 and (time < 8000))", select,
+                           [{fields, [
                                       {identifier, [<<"weather">>]}
                                      ]},
                             {tables, <<"GeoCheckin">>},
@@ -379,9 +358,8 @@ select_field_to_field_forbidden_test() ->
     ?sql_comp_fail("select * from table where time = time").
 
 select_quoted_where_sql_test() ->
-    ?sql_comp_assert_match("select * from \"table with spaces\" where \"color spaces\" = 'someone had painted it blue'",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select * from \"table with spaces\" where \"color spaces\" = 'someone had painted it blue'", select,
+                           [{fields, [
                                       {identifier, [<<"*">>]}
                                      ]},
                             {tables, <<"table with spaces">>},

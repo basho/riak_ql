@@ -28,9 +28,8 @@
 -include("parser_test_utils.hrl").
 
 select_arithmetic_test() ->
-    ?sql_comp_assert_match("select temperature + 1 from details",
-                           [{type, select},
-                            {fields, [
+    ?sql_comp_assert_match("select temperature + 1 from details", select,
+                           [{fields, [
                                       {'+',
                                        {identifier, <<"temperature">>},
                                        {integer, 1}
@@ -41,9 +40,8 @@ select_arithmetic_test() ->
                            ]).
 
 arithmetic_precedence_test() ->
-    ?sql_comp_assert_match("select 1 * 2 + 3 / 4 - 5 * 6 from dual",
-                           [{type, select},
-                            {fields,
+    ?sql_comp_assert_match("select 1 * 2 + 3 / 4 - 5 * 6 from dual", select,
+                           [{fields,
                              [{'-',
                                {'+',
                                 {'*', {integer,1}, {integer,2}},
@@ -56,9 +54,8 @@ arithmetic_precedence_test() ->
                            ]).
 
 parens_precedence_test() ->
-    ?sql_comp_assert_match("select 1 * (2 + 3) / (4 - 5) * 6 from dual",
-                           [{type, select},
-                            {fields,
+    ?sql_comp_assert_match("select 1 * (2 + 3) / (4 - 5) * 6 from dual", select,
+                           [{fields,
                              [{'*',
                                {'/',
                                 {'*', {integer,1},
@@ -70,9 +67,8 @@ parens_precedence_test() ->
                            ]).
 
 negated_parens_test() ->
-    ?sql_comp_assert_match("select - (2 + 3) from dual",
-                           [{type, select},
-                            {fields,
+    ?sql_comp_assert_match("select - (2 + 3) from dual", select,
+                           [{fields,
                              [{negate,
                                {expr,
                                 {'+', {integer,2}, {integer,3}}}}
@@ -87,9 +83,8 @@ no_functions_in_where_test() ->
 
 window_aggregate_fn_arithmetic_1_test() ->
     ?sql_comp_assert_match(
-       "SELECT AVG(temperature) + 1 - 2 * 3 / 4 FROM details",
-       [{type, select},
-        {fields,
+       "SELECT AVG(temperature) + 1 - 2 * 3 / 4 FROM details", select,
+       [{fields,
          [{'-',{'+',{{window_agg_fn,'AVG'},
                      [{identifier,[<<"temperature">>]}]
                     },{integer,1}},
@@ -100,9 +95,8 @@ window_aggregate_fn_arithmetic_1_test() ->
 
 window_aggregate_fn_arithmetic_2_test() ->
     ?sql_comp_assert_match(
-       "SELECT AVG((temperature * 2) + 32) FROM details",
-       [{type, select},
-        {fields,
+       "SELECT AVG((temperature * 2) + 32) FROM details", select,
+       [{fields,
          [{{window_agg_fn,'AVG'},
            [{'+',{expr,{'*',
                         {identifier,<<"temperature">>},{integer,2}}},{integer,32}}]}]
@@ -112,9 +106,8 @@ window_aggregate_fn_arithmetic_2_test() ->
 
 window_aggregate_fn_arithmetic_3_test() ->
     ?sql_comp_assert_match(
-       "SELECT COUNT(x) + 1 / AVG(y) FROM details",
-       [{type, select},
-        {fields,
+       "SELECT COUNT(x) + 1 / AVG(y) FROM details", select,
+       [{fields,
          [{'+',{{window_agg_fn,'COUNT'},
                 [{identifier,[<<"x">>]}]},
            {'/',{integer,1},

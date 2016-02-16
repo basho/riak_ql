@@ -324,8 +324,23 @@ Erlang code.
 %% no way to stop rebar borking on it AFAIK
 -export([
          return_error/2,
+         ql_parse/1,
          canonicalise_where/1
          ]).
+
+%% Provide more useful success tuples
+ql_parse(Tokens) ->
+    interpret_parse_result(parse(Tokens)).
+
+interpret_parse_result({error, _}=Err) ->
+    Err;
+interpret_parse_result({ok, #ddl_v1{}=DDL}) ->
+    {ddl, DDL};
+interpret_parse_result({ok, Proplist}) ->
+    extract_type(proplists:get_value(type, Proplist), Proplist).
+
+extract_type(Type, Proplist) ->
+    {Type, Proplist -- [{type, Type}]}.
 
 %% if no partition key is specified hash on the local key
 fix_up_keys(#ddl_v1{partition_key = none, local_key = LK} = DDL) ->

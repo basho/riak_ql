@@ -27,9 +27,9 @@
 -include("parser_test_utils.hrl").
 
 simple_describe_test() ->
-    ?sql_comp_assert("describe GeoCheckins",
-                     [{type, describe}, {identifier, <<"GeoCheckins">>}]).
+    ?sql_comp_assert("describe GeoCheckins", describe,
+                     [{identifier, <<"GeoCheckins">>}]).
 
 uppercase_quoted_describe_test() ->
-    ?sql_comp_assert("DESCRIBE \"GeoCheckins\"",
-                     [{type, describe}, {identifier, <<"GeoCheckins">>}]).
+    ?sql_comp_assert("DESCRIBE \"GeoCheckins\"", describe,
+                     [{identifier, <<"GeoCheckins">>}]).
