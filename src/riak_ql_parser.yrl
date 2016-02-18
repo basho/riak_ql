@@ -768,8 +768,7 @@ assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
                               [string:join(NonNullFields, ", ")])
     end.
 
-%% @doc Verify that the primary key has three components
-%%      and the third element is a quantum
+%% @doc Assert that the partition key has at least one field.
 assert_partition_key_length(#ddl_v1{partition_key = {key_v1, [_|_]}}) ->
     ok;
 assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) ->
