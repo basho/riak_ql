@@ -57,13 +57,15 @@ Running `./rebar compile` transforms this pair of leex and yecc files into the e
 * `riak_ql_lexer.erl`
 * `riak_ql_parser.erl`
 
+For more details of the lexer and parser see the [Lexer And Parser](./doc/lexer_parser.md)
+
+To understand how the lexer/parser fits into the query pipeline see [Query Pipeline](./doc/the_query_pipeline.md)
+
 There is a ruby script and set of SQL keywords which can be used to generate some of the lexer components of `riak_lexer.xrl`:
 * `priv/keyword_general.rb`
 * `priv/riak_ql_keywords.csv`
 
-For more details see [Lexer Keywords](./doc/lexer_keywords.md)
-
-TODO - add link to the query toolchain documentation.
+For more details see the [Lexer Keywords](./doc/lexer_keywords.md)
 
 This code generates one of 2 output records:
 * `ddl_v1{}` - which captures the `CREATE TABLE...` statement
@@ -76,7 +78,7 @@ Time quantisation is done by the module:
 
 Please read the inline documentation for this module.
 
-## 4.iv DDL Compiler
+### 4.iv DDL Compiler
 
 The DDL compiler is implemented by:
 * `riak_ql_ddl_compiler.erl`
@@ -86,7 +88,8 @@ When a `CREATE TABLE...` statement if fed into the lexer/parser it generates a `
 
 The module `riak_ql_ddl_compiler.erl` performs the compilation and the module `riak_ql_ddl.erl` provides a set of wrappers around the compiled module to add utility functions to the API.
 
-TODO - add link to DDL documentation.
+For more details see the [DDL Compiler](./doc/ddl_compiler.md)
+
 
 ### 4.v Runtime Query Fns
 
