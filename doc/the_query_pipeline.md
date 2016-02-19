@@ -387,9 +387,10 @@ The chunking may be for 2 reasons
 * there is too much data from a particular vnode to appear in memory
 * the data we want is on more than one vnode
 
-Let us now rewrite a Time Series query to see something real
+Let us now rewrite a Time Series query to see something real:
 ```sql
-SELECT device, temp FROM mytimeseries WHERE family = 'myfamily', series = 'myseries', timestamp > 1233 and timestamp < 6789 and temp > 18;
+SELECT device, temp FROM mytimeseries WHERE family = 'myfamily', series = 'myseries', timestamp > 1233
+                                            and timestamp < 6789 and temp > 18;
 ```
 
 This becomes:
