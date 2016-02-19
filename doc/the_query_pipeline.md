@@ -357,7 +357,7 @@ This process is trivially recursive. For operational reasons these operations mu
                   <-----+
 +-------+-------+       |          +-------+-------+-------+
 | Val1X | Val1Y |       |          | Val1a | Val1b | Val1c |
-+---------------+       |          +-----------------------+
++---------------+       | Chunk1   +-----------------------+
 | Val2X | Val2Y |       +----------+ Val2a | Val2b | Val2c |
 +-------+-------+       |          +-----------------------+
                         |          | Val3a | Val3b | Val3c |
@@ -366,7 +366,7 @@ This process is trivially recursive. For operational reasons these operations mu
                         |
                         |          +-------+-------+-------+
                         |          | Val4a | Val4b | Val4c |
-                        |          +-----------------------+
+                        | Chunk2   +-----------------------+
                         +----------+ Val5a | Val5b | Val5c |
                         |          +-----------------------+
                         |          | Val6a | Val6b | Val6c |
@@ -375,7 +375,7 @@ This process is trivially recursive. For operational reasons these operations mu
                         |
                         |          +-------+-------+-------+
                         |          | Val7a | Val7b | Val7c |
-                        |          +-----------------------+
+                        | Chunk3   +-----------------------+
                         +----------+ Val8a | Val8b | Val8c |
                                    +-----------------------+
                                    | Val9a | Val9b | Val0c |
@@ -394,30 +394,30 @@ SELECT device, temp FROM mytimeseries WHERE family = 'myfamily', series = 'myser
 
 This becomes:
 ```
-+ FROM     <----------------+      + FROM     mytable on vnode X
-|                           |      |
-| SELECT   device, temp     |      | SELECT   *
-|                           |      |
-| GROUP BY []               +------+ GROUP BY []
-|                           |      |
-| ORDER BY []               |      | ORDER BY []
-|                           |      |
-+ WHERE    []               |      + WHERE + start_key = {myfamily, myseries, 1233}
-                            |              | end_key   = {myfamily, myseries, 4000}
-                            |              + temp      > 18
++ FROM     <----------------+        + FROM     mytable on vnode X
+|                           |        |
+| SELECT   device, temp     |        | SELECT   *
+|                           | Chunk1 |
+| GROUP BY []               +--------+ GROUP BY []
+|                           |        |
+| ORDER BY []               |        | ORDER BY []
+|                           |        |
++ WHERE    []               |        + WHERE + start_key = {myfamily, myseries, 1233}
+                            |                | end_key   = {myfamily, myseries, 4000}
+                            |                + temp      > 18
                             |
                             |
-                            |     + FROM     mytable on vnode Y
-                            |     |
-                            |     | SELECT   *
-                            |     |
-                            +-----+ GROUP BY []
-                                  |
-                                  | ORDER BY []
-                                  |
-                                  + WHERE + start_key = {myfamily, myseries, 4001}
-                                          | end_key   = {myfamily, myseries, 6789}
-                                          + temp      > 18
+                            |        + FROM     mytable on vnode Y
+                            |        |
+                            |        | SELECT   *
+                            | Chunk2 |
+                            +--------+ GROUP BY []
+                                     |
+                                     | ORDER BY []
+                                     |
+                                     + WHERE + start_key = {myfamily, myseries, 4001}
+                                             | end_key   = {myfamily, myseries, 6789}
+                                             + temp      > 18
 ```
 
 Note 2 things:
