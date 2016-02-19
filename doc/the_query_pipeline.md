@@ -3,6 +3,7 @@
 ## 1	Introduction
 
 This documenation describes:
+
 * Section 2 - client-to-query processing
 * Section 3 - query validation before execution
 * Section 4 - query rewriting for execution
@@ -120,6 +121,7 @@ By emitting a proplist (or set of nested proplists) whose key equate to record f
 The output of the lexer/parser is a valid SQL statement - but that doesn't not correspond to a valid query. There are three different types of validation that the query must pass before it is executable:
 
 * do the fields in various query clauses correspond to fields in the underlying declared table defined by a `CREATE TABLE` statement? The clauses that must be checked are:
+
   * `SELECT`
   * `WHERE`
   * (`ORDER BY` - not implemented yet)
