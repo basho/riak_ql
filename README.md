@@ -14,15 +14,15 @@ This README is an overview of the repo individual sub-systems have their own doc
 ## 2 Table Of Contents
 
 This document contains the following sections (marked as to their completeness)
-- 1 Introduction
-- 2 Table Of Contents
-- 3 Repository Contents
-- 4 Summary
-   - 4.i Runtime Tools
-   - 4.ii SQL Lexer/Parser
-   - 4.iii Time Quantiser Fn
-   - 4.iv DDL Compiler
-   - 4.v Runtime Query Fns
+1 Introduction
+2 Table Of Contents
+3 Repository Contents
+4 Summary
+4.i Runtime Tools
+4.ii SQL Lexer/Parser
+4.iii Time Quantiser Fn
+4.iv DDL Compiler
+4.v Runtime Query Fns
 
 ## 3 Repository Contents
 

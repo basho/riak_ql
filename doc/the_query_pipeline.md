@@ -29,7 +29,7 @@ query
 
 ### 2.b Conformance with the SQL Foundation Document
 
-It is worthing making the point about conformance with the spec at this stage. Below is an extract from the riak_ql_parser.yrl language definition of a Numeric Value Expression:
+It is worthing making the point about conformance with the spec at this stage. Below is an extract from the `riak_ql_parser.yrl` language definition of a Numeric Value Expression:
 
 ```erlang
 %% 6.27 NUMERIC VALUE EXPRESSION
@@ -130,21 +130,25 @@ The output of the lexer/parser is a valid SQL statement - but that doesn't not c
   * for instance you can't divide `varchars` by `integers`
 
 ```
-                      DDL                DDL           DDL      Function
-                     Helper             Helper        Helper    Type Sigs
-                       +                  +             +           +
-                       |                  |             +-----+-----+
-                       |                  |                   |
-                       |                  |                   |
-                       v                  v                   v
-Declatory          Are fields Yes    Is valid TS    Yes    Is query    Yes   To Query
-SQL Select  +----> in table? +-----> WHERE clause? +-----> typesafe? +-----> Rewriter
-Record                 +                  +                   +
-                    No |               No |                No |
-                       |                  |                   |
-                       v                  v                   v
-                     Error              Error               Error
+                                    |
+                      DDL                     DDL           DDL      Function
+                     Helper         |        Helper        Helper    Type Sigs
+                       +                       +             +           +
+                       |            |          |             +-----+-----+
+                       |                       |                   |
+                       |            |          |                   |
+                       v                       v                   v
+Declatory          Are fields YES         Is valid TS    YES    Is query   YES    To Query
+SQL Select  +----> in table? +----------> WHERE clause? +-----> typesafe? +-----> Rewriter
+Record                 +                       +                   +
+                    NO |                    NO |                NO |
+                       |            |          |                   |
+                       v                       v                   v
+                     Error          |        Error               Error
 
+                                    |
+
+           Lexer/Parser - QL        |               Query Compiler KV
 ```
 
 Query validation happens in `riak_kv` after the query is handed over to be executed
@@ -163,7 +167,7 @@ The key restrictions are enforced with the BFL methodology - *brute force and ig
 
 ### 3.d Typesafe Arithmetic
 
-This is similar to the first validation - the Lisp of the select clause needs to be iterated over - and two checks performed:
+This is similar to the first validation - the Lisp of the `SELECT` clause needs to be iterated over - and two checks performed:
 
 * is the application of a function to a field valid?
   * for instance you **CAN** `COUNT` a `sint64` or a `double` or a `varchar`
@@ -180,7 +184,40 @@ The SQL query is not changed by the validation process. A given query is either 
 
 ## 4 Query Rewriting For Execution
 
-## XX The `riak_sql_select_v1{}` Record
+### 4.a Theory
+
+The query rewriter can be thought of the in the following terms:
+
+* the **semantic** meaning of the query remains unchanged
+* the **syntactic** form is transformed
+* the input is **declarative**
+  * this is a statement of the results the users would like to see
+* the output is **executable**
+  * this is how Riak will return results that match the users declaration
+* there is **NOT** a one-to-one correspondence between the **declerative** input and the **executable** output
+  * the query compiler may, based on heuristics, put two queries with the same **declarative** form through different **executable** query plans that have different execution costs
+* the data structure that describes a query can be made recursive by hoisting `SELECT`, `WHERE`, (not-yet-implemented) `GROUP BY` or (not-yet-implemented) `ORDER` clauses into the `FROM` clause and rewriting them
+
+### 4.b The `riak_sql_select_v1{}` Record
+
+```erlang
+-record(riak_select_v1,
+        {
+          'SELECT'              :: #riak_sel_clause_v1{},
+          'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
+          'WHERE'       = []    :: [filter()],
+          'ORDER BY'    = []    :: [sorter()],
+          'LIMIT'       = []    :: [limit()],
+          helper_mod            :: atom(),
+          %% will include groups when we get that far
+          partition_key = none  :: none | #key_v1{},
+          %% indicates whether this query has already been compiled to a sub query
+          is_executable = false :: boolean(),
+          type          = sql   :: sql | timeseries,
+          cover_context = undefined :: term(), %% for parallel queries
+          local_key                                  % prolly a mistake to put this here - should be in DDL
+        }).
+```
 
 The important thing about the  `riak_sql_select_v1{}` record is that it takes many forms. It contains a number of fields which are semantically consistent but which have implementation differences. SQL is a declarative language and the SQL clause structure is preservered, so fields like `SELECT`, `FROM`, `WHERE`, `ORDER BY` and `LIMIT` may contain different data structures for the purposes of execution but which carry the same sematic burden.
 
