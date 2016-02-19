@@ -114,6 +114,13 @@
           'DESCRIBE' = <<>>  :: binary()
         }).
 
+-record(riak_sql_insert_v1,
+	{
+	  table :: binary(),
+	  fields :: [{identifier, binary()}],
+	  values :: list(list(term()))
+	}).
+
 -define(SQL_SELECT, #riak_select_v1).
 -define(SQL_SELECT_RECORD_NAME, riak_select_v1).
 
