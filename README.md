@@ -79,6 +79,8 @@ This code generates one of 2 output records:
 * `ddl_v1{}` - which captures the `CREATE TABLE...` statement
 * `riak_select_v1{}` - which captures a `SELECT * FROM...` statement
 
+**NOTE:** the output of the lexer is a proplist of record field names and values - the actual record is constructed *over the fence* from `riak_ql` in `riak_kv` for the purposes of simplifying inter-repo dependency management.
+
 ### 4.iii Time Quantiser
 
 Time quantisation is done by the module:

@@ -205,21 +205,127 @@ The query rewriter can be thought of the in the following terms:
 ```erlang
 -record(riak_select_v1,
         {
-          'SELECT'              :: #riak_sel_clause_v1{},
-          'FROM'        = <<>>  :: binary() | {list, [binary()]} | {regex, list()},
-          'WHERE'       = []    :: [filter()],
-          'ORDER BY'    = []    :: [sorter()],
-          'LIMIT'       = []    :: [limit()],
-          helper_mod            :: atom(),
-          %% will include groups when we get that far
-          partition_key = none  :: none | #key_v1{},
-          %% indicates whether this query has already been compiled to a sub query
-          is_executable = false :: boolean(),
-          type          = sql   :: sql | timeseries,
+          'SELECT'                  :: #riak_sel_clause_v1{},
+          'FROM'        = <<>>      :: binary() | {list, [binary()]} | {regex, list()},
+          'WHERE'       = []        :: [filter()],
+          'ORDER BY'    = []        :: [sorter()],
+          'LIMIT'       = []        :: [limit()],
+          helper_mod                :: atom(),
+          %% will include group by
+          %% when we get that far
+          partition_key = none      :: none | #key_v1{},
+          %% indicates whether this 
+          %% query has already been 
+          %% compiled to a sub query
+          is_executable = false     :: boolean(),
+          type          = sql       :: sql | timeseries,
           cover_context = undefined :: term(), %% for parallel queries
-          local_key                                  % prolly a mistake to put this here - should be in DDL
+          local_key                            %% prolly a mistake to put this here - should be in DDL
         }).
 ```
+
+Notice that the fields in the record fall into 2 disctinct categories:
+
+* **declarative** fields which contain the users intention
+  * `SELECT`
+  * `FROM`
+  * `WHERE`
+  * `ORDER BY`
+  * `LIMIT`
+* runtime information - required for **execution**
+  * `helper_mod`
+  * `is_executable`
+  * `type`
+  * `cover_context`
+  * `local_key`
+
+We can conceptualise the **declarative** statements as being logically related. Consider the following transforms (operating right to left for reasons that will become obvious later):
+```
++-------+-------+                  +-------+-------+-------+
+| ColX  | ColY  |                  | Col1  | Col2  | Col3  |
+| Type1 | Type2 |                  | Type1 | Type2 | Type3 |
++-------+-------+    SQL Query     +-------+-------+-------+
+                  <--------------+
++-------+-------+                  +-------+-------+-------+
+| Val1X | Val1Y |                  | Val1a | Val1b | Val1c |
++---------------+                  +-----------------------+
+| Val2X | Val2Y |                  | Val2a | Val2b | Val2c |
++-------+-------+                  +-----------------------+
+                                   | Val3a | Val3b | Val3c |
+                                   +-------+-------+-------+
+```
+
+`WHERE`, `ORDER BY` and `GROUP BY` are all row operations:
+```
++-------+-------+-------+                 +-------+-------+-------+
+| Col1  | Col2  | Col3  |                 | Col1  | Col2  | Col3  |
+| Type1 | Type2 | Type3 |                 | Type1 | Type2 | Type3 |
++-------+-------+-------+    Operation    +-------+-------+-------+
+                          <-------------+
++-------+-------+-------+                 +-------+-------+-------+
+| Val1a | Val1b | Val1c |     WHERE       | Val1a | Val1b | Val1c |
++-----------------------+    GROUP BY     +-----------------------+
+| Val3a | Val3b | Val3c |    ORDER BY     | Val2a | Val2b | Val2c |
++-----------------------+                 +-----------------------+
+| Val6a | Val6b | Val6c |                 | Val3a | Val3b | Val3c |
++-----------------------+                 +-----------------------+
+| Val5a | Val5b | Val5c |                 | Val4a | Val4b | Val4c |
++-------+-------+-------+                 +-----------------------+
+                                          | Val5a | Val5b | Val5c |
+                                          +-----------------------+
+                                          | Val6a | Val6b | Val6c |
+                                          +-------+-------+-------+
+```
+Row operations preserve **column names** and **column types**.
+
+`SELECT` is a column operator:
+```
++-------+-------+                 +-------+-------+-------+
+| ColX  | ColY  |                 | Col1  | Col2  | Col3  |
+| Type1 | Type2 |                 | Type1 | Type2 | Type3 |
++-------+-------+    Operation    +-------+-------+-------+
+                  <-------------+
++-------+-------+                 +-------+-------+-------+
+| Val1X | Val1Y |     SELECT      | Val1a | Val1b | Val1c |
++---------------+                 +-----------------------+
+| Val2X | Val2Y |                 | Val2a | Val2b | Val2c |
++-------+-------+                 +-----------------------+
+                                  | Val3a | Val3b | Val3c |
+                                  +-------+-------+-------+
+```
+
+`SELECT` can transform both **column names** and **column types**.
+
+You can see how and why this happens if you consider:
+```sql
+SELECT COUNT(myvarcharfield) FROM mytable;
+SELECT COUNT(myintegerfield)/SUM(myintegerfield) FROM mytable;
+```
+
+In this context `FROM` can be considered to be the identity operator:
+```
++-------+-------+-------+                 +-------+-------+-------+
+| Col1  | Col2  | Col3  |                 | Col1  | Col2  | Col3  |
+| Type1 | Type2 | Type3 |                 | Type1 | Type2 | Type3 |
++-------+-------+-------+    Operation    +-------+-------+-------+
+                         <--------------+
++-------+-------+-------+                 +-------+-------+-------+
+| Val1a | Val1b | Val1c |      FROM       | Val1a | Val1b | Val1c |
++-----------------------+                 +-----------------------+
+| Val2a | Val2b | Val2c |                 | Val2a | Val2b | Val2c |
++-----------------------+                 +-----------------------+
+| Val3a | Val3b | Val3c |                 | Val3a | Val3b | Val3c |
++-----------------------+                 +-----------------------+
+| Val4a | Val4b | Val4c |                 | Val4a | Val4b | Val4c |
++-----------------------+                 +-----------------------+
+| Val5a | Val5b | Val5c |                 | Val5a | Val5b | Val5c |
++-----------------------+                 +-----------------------+
+| Val6a | Val6b | Val6c |                 | Val6a | Val6b | Val6c |
++-------+-------+-------+                 +-------+-------+-------+
+
+
+```
+
 
 The important thing about the  `riak_sql_select_v1{}` record is that it takes many forms. It contains a number of fields which are semantically consistent but which have implementation differences. SQL is a declarative language and the SQL clause structure is preservered, so fields like `SELECT`, `FROM`, `WHERE`, `ORDER BY` and `LIMIT` may contain different data structures for the purposes of execution but which carry the same sematic burden.
 
