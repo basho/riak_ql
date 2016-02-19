@@ -298,9 +298,11 @@ Row operations preserve **column names** and **column types**.
 
 You can see how and why this happens if you consider:
 ```sql
-SELECT COUNT(myvarcharfield) FROM mytable;
+SELECT COUNT(myvarcharfield) AS bobcat FROM mytable;
 SELECT COUNT(myintegerfield)/SUM(myintegerfield) FROM mytable;
 ```
+
+**NOTE:** the `AS` keyword is not yet implemented.
 
 In this context `FROM` can be considered to be the identity operator:
 ```
@@ -322,10 +324,106 @@ In this context `FROM` can be considered to be the identity operator:
 +-----------------------+                 +-----------------------+
 | Val6a | Val6b | Val6c |                 | Val6a | Val6b | Val6c |
 +-------+-------+-------+                 +-------+-------+-------+
-
-
 ```
 
+`FROM` does 2 things - if it is right at the metal it is an identity operator where the right hand data is on disc and the left hand data is in memory. If it is executed at a higher level it just ingests data for one of the other operators to act on.
+
+Using this knowledge we can trivially rewrite an SQL statement as a series of nested SQL statements - with the nesting being implemented as a logical pipeline.
+
+Let us see this happening for a simple SQL statement:
+```sql
+SELECT, height, weight FROM mytable WHERE height > 10;
+```
+
+This can be rewritten into queries - the results of the right hand of which is operated on by the left hand query's `FROM` clause to ingest it:
+```
++ FROM     <---------------------+ + FROM     mytable
+|                                  |
+| SELECT   height, weight          | SELECT   *
+|                                  |
+| GROUP BY []                      | GROUP BY []
+|                                  |
+| ORDER BY []                      | ORDER BY []
+|                                  |
++ WHERE    []                      + WHERE    height > 10
+```
+
+This process is trivially recursive. For operational reasons these operations must be chunked (to prevent memory overflow, unchuncked queries would simply load all the data in to memory, which kinda obviates the very existance of databases as a technology).
+```
++-------+-------+                  +-------+-------+-------+
+| ColX  | ColY  |                  | Col1  | Col2  | Col3  |
+| Type1 | Type2 |                  | Type1 | Type2 | Type3 |
++-------+-------+    SQL Query     +-------+-------+-------+
+                  <-----+
++-------+-------+       |          +-------+-------+-------+
+| Val1X | Val1Y |       |          | Val1a | Val1b | Val1c |
++---------------+       |          +-----------------------+
+| Val2X | Val2Y |       +----------+ Val2a | Val2b | Val2c |
++-------+-------+       |          +-----------------------+
+                        |          | Val3a | Val3b | Val3c |
+                        |          +-------+-------+-------+
+                        |
+                        |
+                        |          +-------+-------+-------+
+                        |          | Val4a | Val4b | Val4c |
+                        |          +-----------------------+
+                        +----------+ Val5a | Val5b | Val5c |
+                        |          +-----------------------+
+                        |          | Val6a | Val6b | Val6c |
+                        |          +-------+-------+-------+
+                        |
+                        |
+                        |          +-------+-------+-------+
+                        |          | Val7a | Val7b | Val7c |
+                        |          +-----------------------+
+                        +----------+ Val8a | Val8b | Val8c |
+                                   +-----------------------+
+                                   | Val9a | Val9b | Val0c |
+                                   +-------+-------+-------+
+```
+
+The chunking may be for 2 reasons
+
+* there is too much data from a particular vnode to appear in memory
+* the data we want is on more than one vnode
+
+Let us now rewrite a Time Series query to see something real
+```sql
+SELECT device, temp FROM mytimeseries WHERE family = 'myfamily', series = 'myseries', timestamp > 1233 and timestamp < 6789 and temp > 18;
+```
+
+This becomes:
+```
++ FROM     <----------------+      + FROM     mytable on vnode X
+|                           |      |
+| SELECT   device, temp     |      | SELECT   *
+|                           |      |
+| GROUP BY []               +------+ GROUP BY []
+|                           |      |
+| ORDER BY []               |      | ORDER BY []
+|                           |      |
++ WHERE    []               |      + WHERE + start_key = {myfamily, myseries, 1233}
+                            |              | end_key   = {myfamily, myseries, 4000}
+                            |              + temp      > 18
+                            |
+                            |
+                            |     + FROM     mytable on vnode Y
+                            |     |
+                            |     | SELECT   *
+                            |     |
+                            +-----+ GROUP BY []
+                                  |
+                                  | ORDER BY []
+                                  |
+                                  + WHERE + start_key = {myfamily, myseries, 4001}
+                                          | end_key   = {myfamily, myseries, 6789}
+                                          + temp      > 18
+```
+
+Note 2 things:
+
+* the `FROM` clauses are now no longer logical `FROM`s they are physical `FROM`s - a coverage plan has been constructed and these SQL statements have been dispatched to vnodes to run
+* the `WHERE` clause has now be reweritten from a **declarative** one to a **executable** one - it has a leveldb start and end key to scan and then a clause to run on all values between those end points
 
 The important thing about the  `riak_sql_select_v1{}` record is that it takes many forms. It contains a number of fields which are semantically consistent but which have implementation differences. SQL is a declarative language and the SQL clause structure is preservered, so fields like `SELECT`, `FROM`, `WHERE`, `ORDER BY` and `LIMIT` may contain different data structures for the purposes of execution but which carry the same sematic burden.
 
