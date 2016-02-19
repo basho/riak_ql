@@ -25,7 +25,8 @@
 
 %% this function can be used to work out which Module to use
 -export([
-         make_module_name/1, make_module_name/2
+         make_module_name/1, make_module_name/2,
+         get_version/0
         ]).
 
 -type ddl() :: #ddl_v1{}.
@@ -66,6 +67,10 @@
 
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
+
+-spec get_version() -> binary().
+get_version() ->
+    ?RIAK_QL_DDL_VERSION.
 
 -spec make_module_name(Table::binary()) ->
                               module().
