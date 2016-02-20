@@ -16,7 +16,6 @@ This section shows the lifecyle of an SQL `SELECT` request
 ### 2.a Process Overview
 
 ```
-
 Client-side   +--+
 text query       |  Protocol
                  |  Buffers
@@ -25,7 +24,6 @@ text query       |  Protocol
 Client-side      |
 parameterised +--+
 query
-
 ```
 
 ### 2.b Conformance with the SQL Foundation Document
@@ -81,6 +79,7 @@ select * from mytable;
 ```
 
 The lexer canonicalises this trivially in the regex's that define the SQL keyword tokens:
+
 ```erlang
 QUANTUM  = (Q|q)(U|u)(A|a)(N|n)(T|t)(U|u)(M|m)
 SELECT   = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
@@ -88,12 +87,14 @@ DESCRIBE = (D|d)(E|e)(S|s)(C|c)(R|r)(I|i)(B|b)(E|e)
 ```
 
 The important canonicalisation (which is implemented in the parser) is the canonicalisation of the `WHERE` clause. Consider the following equivalent statements:
+
 ```
 SELECT * FROM mytable WHERE field1 >= 10 AND (field2 < 2 OR field3 = 'alice');
 SELECT * FROM mytable WHERE  (field3 = 'alice' or field2 < 2) AND field1 >= 10;
 ```
 
 The `WHERE` is a specialist mini-lisp being a tree whose leaves consist of operators that return `booleans`:
+
 ```erlang
 {'>=', <<"field1">>, {integer, 10}}
 {'<',  <<"field2">>, {integer, 2}}
@@ -101,6 +102,7 @@ The `WHERE` is a specialist mini-lisp being a tree whose leaves consist of opera
 ```
 
 which can be composed with the standard set of `boolean` operators:
+
 ```erlang
 {or,  EXPR1, EXPR2}
 {and, EXPR1, EXPR2}
@@ -239,8 +241,53 @@ Notice that the fields in the record fall into 2 disctinct categories:
   * `cover_context`
   * `local_key`
 
-We can conceptualise the **declarative** statements as being logically related. Consider the following transforms (operating right to left for reasons that will become obvious later):
+### 4.c Notes On Terminology
+
+At the heart of thinking about query pipelines is the notion of **tables** which have **column descriptors** and **rows of data**. These are make visible by the riak-shell:
+
 ```
+✅ riak_shell(27)>select time, weather, temperature from GeoCheckin where myfamily='family1' and myseries='seriesX' and time > 0 and time < 1000;
++----+----------------+---------------------------+
+|time|    weather     |        temperature        |
++----+----------------+---------------------------+
+| 1  |    z«êPò¹      |4.19111744258298777600e+18 |
+| 2  |  ^OOgz^Blu7)   |6.07861409217513676800e+18 |
+| 3  |      ÔÖã       |6.84034338181623808000e+17 |
+| 4  |       ^G       |-5.55785206740398080000e+16|
+| 5  |   ¸LËäà«d      |-3.62555783091625574400e+18|
+| 6  |    ^AE^S¥      |1.11236574770119680000e+18 |
+| 7  |    ïö?ï^Fv     |5.51455556936744140800e+18 |
+| 8  | ^FtFVÅë=+#^Y5  |2.44525777392835584000e+17 |
+| 9  |ðÁÖ·©Ü^GV^^^DkU |6.90864738609726668800e+18 |
+| 10 | QÝZa^QËfQ      |5.08590022245487001600e+18 |
++----+----------------+---------------------------+
+```
+
+The columns in this table have *implicit type*, `time` is a `timestamp`, `weather` is a `varchar` and `temperature` is a `double`.
+
+In discussing the query pipeline we regard column headers as one data structure and row sets as another and discuss how both of them may (or may not) be transformed in different contexts.
+
+Conventionally we also consider SQL queries to unroll left to right:
+
+```
+single SQL statement written by user +----------------> many SQL fragments executed across the ring by riak
+                                       query rewriter
+```
+
+Consequently the query pipeline operates right to left:
+
+```
+table returned to user <-----------+ table fragements created in pipeline
+                         Operation
+```
+
+### 4.d Understanding The Query Pipeline
+
+We can conceptualise the **declarative** statements as being logically related. Consider the following transforms (operating right to left, of course):
+
+```
+ Table In Shell                           Data On Disk
+
 +-------+-------+                  +-------+-------+-------+
 | ColX  | ColY  |                  | Col1  | Col2  | Col3  |
 | Type1 | Type2 |                  | Type1 | Type2 | Type3 |
@@ -256,6 +303,7 @@ We can conceptualise the **declarative** statements as being logically related. 
 ```
 
 `WHERE`, `ORDER BY` and `GROUP BY` are all row operations:
+
 ```
 +-------+-------+-------+                 +-------+-------+-------+
 | Col1  | Col2  | Col3  |                 | Col1  | Col2  | Col3  |
@@ -276,9 +324,11 @@ We can conceptualise the **declarative** statements as being logically related. 
                                           | Val6a | Val6b | Val6c |
                                           +-------+-------+-------+
 ```
+
 Row operations preserve **column names** and **column types**.
 
 `SELECT` is a column operator:
+
 ```
 +-------+-------+                 +-------+-------+-------+
 | ColX  | ColY  |                 | Col1  | Col2  | Col3  |
@@ -297,6 +347,7 @@ Row operations preserve **column names** and **column types**.
 `SELECT` can transform both **column names** and **column types**.
 
 You can see how and why this happens if you consider:
+
 ```sql
 SELECT COUNT(myvarcharfield) AS bobcat FROM mytable;
 SELECT COUNT(myintegerfield)/SUM(myintegerfield) FROM mytable;
@@ -305,6 +356,7 @@ SELECT COUNT(myintegerfield)/SUM(myintegerfield) FROM mytable;
 **NOTE:** the `AS` keyword is not yet implemented.
 
 In this context `FROM` can be considered to be the identity operator:
+
 ```
 +-------+-------+-------+                 +-------+-------+-------+
 | Col1  | Col2  | Col3  |                 | Col1  | Col2  | Col3  |
@@ -331,11 +383,15 @@ In this context `FROM` can be considered to be the identity operator:
 Using this knowledge we can trivially rewrite an SQL statement as a series of nested SQL statements - with the nesting being implemented as a logical pipeline.
 
 Let us see this happening for a simple SQL statement:
+
 ```sql
 SELECT, height, weight FROM mytable WHERE height > 10;
 ```
 
 This can be rewritten into queries - the results of the right hand of which is operated on by the left hand query's `FROM` clause to ingest it:
+
+**NOTE:** we have unrolled the query left-to-right, but this pipeline then executes right-to-left.
+
 ```
 + FROM     <---------------------+ + FROM     mytable
 |                                  |
@@ -349,6 +405,7 @@ This can be rewritten into queries - the results of the right hand of which is o
 ```
 
 This process is trivially recursive. For operational reasons these operations must be chunked (to prevent memory overflow, unchuncked queries would simply load all the data in to memory, which kinda obviates the very existance of databases as a technology).
+
 ```
 +-------+-------+                  +-------+-------+-------+
 | ColX  | ColY  |                  | Col1  | Col2  | Col3  |
@@ -388,12 +445,14 @@ The chunking may be for 2 reasons
 * the data we want is on more than one vnode
 
 Let us now rewrite a Time Series query to see something real:
+
 ```sql
 SELECT device, temp FROM mytimeseries WHERE family = 'myfamily', series = 'myseries', timestamp > 1233
                                             and timestamp < 6789 and temp > 18;
 ```
 
-This becomes:
+This becomes (again executing right-to-left):
+
 ```
 + FROM     <----------------+        + FROM     mytable on vnode X
 |                           |        |
@@ -425,6 +484,41 @@ Note 2 things:
 
 * the `FROM` clauses are now no longer logical `FROM`s they are physical `FROM`s - a coverage plan has been constructed and these SQL statements have been dispatched to vnodes to run
 * the `WHERE` clause has now be reweritten from a **declarative** one to a **executable** one - it has a leveldb start and end key to scan and then a clause to run on all values between those end points
+
+This is an accurate view of how Riak TS 1.2 would rewrite that statement. But there is an another obvious, semantically equivalent form that it could be rewritten to, and which would be more efficient (which will be implemented from Riak TS 1.3 onwards):
+
+```
++ FROM     <----------------+        + FROM     mytable on vnode X
+|                           |        |
+| SELECT   *                |        | SELECT   device, temp
+|                           | Chunk1 |
+| GROUP BY []               +--------+ GROUP BY []
+|                           |        |
+| ORDER BY []               |        | ORDER BY []
+|                           |        |
++ WHERE    []               |        + WHERE + start_key = {myfamily, myseries, 1233}
+                            |                | end_key   = {myfamily, myseries, 4000}
+                            |                + temp      > 18
+                            |
+                            |
+                            |        + FROM     mytable on vnode Y
+                            |        |
+                            |        | SELECT   device, temp
+                            | Chunk2 |
+                            +--------+ GROUP BY []
+                                     |
+                                     | ORDER BY []
+                                     |
+                                     + WHERE + start_key = {myfamily, myseries, 4001}
+                                             | end_key   = {myfamily, myseries, 6789}
+                                             + temp      > 18
+```
+
+Performing the selection (which is a column reduction) at the vnode (the right hand side) means that less data is shipped around the cluster than in the case where the selection is performed at the left hand side (in the query co-ordinator). Imagine if the table `mytable` had 100 columns.
+
+This the last essential operation of a query system, building a query plan. This is the most effecient way to rewrite this query to execute with this table which is loaded with data of this *shape* on a riak cluster with this many nodes and ring of this size.
+
+### 4.e Notes Of The Datastructure
 
 The important thing about the  `riak_sql_select_v1{}` record is that it takes many forms. It contains a number of fields which are semantically consistent but which have implementation differences. SQL is a declarative language and the SQL clause structure is preservered, so fields like `SELECT`, `FROM`, `WHERE`, `ORDER BY` and `LIMIT` may contain different data structures for the purposes of execution but which carry the same sematic burden.
 
