@@ -327,7 +327,7 @@ We can conceptualise the **declarative** statements as being logically related. 
 
 Row operations preserve **column names** and **column types**.
 
-`SELECT` is a column operator:
+`SELECT` is **both** a column operator and a row operator:
 
 ```
 +-------+-------+                 +-------+-------+-------+
