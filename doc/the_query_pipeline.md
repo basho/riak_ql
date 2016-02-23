@@ -454,6 +454,10 @@ SELECT device, temp FROM mytimeseries WHERE family = 'myfamily', series = 'myser
 This becomes (again executing right-to-left):
 
 ```
+<----Erlang Coordinator----->        <-----LeveldDB C++ Code----->
+
+                          <---Network--->
+
 + FROM     <----------------+        + FROM     mytable on vnode X
 |                           |        |
 | SELECT   device, temp     |        | SELECT   *
@@ -480,14 +484,19 @@ This becomes (again executing right-to-left):
                                              + temp      > 18
 ```
 
-Note 2 things:
+Note 3 things:
 
 * the `FROM` clauses are now no longer logical `FROM`s they are physical `FROM`s - a coverage plan has been constructed and these SQL statements have been dispatched to vnodes to run
 * the `WHERE` clause has now be reweritten from a **declarative** one to a **executable** one - it has a leveldb start and end key to scan and then a clause to run on all values between those end points
+* this diagram includes the physical locations the various pipeline functions run at - on the right hand side the C++ vnodes, on the left the Erlang co-ordinator (inside the query sub-system)
 
 This is an accurate view of how Riak TS 1.2 would rewrite that statement. But there is an another obvious, semantically equivalent form that it could be rewritten to, and which would be more efficient (which will be implemented from Riak TS 1.3 onwards):
 
 ```
+<----Erlang Coordinator----->        <-----LeveldDB C++ Code----->
+
+                          <---Network--->
+
 + FROM     <----------------+        + FROM     mytable on vnode X
 |                           |        |
 | SELECT   *                |        | SELECT   device, temp
@@ -517,6 +526,65 @@ This is an accurate view of how Riak TS 1.2 would rewrite that statement. But th
 Performing the selection (which is a column reduction) at the vnode (the right hand side) means that less data is shipped around the cluster than in the case where the selection is performed at the left hand side (in the query co-ordinator). Imagine if the table `mytable` had 100 columns.
 
 This the last essential operation of a query system, building a query plan. This is the most effecient way to rewrite this query to execute with this table which is loaded with data of this *shape* on a riak cluster with this many nodes and ring of this size.
+
+Strategically the operations are undifferentiated between the Erlang co-ordinator and the leveldb C++ code. We can see why this is the general case if we rewrite the following SQL function:
+
+```sql
+SELECT AVG(temp) FROM mytimeseries WHERE family = 'myfamily', series = 'myseries', timestamp > 1233
+                                         and timestamp < 6789 and temp > 18;
+```
+
+This becomes (again executing right-to-left):
+
+```
+<----Erlang Coordinator----->               <-----LeveldDB C++ Code----->
+
+                               <---Network--->
+
++ FROM     <-----------------------+        + FROM     mytable on vnode X
+|                                  |        |
+| SELECT   SUM(STemp)/SUM(NoTemp)  |        | SELECT   SUM(temp) AS STemp, COUNT(temp) AS NoTemp
+|                                  | Chunk1 |
+| GROUP BY []                      +--------+ GROUP BY []
+|                                  |        |
+| ORDER BY []                      |        | ORDER BY []
+|                                  |        |
++ WHERE    []                      |        + WHERE + start_key = {myfamily, myseries, 1233}
+                                   |                | end_key   = {myfamily, myseries, 4000}
+                                   |                + temp      > 18
+                                   |
+                                   |
+                                   |        + FROM     mytable on vnode Y
+                                   |        |
+                                   |        | SELECT   SUM(temp) AS STemp, COUNT(temp) AS NoTemp
+                                   | Chunk2 |
+                                   +--------+ GROUP BY []
+                                            |
+                                            | ORDER BY []
+                                            |
+                                            + WHERE + start_key = {myfamily, myseries, 4001}
+                                                    | end_key   = {myfamily, myseries, 6789}
+                                                    + temp      > 18
+```
+
+Notice that the `AVG` function has been broken into a `SUM` and a `COUNT` to be run in the C++ code and another pair of `SUM`s to be run in the Erlang Node.
+
+Strategically we wish to implement all operators in the pipeline (`FROM`, `SELECT`, `WHERE`, `GROUP BY`, `ORDER BY`) as an Erlang behaviour (or a behaviour-like construct in C++, a set of function callbacks with defined specs) and this behaviour MUST be identically callable from both the Erlang co-ordinator and within the C++ leveldb code:
+```
++-------+-------+                  +-------+-------+-------+
+| ColX  | ColY  |                  | Col1  | Col2  | Col3  |
+| Type1 | Type2 |                  | Type1 | Type2 | Type3 |
++-------+-------+     Behaviour    +-------+-------+-------+
+                  <--------------+
++-------+-------+                  +-------+-------+-------+
+| Val1X | Val1Y |                  | Val1a | Val1b | Val1c |
++---------------+                  +-----------------------+
+| Val2X | Val2Y |                  | Val2a | Val2b | Val2c |
++-------+-------+                  +-----------------------+
+                                   | Val3a | Val3b | Val3c |
+                                   +-------+-------+-------+
+```
+
 
 ### 4.e Notes Of The Datastructure
 
