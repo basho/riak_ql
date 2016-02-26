@@ -42,31 +42,31 @@
 
 run_test(Name, CreateTable, SQLQuery, IsValid) ->
     Lexed = riak_ql_lexer:get_tokens(CreateTable),
-    {ok, DDL} = riak_ql_parser:parse(Lexed),
+    {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
     case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
         {module, Module} ->
             Lexed2 = riak_ql_lexer:get_tokens(SQLQuery),
-            Qry = riak_ql_parser:parse(Lexed2),
+            Qry = riak_ql_parser:ql_parse(Lexed2),
             case Qry of
-                {ok, Q} -> case riak_ql_ddl:is_query_valid(Module, DDL, Q) of
-                               true ->
-                                   case IsValid of
-                                       true ->
-                                           ?assert(true);
-                                       false ->
-                                           ?debugFmt("Query in ~p should not be valid", [Name]),
-                                           ?assert(false)
-                                   end;
-                               {false, E} ->
-                                   case IsValid of
-                                       true ->
-                                           ?debugFmt("Test ~p failed with query syntax error of ~p~n",
-                                                     [Name, E]),
-                                           ?assert(false);
-                                       false ->
-                                           ?assert(true)
-                                   end
-                           end;
+                {select, Q} -> case riak_ql_ddl:is_query_valid(Module, DDL, riak_ql_ddl:parsed_sql_to_query(Q)) of
+                                   true ->
+                                       case IsValid of
+                                           true ->
+                                               ?assert(true);
+                                           false ->
+                                               ?debugFmt("Query in ~p should not be valid", [Name]),
+                                               ?assert(false)
+                                       end;
+                                   {false, E} ->
+                                       case IsValid of
+                                           true ->
+                                               ?debugFmt("Test ~p failed with query syntax error of ~p~n",
+                                                         [Name, E]),
+                                               ?assert(false);
+                                           false ->
+                                               ?assert(true)
+                                       end
+                               end;
                 Err     -> ?debugFmt("Test ~p failed with error ~p~n", [Name, Err]),
                            ?assert(false)
             end;

@@ -41,8 +41,8 @@ create_timeseries_sql_test() ->
         " temp varchar,"
         " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))",
     Toks = riak_ql_lexer:get_tokens(String),
-    Got = case riak_ql_parser:parse(Toks) of
-              {ok, G} -> G;
+    Got = case riak_ql_parser:ql_parse(Toks) of
+              {ddl, D} -> D;
               _WC     -> wont_compile
           end,
     Expected = #ddl_v1{
@@ -112,8 +112,8 @@ create_all_types_sql_test() ->
         " PRIMARY KEY ((user, geohash, quantum(time, 15, 'm')),"
         " user, geohash, time))",
     Toks = riak_ql_lexer:get_tokens(String),
-    Got = case riak_ql_parser:parse(Toks) of
-              {ok, G} -> G;
+    Got = case riak_ql_parser:ql_parse(Toks) of
+              {ddl, D} -> D;
               WC     -> WC
           end,
     Expected = #ddl_v1{
@@ -233,7 +233,7 @@ key_fields_must_exist_1_test() ->
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertEqual(
        {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family).">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 key_fields_must_exist_2_test() ->
@@ -244,7 +244,7 @@ key_fields_must_exist_2_test() ->
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertEqual(
        {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family, series).">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 key_fields_must_exist_3_test() ->
@@ -256,7 +256,7 @@ key_fields_must_exist_3_test() ->
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
        {error, {0, riak_ql_parser, <<"Primary key fields do not exist (time).">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 create_table_white_space_test() ->
@@ -268,8 +268,8 @@ create_table_white_space_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       {ddl, #ddl_v1{}},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 primary_key_white_space_test() ->
@@ -281,8 +281,8 @@ primary_key_white_space_test() ->
         "PRIMARY               \t  KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       {ddl, #ddl_v1{}},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 not_null_white_space_test() ->
@@ -294,8 +294,8 @@ not_null_white_space_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       {ddl, #ddl_v1{}},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 short_key_1_test() ->

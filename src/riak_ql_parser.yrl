@@ -324,8 +324,23 @@ Erlang code.
 %% no way to stop rebar borking on it AFAIK
 -export([
          return_error/2,
+         ql_parse/1,
          canonicalise_where/1
          ]).
+
+%% Provide more useful success tuples
+ql_parse(Tokens) ->
+    interpret_parse_result(parse(Tokens)).
+
+interpret_parse_result({error, _}=Err) ->
+    Err;
+interpret_parse_result({ok, #ddl_v1{}=DDL}) ->
+    {ddl, DDL};
+interpret_parse_result({ok, Proplist}) ->
+    extract_type(proplists:get_value(type, Proplist), Proplist).
+
+extract_type(Type, Proplist) ->
+    {Type, Proplist -- [{type, Type}]}.
 
 %% if no partition key is specified hash on the local key
 fix_up_keys(#ddl_v1{partition_key = none, local_key = LK} = DDL) ->
@@ -338,20 +353,13 @@ convert(#outputs{type    = select,
                  fields  = F,
                  limit   = L,
                  where   = W}) ->
-    Q = case B of
-            {Type, _} when Type =:= list orelse Type =:= regex ->
-                ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = F},
-                            'FROM'   = B,
-                            'WHERE'  = W,
-                            'LIMIT'  = L};
-            _ ->
-                ?SQL_SELECT{'SELECT'   = #riak_sel_clause_v1{clause = F},
-                            'FROM'     = B,
-                            'WHERE'    = W,
-                            'LIMIT'    = L,
-                            helper_mod = riak_ql_ddl:make_module_name(B)}
-        end,
-    Q;
+    [
+     {type, select},
+     {tables, B},
+     {fields, F},
+     {limit, L},
+     {where, W}
+    ];
 convert(#outputs{type = create} = O) ->
     O.
 
@@ -389,7 +397,10 @@ wrap_identifier({identifier, IdentifierName})
 wrap_identifier(Default) -> Default.
 
 make_describe({identifier, D}) ->
-    #riak_sql_describe_v1{'DESCRIBE' = D}.
+    [
+     {type, describe},
+     {identifier, D}
+    ].
 
 add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
