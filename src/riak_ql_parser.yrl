@@ -298,7 +298,7 @@ KeyField -> quantum left_paren KeyFieldArgList right_paren :
 KeyField -> Identifier OptOrdering  : 
     #param_v1{name = [element(2, '$1')], ordering = '$2'}.
 
-OptOrdering -> '$empty' : ascending.
+OptOrdering -> '$empty' : undefined.
 OptOrdering -> asc : ascending.
 OptOrdering -> desc : descending.
 
@@ -749,6 +749,7 @@ validate_ddl(DDL) ->
     ok = assert_primary_and_local_keys_match(DDL),
     ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
+    ok = assert_partition_key_fields_not_descending(DDL),
     DDL.
 
 %% @doc Ensure DDL can haz keys
@@ -793,6 +794,17 @@ assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primar
         false ->
             return_error_flat("Local key does not match primary key")
     end.
+
+%%
+assert_partition_key_fields_not_descending(#ddl_v1{ partition_key = #key_v1{ ast = PK }}) ->
+    [ordering_in_partition_key_error(N, O)
+        || #param_v1{ name = [N], ordering = O } <- PK, O /= undefined],
+    ok.
+
+%%
+ordering_in_partition_key_error(N, Ordering) when is_binary(N) ->
+    return_error_flat("Order can only be used in the local key, '~s' set to ~p", [N, Ordering]).
+
 
 assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
     Fields = [N || #param_v1{name = [N]} <- LK],

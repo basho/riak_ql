@@ -123,7 +123,8 @@ get_local_key(#ddl_v1{table = T}=DDL, Obj)
     get_local_key(DDL, Obj, Mod).
 
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
-make_key(_Mod, none, _Vals) -> [];
+make_key(_Mod, none, _Vals) ->
+    [];
 make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso
                                              is_list(Vals) ->
     mk_k(AST, Vals, Mod, []).
@@ -140,9 +141,13 @@ mk_k([#hash_fn_v1{mod = Md,
     V  = erlang:apply(Md, Fn, A2),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
 mk_k([#param_v1{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
-    {Nm, V} = lists:keyfind(Nm, 1, Vals),
-    Ty = Mod:get_field_type([Nm]),
-    mk_k(T1, Vals, Mod, [{Ty, apply_ordering(V, Ordering)} | Acc]).
+    case lists:keyfind(Nm, 1, Vals) of
+        {Nm, V} ->
+            Ty = Mod:get_field_type([Nm]),
+            mk_k(T1, Vals, Mod, [{Ty, apply_ordering(V, Ordering)} | Acc]);
+        false ->
+            {error, {missing_value, Nm, Vals}}
+    end.
 
 -spec extract(list(), [{any(), any()}], [any()]) -> any().
 extract([], _Vals, Acc) ->
