@@ -78,4 +78,11 @@
 -type combinator() :: [binary()].
 -type limit()      :: any().
 
+-record(riak_sql_insert_v1,
+    {
+        table :: binary(),
+        fields :: [{identifier, binary()}],
+        values :: list(list(term()))
+    }).
+
 -endif.
