@@ -436,9 +436,12 @@ make_describe({identifier, D}) ->
     ].
 
 make_insert({identifier, Table}, Fields, Values) ->
-    #riak_sql_insert_v1{table = Table,
-			fields = Fields,
-			values = Values}.
+    [
+     {type, insert},
+     {table, Table},
+     {fields, Fields},
+     {values, Values}
+    ].
 
 add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.

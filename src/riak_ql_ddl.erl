@@ -25,8 +25,9 @@
 
 %% this function can be used to work out which Module to use
 -export([
-         make_module_name/1, make_module_name/2,
-         get_version/0
+         field_positions/2,
+         get_version/0,
+         make_module_name/1, make_module_name/2
         ]).
 
 -type ddl() :: #ddl_v1{}.
@@ -143,6 +144,36 @@ mk_k([#param_v1{name = [Nm]} | T1], Vals, Mod, Acc) ->
     {Nm, V} = lists:keyfind(Nm, 1, Vals),
     Ty = Mod:get_field_type([Nm]),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]).
+
+%%
+%% Lookup the index of the field names.  If no field names are given
+%% use the positions defined in the DDL.  This *requires* that once schema changes
+%% take place the DDL fields are left in order.
+%%
+%% TODO: Field position should be tracked as part of the DDL module rather
+%%       than digging through #ddl_v1{} records to make this future proof through upgrades.
+%%
+-spec field_positions(#ddl_v1{}, undefined | list({identifier, binary()})) ->
+                      {ok, list(non_neg_integer())} | {error, list(string())}.
+field_positions(#ddl_v1{fields = Fields}, undefined) ->
+    {ok, [Pos || #riak_field_v1{position = Pos} <- Fields]};
+field_positions(#ddl_v1{fields = Fields}, FieldIdentifiers) ->
+    case lists:foldl(
+        fun({identifier, FieldName}, {Good, Bad}) ->
+            case lists:keyfind(FieldName, #riak_field_v1.name, Fields) of
+                false ->
+                    {Good, [riak_ql_to_string:flat_format("undefined field ~s", [FieldName]) | Bad]};
+                #riak_field_v1{position = Pos} ->
+                    {[Pos | Good], Bad}
+            end
+        end, {[], []}, FieldIdentifiers)
+    of
+        {Pos, []} ->
+            {ok, lists:reverse(Pos)};
+        {_, Errors} ->
+            %% Only returns the first error, could investigate returning multiple.
+            {error, hd(lists:reverse(Errors))}
+    end.
 
 -spec extract(list(), [{any(), any()}], [any()]) -> any().
 extract([], _Vals, Acc) ->

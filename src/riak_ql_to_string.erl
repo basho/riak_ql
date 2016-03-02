@@ -77,8 +77,8 @@ op_to_string(or_) -> "or";
 op_to_string(Op) ->
     atom_to_list(Op).
 
-flat_format(F, AA) ->
-    lists:flatten(io_lib:format(F, AA)).
+flat_format(Format, Args) ->
+    lists:flatten(io_lib:format(Format, Args)).
 
 
 -ifdef(TEST).

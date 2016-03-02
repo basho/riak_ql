@@ -49,6 +49,7 @@
 -module(riak_ql_ddl_compiler).
 
 -include("riak_ql_ddl.hrl").
+-include_lib("merl/include/merl.hrl").
 
 -export([compile/1]).
 -export([compile_and_load_from_tmp/1]).
@@ -613,7 +614,7 @@ make_module_attr(ModName, LineNo) ->
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
                                   {validate_obj,    1},
-				  {add_column_info, 1},
+				                  {add_column_info, 1},
                                   {get_field_type,  1},
                                   {is_field_valid,  1},
                                   {extract,         2},
