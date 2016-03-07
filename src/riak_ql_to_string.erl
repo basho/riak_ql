@@ -23,7 +23,10 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_to_string).
 
--export([col_names_from_select/1]).
+-export([
+         col_names_from_select/1,
+         flat_format/2
+        ]).
 %% --------------------------
 %% local functions
 

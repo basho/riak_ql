@@ -62,20 +62,30 @@
 
 %% TODO these types will be improved over the duration of the time series project
 -type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
--type selection()  :: {identifier, [binary()]}
-                    | {integer, integer()}
-                    | {float, float()}
-                    | {boolean, boolean()}
-                    | {binary, binary()}
+-type selection()  :: identifier()
+                    | data_value()
                     | selection_function()
                     | {expr, selection()}
                     | {negate, selection()}
                     | {relational_op(), selection(), selection()}.
+
+-type insertion()  :: identifier().
+
 
 -type filter()     :: term().
 -type operator()   :: [binary()].
 -type sorter()     :: term().
 -type combinator() :: [binary()].
 -type limit()      :: any().
+-type identifier() :: {identifier, [binary()]}.
+-type data_value() :: {integer, integer()}
+                    | {float, float()}
+                    | {boolean, boolean()}
+                    | {binary, binary()}.
+
+-export_type([
+              data_value/0,
+              identifier/0
+             ]).
 
 -endif.

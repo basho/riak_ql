@@ -436,10 +436,15 @@ make_describe({identifier, D}) ->
     ].
 
 make_insert({identifier, Table}, Fields, Values) ->
+    FieldsAsList = case is_list(Fields) of
+                       true  -> Fields;
+                       false -> [Fields]
+                   end,
+    FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsAsList],
     [
      {type, insert},
      {table, Table},
-     {fields, Fields},
+     {fields, FieldsWrappedIdentifiers},
      {values, Values}
     ].
 
