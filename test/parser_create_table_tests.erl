@@ -348,5 +348,17 @@ no_quanta_in_primary_key_is_ok_test() ->
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
+multiple_quantum_functions_not_allowed_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(a, 15, 'm'),b,quantum(c, 15, 'm')), a,b,c))",
+    ?assertMatch(
+        {error,{0,riak_ql_parser,<<"More than one quantum function in the partition key.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
 % multiple quanta returns an error (but why not?)
 % 

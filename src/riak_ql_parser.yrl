@@ -752,6 +752,7 @@ validate_ddl(DDL) ->
     ok = assert_primary_and_local_keys_match(DDL),
     ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
+    ok = assert_not_more_than_one_quantum(DDL),
     DDL.
 
 %% @doc Ensure DDL can haz keys
@@ -824,6 +825,17 @@ assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,
         _ ->
             return_error_flat("Primary key fields do not exist (~s).",
                               [string:join(MissingFields, ", ")])
+    end.
+
+assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+    QuantumFns =
+        [Fn || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum} = Fn <- PKAST],
+    case length(QuantumFns) =< 1 of
+        true ->
+            ok;
+        false ->
+            return_error_flat(
+                "More than one quantum function in the partition key.", [])
     end.
 
 %% Check that the field name exists in the list of fields.
