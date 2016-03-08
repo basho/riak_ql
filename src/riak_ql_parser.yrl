@@ -753,6 +753,7 @@ validate_ddl(DDL) ->
     ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
     ok = assert_not_more_than_one_quantum(DDL),
+    ok = assert_quantum_fn_args(DDL),
     DDL.
 
 %% @doc Ensure DDL can haz keys
@@ -815,8 +816,7 @@ assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
 
 %% Ensure that all fields in the primary key exist in the table definition.
 assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,
-                                           partition_key =
-                                               #key_v1{ ast = PK } }) ->
+                                           partition_key = #key_v1{ ast = PK } }) ->
     MissingFields =
         [binary_to_list(name_of(F)) || F <- PK, not is_field(F, Fields)],
     case MissingFields of
@@ -825,6 +825,26 @@ assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,
         _ ->
             return_error_flat("Primary key fields do not exist (~s).",
                               [string:join(MissingFields, ", ")])
+    end.
+
+assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+    [assert_quantum_fn_args2(Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
+    ok.
+
+%% The param argument is validated by assert_partition_key_fields_exist/1.
+assert_quantum_fn_args2([_Param, Unit, Measure]) ->
+    case lists:member(Measure, [d,h,m,s]) of
+        true ->
+            ok;
+        false ->
+            return_error_flat("Quantum time measure was ~p but must be d, h, m or s.",
+                              [Measure])
+    end,
+    case is_integer(Unit) andalso Unit >= 1 of
+        true ->
+            ok;
+        false ->
+            return_error_flat("Quantum time unit must be a positive integer.", [])
     end.
 
 assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
