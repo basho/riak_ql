@@ -45,7 +45,7 @@ create_timeseries_sql_test() ->
               {ddl, D} -> D;
               _WC     -> wont_compile
           end,
-    Expected = #ddl_v1{
+    Expected = ?DDL{
                   table = <<"GeoCheckin">>,
                   fields = [
                             #riak_field_v1{
@@ -116,7 +116,7 @@ create_all_types_sql_test() ->
               {ddl, D} -> D;
               WC     -> WC
           end,
-    Expected = #ddl_v1{
+    Expected = ?DDL{
                   table = <<"GeoCheckin">>,
                   fields = [
                             #riak_field_v1{
@@ -268,7 +268,7 @@ create_table_white_space_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ddl, #ddl_v1{}},
+       {ddl, ?DDL{}},
        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
@@ -281,7 +281,7 @@ primary_key_white_space_test() ->
         "PRIMARY               \t  KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ddl, #ddl_v1{}},
+       {ddl, ?DDL{}},
        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
@@ -294,7 +294,7 @@ not_null_white_space_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ddl, #ddl_v1{}},
+       {ddl, ?DDL{}},
        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
@@ -307,7 +307,7 @@ short_key_1_test() ->
         "PRIMARY KEY "
         " ((quantum(time, 15, 's')), time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
+       {ok, ?DDL{}},
        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
@@ -319,7 +319,7 @@ short_key_2_test() ->
         "c TIMESTAMP NOT NULL, "
         "PRIMARY KEY ((quantum(c, 15, 's')), c))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
+       {ok, ?DDL{}},
        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
@@ -331,22 +331,35 @@ no_quanta_in_primary_key_is_ok_test() ->
         "c SINT64 NOT NULL, "
         "PRIMARY KEY ((a,b), a,b,c))",
     ?assertMatch(
-        {ok, #ddl_v1{
-                partition_key =
-                    #key_v1{
-                       ast = [
-                              #param_v1{name = [<<"a">>]},
-                              #param_v1{name = [<<"b">>]}
-                             ]},
-                local_key =
-                    #key_v1{
-                       ast = [
-                              #param_v1{name = [<<"a">>]},
-                              #param_v1{name = [<<"b">>]},
-                              #param_v1{name = [<<"c">>]}
-                             ]}}},
+       {ok, ?DDL{
+               partition_key =
+                   #key_v1{
+                      ast = [
+                             #param_v1{name = [<<"a">>]},
+                             #param_v1{name = [<<"b">>]}
+                            ]},
+               local_key =
+                   #key_v1{
+                      ast = [
+                             #param_v1{name = [<<"a">>]},
+                             #param_v1{name = [<<"b">>]},
+                             #param_v1{name = [<<"c">>]}
+                            ]}}},
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 % multiple quanta returns an error (but why not?)
 % 
+
+create_with_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c))"
+        " with (a ='2a', c= 3)",
+    ?assertMatch(
+       {ok, ?DDL{properties = [{<<"a">>, <<"2a">>}, {<<"c">>, 3}]}},
+       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).

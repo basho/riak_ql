@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_kv_ddl: defines records used in the data description language
+%% riak_ql_ddl.hrl: defines records used in the data description language
 %%
 %% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
@@ -60,6 +60,14 @@
           local_key          :: #key_v1{}
          }).
 
+-record(ddl_v2, {
+          table              :: binary(),
+          fields        = [] :: [#riak_field_v1{}],
+          partition_key      :: #key_v1{} | none,
+          local_key          :: #key_v1{},
+          properties    = [] :: proplists:proplist()
+         }).
+
 %% TODO these types will be improved over the duration of the time series project
 -type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
 -type selection()  :: {identifier, [binary()]}
@@ -77,5 +85,8 @@
 -type sorter()     :: term().
 -type combinator() :: [binary()].
 -type limit()      :: any().
+
+-define(DDL, #ddl_v2).
+-define(DDL_RECORD_NAME, ddl_v2).
 
 -endif.
