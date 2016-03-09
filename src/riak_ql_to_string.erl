@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_ql_sql_to_string: module that converts the output of the compiler
-%%                        back to the text representation
+%% riak_ql_to_string: module that converts the output of the compiler
+%%                    back to the text representation
 %%
 %%
 %% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
@@ -23,9 +23,37 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_to_string).
 
--export([col_names_from_select/1]).
+-export([sql_to_string/1,
+         col_names_from_select/1]).
 
 -include("riak_ql_ddl.hrl").
+
+-spec sql_to_string({select|describe, proplists:proplist()} | {ddl, ?DDL{}}) ->
+                           string().
+sql_to_string({select, Parts}) ->
+    Fields = proplists:get_value(fields, Parts),
+    Tables = proplists:get_value(tables, Parts),
+    Where  = proplists:get_value(where,  Parts),
+    SQL = [
+           "SELECT",
+           make_select_clause(Fields),
+           "FROM",
+           make_from_clause(Tables),
+           "WHERE",
+           make_where_clause(Where)
+           %% don't forget to add 'ORDER BY' and 'LIMIT' when/if appropriate
+          ],
+    string:join(SQL, " ");
+
+sql_to_string({ddl, ?DDL{table         = T,
+                         fields        = FF,
+                         partition_key = PK,
+                         local_key     = LK,
+                         properties    = PP}}) ->
+    flat_format(
+      "CREATE TABLE ~s (~s, PRIMARY KEY ((~s), ~s))~s",
+      [T, make_fields(FF), make_key(PK), make_key(LK), make_props(PP)]).
+
 
 %% Convert the selection in select clause to a list of strings, one
 %% element for each column. White space in the original query is not reproduced.
@@ -35,6 +63,56 @@ col_names_from_select(Select) ->
 
 %% --------------------------
 %% local functions
+
+make_select_clause(FF) ->
+    string:join([select_col_to_string(F) || F <- FF], ", ").
+
+ 
+make_from_clause(X) when is_binary(X) ->
+    binary_to_list(X);
+make_from_clause({list, XX}) ->
+    string:join(
+      [binary_to_list(X) || X <- XX], ", ");
+make_from_clause({regex, XX}) ->
+    XX.
+
+make_where_clause(XX) ->
+    select_col_to_string(XX).
+
+
+make_fields(FF) ->
+    string:join(
+      [make_field(F) || F <- FF], ", ").
+
+make_field(#riak_field_v1{name = N, type = T, optional = Optional}) ->
+    flat_format("~s ~s~s", [N, T, not_null_or_not(Optional)]).
+
+not_null_or_not(true)  -> "";
+not_null_or_not(false) -> " not null".
+
+make_key(#key_v1{ast = FF}) ->
+    string:join(
+      [make_key_element(F) || F <- FF], ", ").
+
+make_key_element(#param_v1{name = [F]}) ->
+    binary_to_list(F);
+make_key_element(#hash_fn_v1{mod = riak_ql_quanta, fn = quantum,
+                             args = [#param_v1{name = [F]}, QSize, QUnit]}) ->
+    flat_format("quantum(~s, ~p, ~s)", [F, QSize, QUnit]).
+
+make_props([]) ->
+    "";
+make_props(PL) ->
+    [" WITH (",
+     string:join(
+       [flat_format("~s=~s", [K, make_prop_value(V)]) || {K, V} <- PL], ", "),
+     ")"].
+
+make_prop_value(Num) when is_number(Num) ->
+    io_lib:format("~p", [Num]);
+make_prop_value(Str) ->
+    [$',re:replace(Str, "'", "''", [{return, list}, global]), $'].
+
 
 %% Convert one column to a flat string.
 -spec select_col_to_string(any()) ->
@@ -214,80 +292,19 @@ select_col_to_string_negated_parens_test() ->
                     "-asdf",
                     "-(3+-4)"]).
 
-%% "select value from response_times where time > 1388534400",
-
-%% "select value from response_times where time > 1388534400s",
-
-%% "select * from events where time = 1400497861762723 "++
-
-%% "select * from events where state = 'NY'",
-
-%% "select * from events where customer_id = 23 and type = 'click10'",
-
-%% "select * from response_times where value > 500",
-
-%% "select * from response_times where value >= 500",
-
-%% "select * from response_times where value <= 500",
-
-%% "select * from events where signed_in = false",
-
-%% "select * from events where signed_in = -3",
-
-%% "select * from events where user = 'user 1'",
-
-%% "select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
-
-%% "select weather from GeoCheckin where user = 'user_1' and location = 'San Francisco'",
-
-%% "select * FROM tsall2 WHERE d3 = 1.0 OR d3 = 2.0 AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1",
-
-%% "select * FROM tsall2 WHERE d3 = 1.0 OR d3 = 2.0 AND vc1nn != '2' AND vc2nn != '3' AND 0 < ts1nn  AND ts1nn < 1 OR d3 = 3.0 OR d3 = 4.0",
-
-%% "select * from events where user = 'user 1'",
-
-%% "select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'",
-
-%% "select weather from GeoCheckin where (time > 2000 and time < 8000) and user = 'user_1'",
-
-%% "select weather from GeoCheckin where user = 'user_1' and (time > 2000 and time < 8000)",
-
-%% "select weather from GeoCheckin where user = 'user_1' and (time > 2000 and (time < 8000))",
-
-%% "select * from \"table with spaces\"",
-
-%% "select * from \"table with spaces\" where \"color spaces\" = 'someone had painted it blue'",
-
-%% "select * from \"table with spaces\" where \"co\"\"or\" = 'klingon''name' or \"co\"\"or\" = '\"'"
-
-%% "select temperature + 1 from details",
-
-%% "select avg(temp) from details",
-
-%% "select mean(temp) from details",
-
-%% "select avg(temp), sum(counts) from details",
-
-%% "select count(*) from details",
-
-%% "select aVg(temp) from details",
-
-%% "select avg(temp), sum(counts), count(counts), min(counts) "max(counts), stddev(counts) from details",
-
-%% "select aVg(temperature) + 1 - 2 * 3 / 4 from details",
-
-%% "select aVg(temperature) + count(temperature) from details",
-
-%% TODO
-%% this one wont work yet
-%% %% "select aVg(temperature + 1) + count(temperature / distance) from details",
-
-
 create_table_test() ->
     roundtrip_ok(
       "create table fafa ("
       " a sint64 not null, b varchar not null, c timestamp not null,"
-      " PRIMARY KEY ((a, b, quantum(c, 1, m)), a, b, c))").
+      " PRIMARY KEY ((quantum(c, 1, m)), c))").
+
+create_table_with_test() ->
+    roundtrip_ok(
+      "create table fafa ("
+      " a sint64 not null, b varchar not null, c timestamp not null,"
+      " PRIMARY KEY ((quantum(c, 1, m)), c))"
+      " with (x=4, y='3', z='', X='wo''a\"h')").
+      %% sql standard uses doubling of single quotes instead of escaping, and '\' is not special
 
 select_single_simple_test() ->
     roundtrip_ok(
@@ -309,18 +326,15 @@ select_multiple_simple_test() ->
 %% comparisons on those
 roundtrip_ok(Text) ->
     SQL = string_to_sql(Text),
+    %% ?debugFmt("\n Orig SQL : ~p", [SQL]),
+    %% ?debugFmt("\n Orig stmt: \"~s\"", [Text]),
     Text2 = sql_to_string(SQL),
-    %% ?debugFmt("\n  ~s", [Text2]),
+    %% ?debugFmt("\n Converted stmt: \"~s\"", [Text2]),
     ?assertEqual(
        SQL, string_to_sql(Text2)).
 
 string_to_sql(Text) ->
-    case riak_ql_parser:parse(
-           riak_ql_lexer:get_tokens(Text)) of
-        {ok, ?SQL_SELECT{} = SQL} ->
-            SQL;
-        {ok, ?DDL{} = DDL} ->
-            DDL
-    end.
+    riak_ql_parser:ql_parse(
+      riak_ql_lexer:get_tokens(Text)).
 
 -endif.
