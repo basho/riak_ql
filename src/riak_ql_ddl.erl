@@ -29,7 +29,7 @@
          get_version/0
         ]).
 
--type ddl() :: #ddl_v1{}.
+-type ddl() :: ?DDL{}.
 -export_type([ddl/0]).
 
 
@@ -46,6 +46,7 @@
 %%-export([get_return_types_and_col_names/2]).
 -export([make_key/3]).
 -export([syntax_error_to_msg/1]).
+-export([upgrade/1, upgrade/2, downgrade/1, downgrade/2]).
 
 -type query_syntax_error() ::
         {bucket_type_mismatch, DDL_bucket::binary(), Query_bucket::binary()} |
@@ -56,6 +57,8 @@
         {selections_cant_be_blank, []}.
 
 -export_type([query_syntax_error/0]).
+
+-type all_ddl_versions() :: #ddl_v1{} | #ddl_v2{}.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -71,6 +74,41 @@
 -spec get_version() -> binary().
 get_version() ->
     ?RIAK_QL_DDL_VERSION.
+
+%% ddl record conversions
+-spec upgrade(all_ddl_versions(), v1 | v2) -> ?DDL{}.
+upgrade(#ddl_v2{} = DDL, v2) ->
+    DDL;
+upgrade(#ddl_v1{table = Table,
+                fields = Fields,
+                partition_key = PK,
+                local_key = LK},
+        v2) ->
+    ?DDL{table = Table,
+         fields = Fields,
+         partition_key = PK,
+         local_key = LK,
+         properties = []}.
+
+upgrade(X) ->
+    upgrade(X, v2).
+
+-spec downgrade(all_ddl_versions()) -> all_ddl_versions().
+downgrade(#ddl_v1{} = DDL, v1) ->
+    DDL;
+downgrade(#ddl_v2{table = Table,
+                  fields = Fields,
+                  partition_key = PK,
+                  local_key = LK},
+          v1) ->
+    #ddl_v1{table = Table,
+            fields = Fields,
+            partition_key = PK,
+            local_key = LK}.
+
+downgrade(X) ->
+    downgrade(X, v1).
+
 
 -spec make_module_name(Table::binary()) ->
                               module().
@@ -98,26 +136,26 @@ maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
 
--spec get_partition_key(#ddl_v1{}, tuple(), module()) -> term().
-get_partition_key(#ddl_v1{partition_key = PK}, Obj, Mod)
+-spec get_partition_key(?DDL{}, tuple(), module()) -> term().
+get_partition_key(?DDL{partition_key = PK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = PK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_partition_key(#ddl_v1{}, tuple()) -> term().
-get_partition_key(#ddl_v1{table = T}=DDL, Obj)
+-spec get_partition_key(?DDL{}, tuple()) -> term().
+get_partition_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_partition_key(DDL, Obj, Mod).
 
--spec get_local_key(#ddl_v1{}, tuple(), module()) -> term().
-get_local_key(#ddl_v1{local_key = LK}, Obj, Mod)
+-spec get_local_key(?DDL{}, tuple(), module()) -> term().
+get_local_key(?DDL{local_key = LK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_local_key(#ddl_v1{}, tuple()) -> term().
-get_local_key(#ddl_v1{table = T}=DDL, Obj)
+-spec get_local_key(?DDL{}, tuple()) -> term().
+get_local_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_local_key(DDL, Obj, Mod).
@@ -224,9 +262,9 @@ syntax_error_to_msg2({operator_type_mismatch, Fn, Type1, Type2}) ->
 unquote_fn(Fn) when is_atom(Fn) ->
     string:strip(atom_to_list(Fn), both, $').
 
--spec is_query_valid(module(), #ddl_v1{}, {term(), term(), term()}) ->
+-spec is_query_valid(module(), ?DDL{}, {term(), term(), term()}) ->
                             true | {false, [query_syntax_error()]}.
-is_query_valid(_, #ddl_v1{ table = T1 },
+is_query_valid(_, ?DDL{ table = T1 },
                {T2, _Select, _Where}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _, {_Table, Selection, Where}) ->
@@ -417,10 +455,10 @@ make_ddl(Table, Fields, PK) when is_binary(Table) ->
 
 make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
   when is_binary(Table) ->
-    #ddl_v1{table         = Table,
-            fields        = Fields,
-            partition_key = PK,
-            local_key     = LK}.
+    ?DDL{table         = Table,
+         fields        = Fields,
+         partition_key = PK,
+         local_key     = LK}.
 
 %%
 %% get partition_key tests
@@ -971,11 +1009,11 @@ timeseries_filter_test() ->
                         #param_v1{name = [<<"time">>]},
                         #param_v1{name = [<<"user">>]}]
                 },
-    DDL = #ddl_v1{table         = <<"timeseries_filter_test">>,
-                  fields        = Fields,
-                  partition_key = PK,
-                  local_key     = LK
-                 },
+    DDL = ?DDL{table         = <<"timeseries_filter_test">>,
+               fields        = Fields,
+               partition_key = PK,
+               local_key     = LK
+              },
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     Expected = true,
@@ -990,9 +1028,10 @@ parsed_sql_to_query(Proplist) ->
     }.
 
 test_parse(SQL) ->
-    element(2,
-            riak_ql_parser:parse(
-              riak_ql_lexer:get_tokens(SQL))).
+    {ok, Parsed} =
+        riak_ql_parser:parse(
+          riak_ql_lexer:get_tokens(SQL)),
+    Parsed.
 
 is_query_valid_test_helper(Table_name, Table_def, Query) ->
     Mod_name = make_module_name(iolist_to_binary(Table_name)),

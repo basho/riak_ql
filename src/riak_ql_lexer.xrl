@@ -26,6 +26,7 @@ TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
 TRUE = (T|t)(R|r)(U|u)(E|e)
 VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
+WITH = (W|w)(I|i)(T|t)(H|h)
 
 CHARACTER_LITERAL = ('([^\']|(\'\'))*')
 
@@ -85,6 +86,7 @@ Rules.
 {TRUE} : {token, {true, list_to_binary(TokenChars)}}.
 {VARCHAR} : {token, {varchar, list_to_binary(TokenChars)}}.
 {WHERE} : {token, {where, list_to_binary(TokenChars)}}.
+{WITH} : {token, {with, list_to_binary(TokenChars)}}.
 
 {INTNUM}   : {token, {integer, list_to_integer(TokenChars)}}.
 
