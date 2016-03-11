@@ -23,13 +23,10 @@
 
 -include("riak_ql_ddl.hrl").
 
-%% this function can be used to work out which Module to use
 -export([
          get_version/0,
          make_module_name/1, make_module_name/2
         ]).
-
--type ddl() :: #ddl_v1{}.
 
 -type simple_field_type()  :: varchar | sint64 | double | timestamp | boolean | set.
 -type complex_field_type() :: {map, [#riak_field_v1{}]} | any().
@@ -38,7 +35,6 @@
 %% Relational operators allowed in a where clause.
 -type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
 
-%% TODO these types will be improved over the duration of the time series project
 -type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
 -type data_value()       :: {integer, integer()}
                           | {float, float()}
@@ -54,6 +50,8 @@
 
 -type insertion()  :: field_identifier().
 -type filter()     :: term().
+
+-type ddl() :: ?DDL{}.
 
 -export_type([
               data_value/0,
@@ -139,26 +137,26 @@ maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
 
--spec get_partition_key(#ddl_v1{}, tuple(), module()) -> term().
-get_partition_key(#ddl_v1{partition_key = PK}, Obj, Mod)
+-spec get_partition_key(?DDL{}, tuple(), module()) -> term().
+get_partition_key(?DDL{partition_key = PK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = PK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_partition_key(#ddl_v1{}, tuple()) -> term().
-get_partition_key(#ddl_v1{table = T}=DDL, Obj)
+-spec get_partition_key(?DDL{}, tuple()) -> term().
+get_partition_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_partition_key(DDL, Obj, Mod).
 
--spec get_local_key(#ddl_v1{}, tuple(), module()) -> term().
-get_local_key(#ddl_v1{local_key = LK}, Obj, Mod)
+-spec get_local_key(?DDL{}, tuple(), module()) -> term().
+get_local_key(?DDL{local_key = LK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_local_key(#ddl_v1{}, tuple()) -> term().
-get_local_key(#ddl_v1{table = T}=DDL, Obj)
+-spec get_local_key(?DDL{}, tuple()) -> term().
+get_local_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_local_key(DDL, Obj, Mod).
@@ -273,9 +271,9 @@ syntax_error_to_msg2({operator_type_mismatch, Fn, Type1, Type2}) ->
 unquote_fn(Fn) when is_atom(Fn) ->
     string:strip(atom_to_list(Fn), both, $').
 
--spec is_query_valid(module(), #ddl_v1{}, {term(), term(), term()}) ->
+-spec is_query_valid(module(), ?DDL{}, {term(), term(), term()}) ->
                             true | {false, [query_syntax_error()]}.
-is_query_valid(_, #ddl_v1{ table = T1 },
+is_query_valid(_, ?DDL{ table = T1 },
                {T2, _Select, _Where}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _, {_Table, Selection, Where}) ->
@@ -583,10 +581,10 @@ make_ddl(Table, Fields, PK) when is_binary(Table) ->
 
 make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
   when is_binary(Table) ->
-    #ddl_v1{table         = Table,
-            fields        = Fields,
-            partition_key = PK,
-            local_key     = LK}.
+    ?DDL{table         = Table,
+         fields        = Fields,
+         partition_key = PK,
+         local_key     = LK}.
 
 %%
 %% get partition_key tests
@@ -1137,11 +1135,11 @@ timeseries_filter_test() ->
                         #param_v1{name = [<<"time">>]},
                         #param_v1{name = [<<"user">>]}]
                 },
-    DDL = #ddl_v1{table         = <<"timeseries_filter_test">>,
-                  fields        = Fields,
-                  partition_key = PK,
-                  local_key     = LK
-                 },
+    DDL = ?DDL{table         = <<"timeseries_filter_test">>,
+               fields        = Fields,
+               partition_key = PK,
+               local_key     = LK
+              },
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     Expected = true,
@@ -1164,9 +1162,13 @@ parsed_sql_to_insert(Mod, Proplist) ->
     }.
 
 test_parse(SQL) ->
-    element(2,
-            riak_ql_parser:parse(
-              riak_ql_lexer:get_tokens(SQL))).
+    case riak_ql_parser:ql_parse(
+           riak_ql_lexer:get_tokens(SQL)) of
+        {ddl, Parsed, _Props} ->
+            Parsed;
+        {_Species, Parsed} ->
+            Parsed
+    end.
 
 is_sql_valid_test_helper(Table_name, Table_def) ->
     Mod_name = make_module_name(iolist_to_binary(Table_name)),

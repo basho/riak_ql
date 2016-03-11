@@ -29,6 +29,7 @@ TRUE = (T|t)(R|r)(U|u)(E|e)
 VALUES = (V|v)(A|a)(L|l)(U|u)(E|e)(S|s)
 VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
+WITH = (W|w)(I|i)(T|t)(H|h)
 
 CHARACTER_LITERAL = ('([^\']|(\'\'))*')
 
@@ -91,6 +92,7 @@ Rules.
 {VALUES} : {token, {values, list_to_binary(TokenChars)}}.
 {VARCHAR} : {token, {varchar, list_to_binary(TokenChars)}}.
 {WHERE} : {token, {where, list_to_binary(TokenChars)}}.
+{WITH} : {token, {with, list_to_binary(TokenChars)}}.
 
 {INTNUM}   : {token, {integer, list_to_integer(TokenChars)}}.
 

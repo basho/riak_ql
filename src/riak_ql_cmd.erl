@@ -45,9 +45,12 @@
 main([_|_] = Args) ->
     Query = lists:last(Args),
     Lexed = riak_ql_lexer:get_tokens(Query),
-    case riak_ql_parser:parse(Lexed) of
-        {ok, DDL} ->
-            maybe_print_ddl(Args, DDL);
+    case riak_ql_parser:ql_parse(Lexed) of
+        {Species, SQL} when Species == select;
+                            Species == describe ->
+            maybe_print_ddl(Args, SQL);
+        {ddl, DDL, WithProperties} ->
+            maybe_print_ddl(Args, {DDL, WithProperties});
         {error, {Token,_,_}} ->
             io:format("Error: syntax error before ~s~n", [Token]),
             % return an error code for the proc if an error has occurred
