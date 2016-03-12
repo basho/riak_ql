@@ -43,6 +43,7 @@
 -export([
          get_local_key/2, get_local_key/3,
          get_partition_key/2, get_partition_key/3,
+         insert_sql_columns/2,
          is_insert_valid/3,
          is_query_valid/3,
          make_key/3,
@@ -432,7 +433,7 @@ are_insert_columns_valid(Mod, Columns, _) ->
     end.
 
 %% Reported error types must be supported by the function syntax_error_to_msg2
--spec is_insert_column_valid(module(), identifier(), list()) ->
+-spec is_insert_column_valid(module(), field_identifier(), list()) ->
                              list(true | query_syntax_error()).
 is_insert_column_valid(Mod, {identifier, X}, Acc) ->
     case Mod:is_field_valid(X) of
@@ -460,26 +461,65 @@ are_insert_types_valid(Mod, Columns, Values) ->
 -spec is_insert_row_type_valid(module(), [insertion()], [data_value()]) ->
     [] | [false].
 is_insert_row_type_valid(Mod, Columns, RowValues) ->
+    ColPos = build_insert_col_positions(Mod, Columns, RowValues),
+    DataRow = build_insert_validation_obj(Mod, ColPos),
+    Mod:validate_obj(DataRow).
+
+-spec build_insert_col_positions(module(), [insertion()], [data_value()]) ->
+    [{pos_integer(), term()}].
+build_insert_col_positions(Mod, Columns, RowValues) ->
     BuildListFn =
         fun({{identifier, Col}, {_Type, Val}}, Acc) ->
             Pos = Mod:get_field_position(Col),
             [{Pos, Val} | Acc]
         end,
-    Unsorted = lists:foldl(BuildListFn, [], lists:zip(Columns, RowValues)),
-    Sorted = lists:keysort(1, Unsorted),
+    Unsorted = lists:foldl(BuildListFn, [], match_columns_to_values(Columns, RowValues)),
+    lists:keysort(1, Unsorted).
+
+%% Make the list lengths match to allow construction of validation object
+-spec match_columns_to_values([field_identifier()], [data_value()]) ->
+                           [{field_identifier(), data_value()}].
+match_columns_to_values(Cols, Vals) when length(Cols) == length(Vals) ->
+    lists:zip(Cols, Vals);
+match_columns_to_values(Cols, Vals) when length(Cols) > length(Vals) ->
+    lists:zip(lists:sublist(Cols, 1, length(Vals)), Vals);
+match_columns_to_values(Cols, Vals) when length(Cols) < length(Vals) ->
+    lists:zip(Cols, lists:sublist(Vals, 1, length(Cols))).
+
+-spec build_insert_validation_obj(module(), [{pos_integer(), term()}]) ->
+    tuple().
+build_insert_validation_obj(Mod, ColPos) ->
     Row = make_empty_insert_row(Mod),
     ExtractFn = fun({Pos, Val}, Acc) ->
-                    case is_integer(Pos) of
-                        true -> setelement(Pos, Acc, Val);
-                        _ -> Acc
-                    end
-                end,
-    DataRow = lists:foldl(ExtractFn, Row, Sorted),
-    Mod:validate_obj(DataRow).
+        case is_integer(Pos) of
+            true -> setelement(Pos, Acc, Val);
+            _ -> Acc
+        end
+    end,
+    lists:foldl(ExtractFn, Row, ColPos).
 
 make_empty_insert_row(Mod) ->
     Positions = Mod:get_field_positions(),
     list_to_tuple(lists:duplicate(length(Positions), [])).
+
+%% If the INSERT command does not specify a list of columns
+%% the expected behaviour is that ALL columns are specified
+%% in the VALUES clause, so we insert a list of all columns
+%% for validation purposes
+-spec insert_sql_columns(module(), [undefined | field_identifier()]) -> [field_identifier()].
+insert_sql_columns(Mod, [undefined]) when is_atom(Mod) ->
+    default_insert_columns(Mod);
+insert_sql_columns(_Mod, Fields) ->
+    Fields.
+
+%% Build the default column list, if none is specified
+-spec default_insert_columns(module()) -> [field_identifier()].
+default_insert_columns(Mod) when is_atom(Mod) ->
+    ColPos = Mod:get_field_positions(),
+    FormatFn = fun({Col, _Pos}) when is_list(Col) ->
+                    {identifier, Col}
+               end,
+    lists:map(FormatFn, ColPos).
 
 -ifdef(TEST).
 -compile(export_all).
@@ -1082,10 +1122,10 @@ parsed_sql_to_query(Proplist) ->
     }.
 
 %% is_query_valid expects a 3-tuple: table name, fields, values
-parsed_sql_to_insert(Proplist) ->
+parsed_sql_to_insert(Mod, Proplist) ->
     {
         proplists:get_value(table, Proplist, <<>>),
-        proplists:get_value(fields, Proplist, []),
+        insert_sql_columns(Mod, proplists:get_value(fields, Proplist, [])),
         proplists:get_value(values, Proplist, [])
     }.
 
@@ -1109,7 +1149,7 @@ is_query_valid_test_helper(Table_name, Table_def, Query) ->
 
 is_insert_valid_test_helper(Table_name, Table_def, Insert) ->
     {DDL, Mod} = is_sql_valid_test_helper(Table_name, Table_def),
-    is_insert_valid(Mod, DDL, parsed_sql_to_insert(test_parse(Insert))).
+    is_insert_valid(Mod, DDL, parsed_sql_to_insert(Mod, test_parse(Insert))).
 
 -define(LARGE_TABLE_DEF,
         "CREATE TABLE mytab"
@@ -1287,7 +1327,15 @@ is_insert_valid_1_test() ->
             "(myfamily, myseries, time, weather) VALUES"
             "('hazen', 'world', 15, 'sunny')")).
 
-is_insert_valid_out_of_order_2_test() ->
+
+is_insert_valid_2_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 69, 'sunny', 45.0)")).
+
+is_insert_valid_out_of_order_1_test() ->
     ?assertEqual(
         true,
         is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
@@ -1295,7 +1343,7 @@ is_insert_valid_out_of_order_2_test() ->
             "(myfamily, myseries, weather, time) VALUES"
             "('hazen', 'world', 'sunny', 15)")).
 
-is_insert_valid_wrong_type_3_test() ->
+is_insert_valid_wrong_type_1_test() ->
     ?assertEqual(
         incompatible_insert_type,
         is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
@@ -1303,7 +1351,21 @@ is_insert_valid_wrong_type_3_test() ->
             "(myfamily, myseries, weather, time) VALUES"
             "('hazen', 'world', 4.5, 15)")).
 
-is_insert_valid_invalid_column_4_test() ->
+is_insert_valid_wrong_type_2_test() ->
+    ?assertEqual(
+        incompatible_insert_type,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 4.5, 15)")).
+
+is_insert_valid_too_many_1_test() ->
+    ?assertEqual(
+        incompatible_insert_type,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 4.5, 15, 'haggis', 'kilt')")).
+
+is_insert_valid_invalid_column_1_test() ->
     ?assertEqual(
         {false, [
                  {unexpected_insert_field,<<"peppermint">>}]},

@@ -23,7 +23,7 @@
 -ifndef(RIAK_QL_DDL_HRL).
 -define(RIAK_QL_DDL_HRL, included).
 
--define(RIAK_QL_DDL_VERSION, <<"1.2">>).
+-define(RIAK_QL_DDL_VERSION, <<"1.3">>).
 -record(riak_field_v1, {
           name     = <<>>  :: binary(),
           position         :: undefined | pos_integer(),
@@ -62,30 +62,30 @@
 
 %% TODO these types will be improved over the duration of the time series project
 -type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
--type selection()  :: identifier()
+-type selection()  :: field_identifier()
                     | data_value()
                     | selection_function()
                     | {expr, selection()}
                     | {negate, selection()}
                     | {relational_op(), selection(), selection()}.
 
--type insertion()  :: identifier().
+-type insertion()  :: field_identifier().
 
 
--type filter()     :: term().
--type operator()   :: [binary()].
--type sorter()     :: term().
--type combinator() :: [binary()].
--type limit()      :: any().
--type identifier() :: {identifier, [binary()]}.
--type data_value() :: {integer, integer()}
-                    | {float, float()}
-                    | {boolean, boolean()}
-                    | {binary, binary()}.
+-type filter()           :: term().
+-type operator()         :: [binary()].
+-type sorter()           :: term().
+-type combinator()       :: [binary()].
+-type limit()            :: any().
+-type field_identifier() :: {identifier, [binary()]}.
+-type data_value()       :: {integer, integer()}
+                            | {float, float()}
+                            | {boolean, boolean()}
+                            | {binary, binary()}.
 
 -export_type([
               data_value/0,
-              identifier/0
+              field_identifier/0
              ]).
 
 -endif.

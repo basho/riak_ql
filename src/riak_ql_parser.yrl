@@ -341,7 +341,7 @@ Erlang code.
 
 -record(outputs,
         {
-          type :: select | create | describe,
+          type :: create | describe | insert | select,
           buckets = [],
           fields  = [],
           limit   = [],

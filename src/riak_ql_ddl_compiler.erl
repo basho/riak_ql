@@ -641,7 +641,7 @@ make_module_attr(ModName, LineNo) ->
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
                                   {validate_obj,        1},
-				                  {add_column_info,     1},
+                                  {add_column_info,     1},
                                   {get_field_type,      1},
                                   {get_field_position,  1},
                                   {get_field_positions, 0},

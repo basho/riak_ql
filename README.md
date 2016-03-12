@@ -78,6 +78,19 @@ The structure and interfaces of the generated modules is shown as per this `.erl
     get_field_type([<<"weather">>]) -> varchar;
     get_field_type([<<"temperature">>]) -> varchar.
     
+    get_field_position([<<"geohash">>]) -> 1;
+    get_field_position([<<"user">>]) -> 2;
+    get_field_position([<<"time">>]) -> 3;
+    get_field_position([<<"weather">>]) -> 4;
+    get_field_position([<<"temperature">>]) -> 5.
+
+    get_field_positions() -> [
+        {[<<"geohash">>], 1},
+        {[<<"user">>], 2},
+        {[<<"time">>], 3},
+        {[<<"weather">>], 4},
+        {[<<"temperature">>], 5}].
+
     is_field_valid([<<"geohash">>]) -> true;
     is_field_valid([<<"user">>]) -> true;
     is_field_valid([<<"time">>]) -> true;
