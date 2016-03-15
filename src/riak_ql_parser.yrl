@@ -16,6 +16,7 @@ Field
 FieldElem
 Fields
 Identifier
+Insert
 CharacterLiteral
 Where
 Cond
@@ -58,6 +59,12 @@ CreateTable
 PrimaryKey
 FunArg
 FunArgN
+
+OptFieldList
+IdentifierList
+RowValueList
+RowValue
+FieldValue
 .
 
 Terminals
@@ -77,7 +84,9 @@ from
 greater_than_operator
 gte
 identifier
+insert
 integer
+into
 key
 limit
 left_paren
@@ -100,6 +109,7 @@ solidus
 table
 timestamp
 true
+values
 varchar
 where
 .
@@ -113,6 +123,7 @@ Statement -> StatementWithoutSemicolon semicolon : '$1'.
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
+StatementWithoutSemicolon -> Insert : '$1'.
 
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
@@ -122,6 +133,8 @@ Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4')
 
 %% 20.9 DESCRIBE STATEMENT
 Describe -> describe Bucket : make_describe('$2').
+
+Insert -> insert into Identifier OptFieldList values RowValueList : make_insert('$3', '$4', '$6').
 
 Where -> where BooleanValueExpression : make_where('$1', '$2').
 
@@ -304,11 +317,31 @@ KeyFieldArg -> CharacterLiteral    : '$1'.
 KeyFieldArg -> Identifier : '$1'.
 %% KeyFieldArg -> atom left_paren Word right_paren : make_atom('$3').
 
+
+OptFieldList -> left_paren IdentifierList right_paren : '$2'.
+OptFieldList -> '$empty' : undefined.
+
+IdentifierList -> IdentifierList comma Identifier : '$1' ++ ['$3'].
+IdentifierList -> Identifier : ['$1'].
+
+RowValueList -> left_paren right_paren : [[]].
+RowValueList -> left_paren RowValue right_paren : ['$2'].
+RowValueList -> RowValueList comma left_paren RowValue right_paren : '$1' ++ ['$4'].
+
+RowValue -> RowValue comma FieldValue : '$1' ++ ['$3'].
+RowValue -> FieldValue : ['$1'].
+
+FieldValue -> integer : '$1'.
+FieldValue -> float : '$1'.
+FieldValue -> CharacterLiteral : '$1'.
+FieldValue -> Identifier : '$1'.
+
+
 Erlang code.
 
 -record(outputs,
         {
-          type :: select | create | describe,
+          type :: create | describe | insert | select,
           buckets = [],
           fields  = [],
           limit   = [],
@@ -400,6 +433,19 @@ make_describe({identifier, D}) ->
     [
      {type, describe},
      {identifier, D}
+    ].
+
+make_insert({identifier, Table}, Fields, Values) ->
+    FieldsAsList = case is_list(Fields) of
+                       true  -> Fields;
+                       false -> []
+                   end,
+    FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsAsList],
+    [
+     {type, insert},
+     {table, Table},
+     {fields, FieldsWrappedIdentifiers},
+     {values, Values}
     ].
 
 add_limit(A, _B, {integer, C}) ->
