@@ -43,6 +43,7 @@ The structure and interfaces of the generated modules is shown as per this `.erl
     
     -export([validate_obj/1, add_column_info/1,
     	 get_field_type/1, is_field_valid/1, extract/2,
+         get_field_position/1, get_field_positions/0,
     	 get_ddl/0]).
     
     validate_obj({Var1_geohash, Var2_user, Var3_time,
