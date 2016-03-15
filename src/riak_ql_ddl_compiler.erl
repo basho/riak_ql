@@ -382,7 +382,7 @@ build_get_posn_fn([], LineNo, Acc) ->
     {?Q(Fn), LineNo + 1};
 
 build_get_posn_fn([#riak_field_v1{name = Name, position = Pos} | T], LineNo, Acc) ->
-    Clause = riak_ql_to_string:flat_format("get_field_position([<<\"~s\">>]) -> ~p;", [Name, Pos]),
+    Clause = flat_format("get_field_position([<<\"~s\">>]) -> ~p;", [Name, Pos]),
     build_get_posn_fn(T, LineNo, Acc ++ Clause).
 
 %% NOTE: build_get_posns_fn does not support maps
@@ -392,11 +392,11 @@ build_get_posns_fn([], LineNo, Acc) ->
     Header = "get_field_positions() -> [",
     Body = string:strip(Acc, right, $,),
     End = "].",
-    Fn = riak_ql_to_string:flat_format("~s~s~s", [Header, Body, End]),
+    Fn = flat_format("~s~s~s", [Header, Body, End]),
     {?Q(Fn), LineNo + 1};
 
 build_get_posns_fn([#riak_field_v1{name = Name, position = Pos} | T], LineNo, Acc) ->
-    Clause = riak_ql_to_string:flat_format("{[<<\"~s\">>], ~p},", [Name, Pos]),
+    Clause = flat_format("{[<<\"~s\">>], ~p},", [Name, Pos]),
     build_get_posns_fn(T, LineNo, Acc ++ Clause).
 
 make_conses([], _LineNo, Conses)  -> Conses;
@@ -649,6 +649,10 @@ make_export_attr(LineNo) ->
                                   {extract,             2},
                                   {get_ddl,             0}
                                  ]}, LineNo + 1}.
+
+
+flat_format(Format, Args) ->
+    lists:flatten(io_lib:format(Format, Args)).
 
 -ifdef(TEST).
 -compile(export_all).
