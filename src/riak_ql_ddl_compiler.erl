@@ -540,7 +540,7 @@ make_v_gds2([#riak_field_v1{name     = Name,
 -spec make_op(atom(), expr(), expr(), pos_integer()) -> expr().
 make_op(Op, LHS, RHS, LineNo) -> {op, LineNo, Op, LHS, RHS}.
 
--spec make_validation_guard(expr(), simple_field_type(), pos_integer()) -> expr().
+-spec make_validation_guard(expr(), riak_ql_ddl:simple_field_type(), pos_integer()) -> expr().
 make_validation_guard(Nm, varchar, LNo) ->
     {call, LNo, make_atom(is_binary,  LNo), [Nm]};
 make_validation_guard(Nm, sint64, LNo) ->

@@ -30,7 +30,41 @@
         ]).
 
 -type ddl() :: #ddl_v1{}.
--export_type([ddl/0]).
+
+-type simple_field_type()  :: varchar | sint64 | double | timestamp | boolean | set.
+-type complex_field_type() :: {map, [#riak_field_v1{}]} | any().
+-type field_type()         :: simple_field_type() | complex_field_type().
+
+%% Relational operators allowed in a where clause.
+-type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
+
+%% TODO these types will be improved over the duration of the time series project
+-type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
+-type data_value()       :: {integer, integer()}
+                          | {float, float()}
+                          | {boolean, boolean()}
+                          | {binary, binary()}.
+-type field_identifier() :: {identifier, [binary()]}.
+-type selection()  :: field_identifier()
+                    | data_value()
+                    | selection_function()
+                    | {expr, selection()}
+                    | {negate, selection()}
+                    | {relational_op(), selection(), selection()}.
+
+-type insertion()  :: field_identifier().
+-type filter()     :: term().
+
+-export_type([
+              data_value/0,
+              ddl/0,
+              field_identifier/0,
+              field_type/0,
+              filter/0,
+              selection/0,
+              selection_function/0,
+              simple_field_type/0
+             ]).
 
 
 %% a helper function for destructuring data objects
@@ -506,8 +540,8 @@ make_empty_insert_row(Mod) ->
 %% the expected behaviour is that ALL columns are specified
 %% in the VALUES clause, so we insert a list of all columns
 %% for validation purposes
--spec insert_sql_columns(module(), [undefined | field_identifier()]) -> [field_identifier()].
-insert_sql_columns(Mod, [undefined]) when is_atom(Mod) ->
+-spec insert_sql_columns(module(), [field_identifier()]) -> [field_identifier()].
+insert_sql_columns(Mod, []) when is_atom(Mod) ->
     default_insert_columns(Mod);
 insert_sql_columns(_Mod, Fields) ->
     Fields.

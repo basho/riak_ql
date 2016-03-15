@@ -27,16 +27,10 @@
 -record(riak_field_v1, {
           name     = <<>>  :: binary(),
           position         :: undefined | pos_integer(),
-          type             :: undefined | field_type(),
+          type             :: undefined | riak_ql_ddl:field_type(),
           optional = false :: boolean()
          }).
 
--type field_type()         :: simple_field_type() | complex_field_type().
--type simple_field_type()  :: varchar | sint64 | double | timestamp | boolean | set.
--type complex_field_type() :: {map, [#riak_field_v1{}]} | any().
-
-%% Relational operators allowed in a where clause.
--type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
 
 -record(param_v1, {
           name :: [binary()]
@@ -46,7 +40,7 @@
           mod       :: atom(),
           fn        :: atom(),
           args = [] :: [#param_v1{} | any()],
-          type      :: field_type()
+          type      :: riak_ql_ddl:field_type()
          }).
 
 -record(key_v1, {
@@ -59,33 +53,5 @@
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
          }).
-
-%% TODO these types will be improved over the duration of the time series project
--type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
--type selection()  :: field_identifier()
-                    | data_value()
-                    | selection_function()
-                    | {expr, selection()}
-                    | {negate, selection()}
-                    | {relational_op(), selection(), selection()}.
-
--type insertion()  :: field_identifier().
-
-
--type filter()           :: term().
--type operator()         :: [binary()].
--type sorter()           :: term().
--type combinator()       :: [binary()].
--type limit()            :: any().
--type field_identifier() :: {identifier, [binary()]}.
--type data_value()       :: {integer, integer()}
-                            | {float, float()}
-                            | {boolean, boolean()}
-                            | {binary, binary()}.
-
--export_type([
-              data_value/0,
-              field_identifier/0
-             ]).
 
 -endif.

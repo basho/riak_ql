@@ -37,8 +37,8 @@
 -include("riak_ql_ddl.hrl").
 
 
--spec fn_type_signature(aggregate_function(), Args::[simple_field_type()]) ->
-        simple_field_type().
+-spec fn_type_signature(aggregate_function(), Args::[riak_ql_ddl:simple_field_type()]) ->
+        riak_ql_ddl:simple_field_type().
 fn_type_signature('AVG', [double]) -> double;
 fn_type_signature('AVG', [sint64]) -> double;
 fn_type_signature('COUNT', [_]) -> sint64;
