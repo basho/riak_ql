@@ -30,7 +30,7 @@
         ?assertEqual(Expected, Got)).
 
 -define(where_test(Uncanonical, Expected),
-        Got = riak_ql_parser:canonicalise_where(Uncanonical),
+        Got = riak_ql_where_pipeline:canonicalise_where_TEST(Uncanonical),
         ?assertEqual(Expected, Got)).
 
 -define(sql_comp_assert_match(String, Type, Expected),

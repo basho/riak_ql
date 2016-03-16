@@ -54,6 +54,7 @@
 -export([compile/1]).
 -export([compile_and_load_from_tmp/1]).
 -export([write_source_to_files/3]).
+-export([get_version/0]).
 
 -define(IGNORE,        true).
 -define(DONTIGNORE,    false).
@@ -71,6 +72,8 @@
 %% maps() are an aggregration of [map()]
 -type maps()   :: {maps, [[#riak_field_v1{}]]}.
 -type map()    :: {map,  [#riak_field_v1{}]}.
+
+get_version() -> "1.3".
 
 %% Compile the DDL to its helper module AST.
 -spec compile(#ddl_v1{}) ->

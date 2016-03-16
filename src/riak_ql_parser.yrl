@@ -117,26 +117,26 @@ where
 Rootsymbol Statement.
 Endsymbol '$end'.
 
-Statement -> StatementWithoutSemicolon : '$1'.
+Statement -> StatementWithoutSemicolon           : '$1'.
 Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
-StatementWithoutSemicolon -> Query           : convert('$1').
-StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
-StatementWithoutSemicolon -> Describe : '$1'.
-StatementWithoutSemicolon -> Insert : '$1'.
+StatementWithoutSemicolon -> Query           : '$1'.
+StatementWithoutSemicolon -> TableDefinition : '$1'.
+StatementWithoutSemicolon -> Describe        : '$1'.
+StatementWithoutSemicolon -> Insert          : '$1'.
 
-Query -> Select limit integer : add_limit('$1', '$2', '$3').
-Query -> Select               : '$1'.
+Query -> Select limit integer : riak_ql_select_pipeline:make_select('$1', '$3').
+Query -> Select               : riak_ql_select_pipeline:make_select('$1', none).
 
-Select -> select Fields from Buckets Where : make_select('$1', '$2', '$3', '$4', '$5').
-Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4').
+Select -> select Fields from Buckets Where : {'$2', '$4', '$5'}.
+Select -> select Fields from Buckets       : {'$2', '$4', {where, []}}.
 
-%% 20.9 DESCRIBE STATEMENT
-Describe -> describe Bucket : make_describe('$2').
+%% 20.9 DESCRIBE STATEMENTo
+Describe -> describe Bucket : riak_ql_describe_pipeline:make_describe('$2').
 
-Insert -> insert into Identifier OptFieldList values RowValueList : make_insert('$3', '$4', '$6').
+Insert -> insert into Identifier OptFieldList values RowValueList : riak_ql_insert_pipeline:make_insert('$3', '$4', '$6').
 
-Where -> where BooleanValueExpression : make_where('$1', '$2').
+Where -> where BooleanValueExpression : riak_ql_where_pipeline:make_where('$1', '$2').
 
 Fields -> Fields     comma   FieldElem   : concat_select('$1', '$3').
 Fields -> FieldElem                      : '$1'.
@@ -268,7 +268,7 @@ BooleanPredicand ->
 
 TableDefinition ->
     CreateTable Bucket TableContentsSource :
-        make_table_definition('$2', '$3').
+        riak_ql_create_table_pipeline:make_create_table('$2', '$3').
 
 TableContentsSource -> TableElementList : '$1'.
 TableElementList -> left_paren TableElements right_paren : '$2'.
@@ -336,18 +336,7 @@ FieldValue -> float : '$1'.
 FieldValue -> CharacterLiteral : '$1'.
 FieldValue -> Identifier : '$1'.
 
-
 Erlang code.
-
--record(outputs,
-        {
-          type :: create | describe | insert | select,
-          buckets = [],
-          fields  = [],
-          limit   = [],
-          where   = [],
-          ops     = []
-         }).
 
 -include("riak_ql_ddl.hrl").
 
@@ -357,13 +346,18 @@ Erlang code.
 %% no way to stop rebar borking on it AFAIK
 -export([
          return_error/2,
+         return_error_flat/1,
+         return_error_flat/2,
          ql_parse/1,
-         canonicalise_where/1
-         ]).
+         get_version/0
+        ]).
+
+get_version() -> "1.3".
 
 %% Provide more useful success tuples
 ql_parse(Tokens) ->
-    interpret_parse_result(parse(Tokens)).
+    Result = parse(Tokens),
+    interpret_parse_result(Result).
 
 interpret_parse_result({error, _}=Err) ->
     Err;
@@ -374,82 +368,6 @@ interpret_parse_result({ok, Proplist}) ->
 
 extract_type(Type, Proplist) ->
     {Type, Proplist -- [{type, Type}]}.
-
-%% if no partition key is specified hash on the local key
-fix_up_keys(#ddl_v1{partition_key = none, local_key = LK} = DDL) ->
-    DDL#ddl_v1{partition_key = LK, local_key = LK};
-fix_up_keys(A) ->
-    A.
-
-convert(#outputs{type    = select,
-                 buckets = B,
-                 fields  = F,
-                 limit   = L,
-                 where   = W}) ->
-    [
-     {type, select},
-     {tables, B},
-     {fields, F},
-     {limit, L},
-     {where, W}
-    ];
-convert(#outputs{type = create} = O) ->
-    O.
-
-%% make_atom({binary, SomeWord}) ->
-%%     {atom, binary_to_atom(SomeWord, utf8)}.
-
-make_select(A, B, C, D) -> make_select(A, B, C, D, {where, []}).
-
-make_select({select, _SelectBytes},
-            Select,
-            {from, _FromBytes},
-            {Type, D},
-            {_WhereType, E}) ->
-    Bucket = case Type of
-                 identifier -> D;
-                 list   -> {list, [X || X <- D]};
-                 regex  -> {regex, D}
-             end,
-    FieldsAsList = case is_list(Select) of
-                       true  -> Select;
-                       false -> [Select]
-                   end,
-    FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
-    FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
-    _O = #outputs{type    = select,
-                  fields  = FieldsWrappedIdentifiers,
-                  buckets = Bucket,
-                  where   = E
-                 }.
-
-
-wrap_identifier({identifier, IdentifierName})
-  when is_binary(IdentifierName) ->
-    {identifier, [IdentifierName]};
-wrap_identifier(Default) -> Default.
-
-make_describe({identifier, D}) ->
-    [
-     {type, describe},
-     {identifier, D}
-    ].
-
-make_insert({identifier, Table}, Fields, Values) ->
-    FieldsAsList = case is_list(Fields) of
-                       true  -> Fields;
-                       false -> []
-                   end,
-    FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsAsList],
-    [
-     {type, insert},
-     {table, Table},
-     {fields, FieldsWrappedIdentifiers},
-     {values, Values}
-    ].
-
-add_limit(A, _B, {integer, C}) ->
-    A#outputs{limit = C}.
 
 make_expr({LiteralFlavor, Literal},
           {Op, _},
@@ -486,127 +404,12 @@ make_expr({TypeA, A}, {B, _}, {Type, C}) ->
 
 make_wildcard({asterisk, <<"*">>}) -> {identifier, [<<"*">>]}.
 
-make_where({where, A}, {expr, B}) ->
-    NewB = remove_exprs(B),
-    {A, [canonicalise_where(NewB)]}.
 
 maybe_flip_op(less_than_operator)    -> greater_than_operator;
 maybe_flip_op(greater_than_operator) -> less_than_operator;
 maybe_flip_op(lte)                   -> gte;
 maybe_flip_op(gte)                   -> lte;
 maybe_flip_op(Op)                    -> Op.
-
-%%
-%% rewrite the where clause to have a canonical form
-%% makes query rewriting easier
-%%
-canonicalise_where(WhereClause) ->
-    Canonical = canon2(WhereClause),
-    _NewWhere = hoist(Canonical).
-
-canon2({Cond, A, B}) when is_binary(B) andalso not is_binary(A) ->
-    canonicalize_condition_order({Cond, B, A});
-canon2({Cond, A, B}) when Cond =:= and_ orelse
-                          Cond =:= or_  ->
-    %% this is stack busting non-tail recursion
-    %% but our where clauses are bounded in size so thats OK
-    A1 = canon2(A),
-    B1 = canon2(B),
-    case A1 == B1 of
-        true ->
-            A1;
-        false ->
-            case is_lower(A1, B1) of
-                true  -> {Cond, A1, B1};
-                false -> {Cond, B1, A1}
-            end
-    end;
-canon2({Op, A, B}) ->
-    {Op, strip(A), strip(B)};
-canon2(A) ->
-    A.
-
-strip({identifier, A}) -> A;
-strip(A)               -> A.
-
--spec canonicalize_condition_order({atom(), any(), binary()}) -> {atom(), binary(), any()}.
-canonicalize_condition_order({'>', Reference, Column}) ->
-    canon2({'<', Column, Reference});
-canonicalize_condition_order({'<', Reference, Column}) ->
-    canon2({'>', Column, Reference}).
-
-hoist({and_, {and_, A, B}, C}) ->
-    Hoisted = {and_, A, hoist({and_, B, C})},
-    _Sort = sort(Hoisted);
-hoist({A, B, C}) ->
-    B2 = case B of
-             {and_, _, _} -> hoist(B);
-             _            -> B
-         end,
-    C2 = case C of
-             {and_, _, _} -> hoist(C);
-             _            -> C
-         end,
-    {A, B2, C2}.
-
-%% a truly horendous bubble sort algo which is also
-%% not tail recursive
-sort({and_, A, {and_, B, C}}) ->
-    case is_lower(A, B) of
-        true ->
-            {and_, B1, C1} = sort({and_, B, C}),
-            case is_lower(A, B1) of
-                true  -> {and_, A, {and_, B1, C1}};
-                false -> sort({and_, B1, {and_, A, C1}})
-            end;
-        false ->
-            sort({and_, B, sort({and_, A, C})})
-    end;
-sort({and_, A, A}) ->
-    A;
-sort({Op, A, B}) ->
-    case is_lower(A, B) of
-        true  -> {Op, A, B};
-        false -> {Op, B, A}
-    end.
-
-is_lower(Ands, {_, _, _}) when is_list(Ands)->
-    true;
-is_lower({_, _, _}, Ands) when is_list(Ands)->
-    true;
-is_lower(Ands1, Ands2) when is_list(Ands1) andalso is_list(Ands2) ->
-    true;
-is_lower({Op1, _, _} = A, {Op2, _, _} = B) when (Op1 =:= and_ orelse
-                                         Op1 =:= or_  orelse
-                                         Op1 =:= '>'  orelse
-                                         Op1 =:= '<'  orelse
-                                         Op1 =:= '>=' orelse
-                                         Op1 =:= '<=' orelse
-                                         Op1 =:= '='  orelse
-                                         Op1 =:= '<>' orelse
-                                         Op1 =:= '=~' orelse
-                                         Op1 =:= '!~' orelse
-                                         Op1 =:= '!=')
-                                        andalso
-                                        (Op2 =:= and_ orelse
-                                         Op2 =:= or_  orelse
-                                         Op2 =:= '>'  orelse
-                                         Op2 =:= '<'  orelse
-                                         Op2 =:= '>=' orelse
-                                         Op2 =:= '<=' orelse
-                                         Op2 =:= '='  orelse
-                                         Op2 =:= '<>' orelse
-                                         Op2 =:= '=~' orelse
-                                         Op2 =:= '!~' orelse
-                                         Op2 =:= '!=') ->
-    (A =< B).
-
-remove_exprs({expr, A}) ->
-    remove_exprs(A);
-remove_exprs({A, B, C}) ->
-    {A, remove_exprs(B), remove_exprs(C)};
-remove_exprs(A) ->
-    A.
 
 %% Functions are disabled so return an error.
 make_funcall({identifier, FuncName}, Args) ->
@@ -742,32 +545,6 @@ extract_key_field_list({list, [Field | Rest]}, Extracted) ->
     [#param_v1{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
-make_table_definition({identifier, Table}, Contents) ->
-    validate_ddl(
-      #ddl_v1{
-         table = Table,
-         partition_key = find_partition_key(Contents),
-         local_key = find_local_key(Contents),
-         fields = find_fields(Contents)}).
-
-find_partition_key({table_element_list, Elements}) ->
-    find_partition_key(Elements);
-find_partition_key([{partition_key, Key} | _Rest]) ->
-    Key;
-find_partition_key([_Head | Rest]) ->
-    find_partition_key(Rest);
-find_partition_key(_) ->
-    none.
-
-find_local_key({table_element_list, Elements}) ->
-    find_local_key(Elements);
-find_local_key([{local_key, Key} | _Rest]) ->
-    Key;
-find_local_key([_Head | Rest]) ->
-    find_local_key(Rest);
-find_local_key(_) ->
-    none.
-
 make_modfun(quantum, {list, Args}) ->
     [Param, Quantity, Unit] = lists:reverse(Args),
     {modfun, #hash_fn_v1{
@@ -776,129 +553,6 @@ make_modfun(quantum, {list, Args}) ->
                 args = [#param_v1{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
                 type = timestamp
                }}.
-
-find_fields({table_element_list, Elements}) ->
-    find_fields(1, Elements, []).
-
-find_fields(_Count, [], Found) ->
-    lists:reverse(Found);
-find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
-    PositionedField = Field#riak_field_v1{position = Count},
-    find_fields(Count + 1, Rest, [PositionedField | Elements]);
-find_fields(Count, [_Head | Rest], Elements) ->
-    find_fields(Count, Rest, Elements).
-
-
-%% DDL validation
-
-validate_ddl(DDL) ->
-    ok = assert_keys_present(DDL),
-    ok = assert_unique_fields_in_pk(DDL),
-    ok = assert_partition_key_length(DDL),
-    ok = assert_primary_and_local_keys_match(DDL),
-    ok = assert_partition_key_fields_exist(DDL),
-    ok = assert_primary_key_fields_non_null(DDL),
-    DDL.
-
-%% @doc Ensure DDL can haz keys
-assert_keys_present(#ddl_v1{local_key = LK, partition_key = PK})
-  when LK == none;
-       PK == none ->
-    return_error_flat("Missing primary key");
-assert_keys_present(_GoodDDL) ->
-    ok.
-
-%% @doc Ensure all fields appearing in PRIMARY KEY are not null.
-assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
-                                           fields = Fields}) ->
-    PKFieldNames = [N || #param_v1{name = [N]} <- LK],
-    OnlyPKFields = [F || #riak_field_v1{name = N} = F <- Fields,
-                         lists:member(N, PKFieldNames)],
-    NonNullFields =
-        [binary_to_list(F) || #riak_field_v1{name = F, optional = Null}
-                                  <- OnlyPKFields, Null == true],
-    case NonNullFields of
-        [] ->
-            ok;
-        NonNullFields ->
-            return_error_flat("Primary key has 'null' fields (~s)",
-                              [string:join(NonNullFields, ", ")])
-    end.
-
-%% @doc Assert that the partition key has at least one field.
-assert_partition_key_length(#ddl_v1{partition_key = {key_v1, [_|_]}}) ->
-    ok;
-assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) ->
-    return_error_flat("Primary key must have one or more fields ~p", [Key]).
-
-%% @doc Verify primary key and local partition have the same elements
-assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primary},
-                                            local_key = #key_v1{ast = Local}}) ->
-    PrimaryList = [query_field_name(F) || F <- Primary],
-    LocalList = [query_field_name(F) || F <- lists:sublist(Local, length(PrimaryList))],
-    case PrimaryList == LocalList of
-        true ->
-            ok;
-        false ->
-            return_error_flat("Local key does not match primary key")
-    end.
-
-assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
-    Fields = [N || #param_v1{name = [N]} <- LK],
-    case length(Fields) == length(lists:usort(Fields)) of
-        true ->
-            ok;
-        false ->
-            return_error_flat(
-              "Primary key has duplicate fields (~s)",
-              [string:join(
-                 which_duplicate(
-                   lists:sort(
-                     [binary_to_list(F) || F <- Fields])),
-                 ", ")])
-    end.
-
-%% Ensure that all fields in the primary key exist in the table definition.
-assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,
-                                           partition_key =
-                                               #key_v1{ ast = PK } }) ->
-    MissingFields =
-        [binary_to_list(name_of(F)) || F <- PK, not is_field(F, Fields)],
-    case MissingFields of
-        [] ->
-            ok;
-        _ ->
-            return_error_flat("Primary key fields do not exist (~s).",
-                              [string:join(MissingFields, ", ")])
-    end.
-
-%% Check that the field name exists in the list of fields.
-is_field(Field, Fields) ->
-    (lists:keyfind(name_of(Field), 2, Fields) /= false).
-
-%%
-name_of(#param_v1{ name = [N] }) ->
-    N;
-name_of(#hash_fn_v1{ args = [#param_v1{ name = [N] }|_] }) ->
-    N.
-
-which_duplicate(FF) ->
-    which_duplicate(FF, []).
-which_duplicate([], Acc) ->
-    Acc;
-which_duplicate([_], Acc) ->
-    Acc;
-which_duplicate([A,A|_] = [_|T], Acc) ->
-    which_duplicate(T, [A|Acc]);
-which_duplicate([_|T], Acc) ->
-    which_duplicate(T, Acc).
-
-%% Pull the name out of the appropriate record
-query_field_name(#hash_fn_v1{args = Args}) ->
-    Param = lists:keyfind(param_v1, 1, Args),
-    query_field_name(Param);
-query_field_name(#param_v1{name = Field}) ->
-    Field.
 
 -spec return_error_flat(string()) -> no_return().
 return_error_flat(F) ->
