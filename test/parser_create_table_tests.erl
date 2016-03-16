@@ -354,9 +354,6 @@ no_quanta_in_primary_key_is_ok_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
-% multiple quanta returns an error (but why not?)
-% 
-
 create_with_2_test() ->
     Table_def =
         "CREATE TABLE temperatures ("

@@ -46,8 +46,8 @@ main([_|_] = Args) ->
     Query = lists:last(Args),
     Lexed = riak_ql_lexer:get_tokens(Query),
     case riak_ql_parser:ql_parse(Lexed) of
-        {Species, SQL} when Species == select;
-                            Species == describe ->
+        {QueryType, SQL} when QueryType == select;
+                              QueryType == describe ->
             maybe_print_ddl(Args, SQL);
         {ddl, DDL, WithProperties} ->
             maybe_print_ddl(Args, {DDL, WithProperties});
