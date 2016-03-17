@@ -357,6 +357,8 @@ TableProperty ->
     identifier equals_operator TablePropertyValue :
         make_table_property('$1', '$3').
 
+TablePropertyValue -> identifier : '$1'.   %% this is not valid
+%% the above rule is just to produce a specific error message
 TablePropertyValue -> TruthValue : '$1'.
 TablePropertyValue -> integer : '$1'.
 TablePropertyValue -> float : '$1'.
@@ -818,6 +820,12 @@ find_fields(Count, [_Head | Rest], Elements) ->
 prepend_table_proplist(L, P) ->
     [P | L].
 
+make_table_property({identifier, K}, {Type, _V})
+  when Type == identifier ->
+    return_error(
+      0, iolist_to_binary(
+           io_lib:format("Expecting a numeric, boolean or string value for WITH property \"~s\""
+                         " (did you forget to quote a string?)", [K])));
 make_table_property({identifier, K}, {Type, V})
   when Type == boolean;
        Type == integer;
