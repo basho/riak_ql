@@ -354,6 +354,20 @@ no_quanta_in_primary_key_is_ok_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
+create_with_1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c))"
+        " with ()",
+    {ddl, _DDL, WithProps} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+      [],
+      WithProps).
+
 create_with_2_test() ->
     Table_def =
         "CREATE TABLE temperatures ("
@@ -362,7 +376,8 @@ create_with_2_test() ->
         "c TIMESTAMP NOT NULL, "
         "PRIMARY KEY ((quantum(c, 15, 's')), c))"
         " with (a ='2a', c= 3)",
-    ?assertMatch(
-       {ddl, ?DDL{}, [{<<"a">>, <<"2a">>}, {<<"c">>, 3}]},
-       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+    {ddl, _DDL, WithProps} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+      [{<<"a">>, <<"2a">>}, {<<"c">>, 3}],
+      WithProps).
