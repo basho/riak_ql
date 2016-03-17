@@ -6,6 +6,8 @@ desc
 double
 false
 from
+insert
+into
 key
 limit
 not
@@ -18,5 +20,6 @@ sint64
 table
 timestamp
 true
+values
 varchar
 where

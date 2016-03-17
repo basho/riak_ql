@@ -49,6 +49,7 @@
 -module(riak_ql_ddl_compiler).
 
 -include("riak_ql_ddl.hrl").
+-include_lib("merl/include/merl.hrl").
 
 -export([compile/1]).
 -export([compile_and_load_from_tmp/1]).
@@ -83,12 +84,14 @@ compile(#ddl_v1{ table = Table, fields = Fields } = DDL) ->
     {ACFns, LineNo3} = build_add_cols_fns(Fields, LineNo2),
     {ExtractFn, LineNo4} = build_extract_fn([Fields],  LineNo3, []),
     {GetTypeFn, LineNo5} = build_get_type_fn([Fields], LineNo4, []),
-    {IsValidFn, LineNo6} = build_is_valid_fn([Fields], LineNo5, []),
-    {GetDDLFn, LineNo7}  = build_get_ddl_fn(DDL, LineNo6, []),
+    {GetPosnFn, LineNo6} = build_get_posn_fn(Fields, LineNo5, []),
+    {GetPosnsFn, LineNo7} = build_get_posns_fn(Fields, LineNo6, []),
+    {IsValidFn, LineNo8} = build_is_valid_fn([Fields], LineNo7, []),
+    {GetDDLFn, LineNo9}  = build_get_ddl_fn(DDL, LineNo8, []),
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, IsValidFn, GetDDLFn, {eof, LineNo7}],
+        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, GetDDLFn, {eof, LineNo9}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
@@ -374,6 +377,31 @@ make_get_type_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
         end,
     make_get_type_cls(T, NewLineNo, Prefix, NewA).
 
+%% NOTE: build_get_posn_fn does not support maps
+-spec build_get_posn_fn([#riak_field_v1{}], pos_integer(), ast()) ->
+    {expr(), pos_integer()}.
+build_get_posn_fn([], LineNo, Acc) ->
+    Fn = Acc ++ "get_field_position(_Other) -> undefined.",
+    {?Q(Fn), LineNo + 1};
+
+build_get_posn_fn([#riak_field_v1{name = Name, position = Pos} | T], LineNo, Acc) ->
+    Clause = flat_format("get_field_position([<<\"~s\">>]) -> ~p;", [Name, Pos]),
+    build_get_posn_fn(T, LineNo, Acc ++ Clause).
+
+%% NOTE: build_get_posns_fn does not support maps
+-spec build_get_posns_fn([#riak_field_v1{}], pos_integer(), ast()) ->
+    {expr(), pos_integer()}.
+build_get_posns_fn([], LineNo, Acc) ->
+    Header = "get_field_positions() -> [",
+    Body = string:strip(Acc, right, $,),
+    End = "].",
+    Fn = flat_format("~s~s~s", [Header, Body, End]),
+    {?Q(Fn), LineNo + 1};
+
+build_get_posns_fn([#riak_field_v1{name = Name, position = Pos} | T], LineNo, Acc) ->
+    Clause = flat_format("{[<<\"~s\">>], ~p},", [Name, Pos]),
+    build_get_posns_fn(T, LineNo, Acc ++ Clause).
+
 make_conses([], _LineNo, Conses)  -> Conses;
 make_conses([H | T], LineNo, Acc) -> NewAcc = {cons, LineNo, H, Acc},
                                      make_conses(T, LineNo, NewAcc).
@@ -515,7 +543,7 @@ make_v_gds2([#riak_field_v1{name     = Name,
 -spec make_op(atom(), expr(), expr(), pos_integer()) -> expr().
 make_op(Op, LHS, RHS, LineNo) -> {op, LineNo, Op, LHS, RHS}.
 
--spec make_validation_guard(expr(), simple_field_type(), pos_integer()) -> expr().
+-spec make_validation_guard(expr(), riak_ql_ddl:simple_field_type(), pos_integer()) -> expr().
 make_validation_guard(Nm, varchar, LNo) ->
     {call, LNo, make_atom(is_binary,  LNo), [Nm]};
 make_validation_guard(Nm, sint64, LNo) ->
@@ -615,13 +643,19 @@ make_module_attr(ModName, LineNo) ->
 
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
-                                  {validate_obj,    1},
-				  {add_column_info, 1},
-                                  {get_field_type,  1},
-                                  {is_field_valid,  1},
-                                  {extract,         2},
-                                  {get_ddl,         0}
+                                  {validate_obj,        1},
+                                  {add_column_info,     1},
+                                  {get_field_type,      1},
+                                  {get_field_position,  1},
+                                  {get_field_positions, 0},
+                                  {is_field_valid,      1},
+                                  {extract,             2},
+                                  {get_ddl,             0}
                                  ]}, LineNo + 1}.
+
+
+flat_format(Format, Args) ->
+    lists:flatten(io_lib:format(Format, Args)).
 
 -ifdef(TEST).
 -compile(export_all).
