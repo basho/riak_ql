@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_ql_to_string: module that converts the output of the compiler
+%% riak_ql_to_string: convert the output of the compiler
 %%                    back to the text representation
 %%
 %%
@@ -23,38 +23,9 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_to_string).
 
--export([sql_to_string/1,
-         col_names_from_select/1]).
+-export([col_names_from_select/1]).
 
 -include("riak_ql_ddl.hrl").
-
--spec sql_to_string({select|describe, proplists:proplist()} | {ddl, ?DDL{}}) ->
-                           string().
-sql_to_string({select, Parts}) ->
-    Fields = proplists:get_value(fields, Parts),
-    Tables = proplists:get_value(tables, Parts),
-    Where  = proplists:get_value(where,  Parts),
-    SQL = [
-           "SELECT",
-           make_select_clause(Fields),
-           "FROM",
-           make_from_clause(Tables),
-           "WHERE",
-           make_where_clause(Where)
-           %% don't forget to add 'ORDER BY' and 'LIMIT' when/if appropriate
-          ],
-    string:join(SQL, " ");
-
-sql_to_string({ddl, ?DDL{table         = T,
-                         fields        = FF,
-                         partition_key = PK,
-                         local_key     = LK},
-               WithProps}) ->
-    flat_format(
-      "CREATE TABLE ~s (~s, PRIMARY KEY ((~s), ~s))~s",
-      [T, make_fields(FF), make_key(PK), make_key(LK),
-       make_props(WithProps)]).
-
 
 %% Convert the selection in select clause to a list of strings, one
 %% element for each column. White space in the original query is not reproduced.
@@ -64,55 +35,6 @@ col_names_from_select(Select) ->
 
 %% --------------------------
 %% local functions
-
-make_select_clause(FF) ->
-    string:join([select_col_to_string(F) || F <- FF], ", ").
-
- 
-make_from_clause(X) when is_binary(X) ->
-    binary_to_list(X);
-make_from_clause({list, XX}) ->
-    string:join(
-      [binary_to_list(X) || X <- XX], ", ");
-make_from_clause({regex, XX}) ->
-    XX.
-
-make_where_clause(XX) ->
-    select_col_to_string(XX).
-
-
-make_fields(FF) ->
-    string:join(
-      [make_field(F) || F <- FF], ", ").
-
-make_field(#riak_field_v1{name = N, type = T, optional = Optional}) ->
-    flat_format("~s ~s~s", [N, T, not_null_or_not(Optional)]).
-
-not_null_or_not(true)  -> "";
-not_null_or_not(false) -> " not null".
-
-make_key(#key_v1{ast = FF}) ->
-    string:join(
-      [make_key_element(F) || F <- FF], ", ").
-
-make_key_element(#param_v1{name = [F]}) ->
-    binary_to_list(F);
-make_key_element(#hash_fn_v1{mod = riak_ql_quanta, fn = quantum,
-                             args = [#param_v1{name = [F]}, QSize, QUnit]}) ->
-    flat_format("quantum(~s, ~p, ~s)", [F, QSize, QUnit]).
-
-make_props([]) ->
-    "";
-make_props(PL) ->
-    [" WITH (",
-     string:join(
-       [flat_format("~s=~s", [K, make_prop_value(V)]) || {K, V} <- PL], ", "),
-     ")"].
-
-make_prop_value(Num) when is_number(Num) ->
-    io_lib:format("~p", [Num]);
-make_prop_value(Str) ->
-    [$',re:replace(Str, "'", "''", [{return, list}, global]), $'].
 
 
 %% Convert one column to a flat string.
@@ -292,50 +214,5 @@ select_col_to_string_negated_parens_test() ->
                    ["-1",
                     "-asdf",
                     "-(3+-4)"]).
-
-create_table_test() ->
-    roundtrip_ok(
-      "create table fafa ("
-      " a sint64 not null, b varchar not null, c timestamp not null,"
-      " PRIMARY KEY ((quantum(c, 1, m)), c))").
-
-create_table_with_test() ->
-    roundtrip_ok(
-      "create table fafa ("
-      " a sint64 not null, b varchar not null, c timestamp not null,"
-      " PRIMARY KEY ((quantum(c, 1, m)), c))"
-      " with (x=4, y='3', z='', X='wo''a\"h')").
-      %% sql standard uses doubling of single quotes instead of escaping, and '\' is not special
-
-select_single_simple_test() ->
-    roundtrip_ok(
-      "select a from b where a < 11 and a > 33").
-select_multiple_simple_test() ->
-    roundtrip_ok(
-      "select a, a1 from b where a < 11 and a > 33").
-%% select_multiple_ffa_test() ->
-%%     roundtrip_ok(
-%%       "select avg((a+4)), (avg((a)+4))+2, stddev(x/2 + 2),"
-%%       " 3*23+2, 3+23*2,"
-%%       " 3+(23*2), (3+23)*2, 3*(23+2), (3*23)+2,"
-%%       " (4), (((2))), 5*5, a*2, -8, 8, (8), -8 - 4,-8+3,-8*2, d, (e)"
-%%       " from b where a < 11+2 and a > 33").
-%%% uncomment when parser gets to skill level 80
-
-%% because of the need to ignore whitespace, case and paren
-%% differences, let's convert strings to SQL structure and do the
-%% comparisons on those
-roundtrip_ok(Text) ->
-    SQL = string_to_sql(Text),
-    %% ?debugFmt("\n Orig SQL : ~p", [SQL]),
-    %% ?debugFmt("\n Orig stmt: \"~s\"", [Text]),
-    Text2 = sql_to_string(SQL),
-    %% ?debugFmt("\n Converted stmt: \"~s\"", [Text2]),
-    ?assertEqual(
-       SQL, string_to_sql(Text2)).
-
-string_to_sql(Text) ->
-    riak_ql_parser:ql_parse(
-      riak_ql_lexer:get_tokens(Text)).
 
 -endif.
