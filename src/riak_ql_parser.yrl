@@ -357,7 +357,9 @@ TableProperty ->
     identifier equals_operator TablePropertyValue :
         make_table_property('$1', '$3').
 
+TablePropertyValue -> TruthValue : '$1'.
 TablePropertyValue -> integer : '$1'.
+TablePropertyValue -> float : '$1'.
 TablePropertyValue -> character_literal : '$1'.
 
 Erlang code.
@@ -817,7 +819,9 @@ prepend_table_proplist(L, P) ->
     [P | L].
 
 make_table_property({identifier, K}, {Type, V})
-  when Type == integer;
+  when Type == boolean;
+       Type == integer;
+       Type == float;
        Type == character_literal ->
     {K, V}.
 
