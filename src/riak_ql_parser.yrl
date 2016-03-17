@@ -347,6 +347,8 @@ TableProperties ->
     left_paren TablePropertyList right_paren : '$2'.
 
 TablePropertyList ->
+    '$empty' : [].
+TablePropertyList ->
     TableProperty : prepend_table_proplist([], '$1').
 TablePropertyList ->
     TableProperty comma TablePropertyList : prepend_table_proplist('$3', '$1').
