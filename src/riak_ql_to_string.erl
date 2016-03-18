@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_ql_sql_to_string: module that converts the output of the compiler
-%%                        back to the text representation
+%% riak_ql_to_string: convert the output of the compiler
+%%                    back to the text representation
 %%
 %%
 %% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
@@ -23,17 +23,19 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_to_string).
 
--export([
-         col_names_from_select/1
-        ]).
-%% --------------------------
-%% local functions
+-export([col_names_from_select/1]).
+
+-include("riak_ql_ddl.hrl").
 
 %% Convert the selection in select clause to a list of strings, one
 %% element for each column. White space in the original query is not reproduced.
 -spec col_names_from_select(list(term())) -> [string()].
 col_names_from_select(Select) ->
     [select_col_to_string(S) || S <- Select].
+
+%% --------------------------
+%% local functions
+
 
 %% Convert one column to a flat string.
 -spec select_col_to_string(any()) ->

@@ -39,7 +39,7 @@
 -define(passing_test(Name, Query, Val, ExpectedPK, ExpectedLK),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
                case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
@@ -56,7 +56,7 @@
 -define(passing_short_test(Name, Query, Val),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
                case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
@@ -74,7 +74,7 @@
 -define(failing_test(Name, Query, Val),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
                case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
@@ -91,7 +91,7 @@
 -define(not_valid_test(Name, Query),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
                case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {error, _} ->
                        ?assertEqual(?VALID, true);
@@ -107,7 +107,7 @@
 -define(ddl_roundtrip_assert(Name, Query),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
                %% ?debugFmt("in ~p~n- DDL is:~n -~p~n", [Name, DDL]),
                {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
                Got = Module:get_ddl(),
