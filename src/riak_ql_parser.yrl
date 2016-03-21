@@ -849,7 +849,7 @@ assert_quantum_fn_args2([_Param, Unit, Measure]) ->
 
 assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
     QuantumFns =
-        [Fn || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum} = Fn <- PKAST],
+        [Fn || #hash_fn_v1{ } = Fn <- PKAST],
     case length(QuantumFns) =< 1 of
         true ->
             ok;
