@@ -49,6 +49,7 @@
 -module(riak_ql_ddl_compiler).
 
 -include("riak_ql_ddl.hrl").
+-include_lib("merl/include/merl.hrl").
 
 -export([compile/1]).
 -export([compile_and_load_from_tmp/1]).
@@ -72,23 +73,25 @@
 -type map()    :: {map,  [#riak_field_v1{}]}.
 
 %% Compile the DDL to its helper module AST.
--spec compile(#ddl_v1{}) ->
+-spec compile(?DDL{}) ->
         {module, ast()} | {error, tuple()}.
-compile({ok, #ddl_v1{} = DDL}) ->
+compile({ok, ?DDL{} = DDL}) ->
     % handle output directly from riak_ql_parser
     compile(DDL);
-compile(#ddl_v1{ table = Table, fields = Fields } = DDL) ->
+compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {ModName, Attrs, LineNo} = make_attrs(Table, ?LINENOSTART),
     {VFns,  LineNo2} = build_validn_fns([Fields],   LineNo,  ?POSNOSTART, [], []),
     {ACFns, LineNo3} = build_add_cols_fns(Fields, LineNo2),
     {ExtractFn, LineNo4} = build_extract_fn([Fields],  LineNo3, []),
     {GetTypeFn, LineNo5} = build_get_type_fn([Fields], LineNo4, []),
-    {IsValidFn, LineNo6} = build_is_valid_fn([Fields], LineNo5, []),
-    {GetDDLFn, LineNo7}  = build_get_ddl_fn(DDL, LineNo6, []),
+    {GetPosnFn, LineNo6} = build_get_posn_fn(Fields, LineNo5, []),
+    {GetPosnsFn, LineNo7} = build_get_posns_fn(Fields, LineNo6, []),
+    {IsValidFn, LineNo8} = build_is_valid_fn([Fields], LineNo7, []),
+    {GetDDLFn, LineNo9}  = build_get_ddl_fn(DDL, LineNo8, []),
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, IsValidFn, GetDDLFn, {eof, LineNo7}],
+        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, GetDDLFn, {eof, LineNo9}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
@@ -97,20 +100,20 @@ compile(#ddl_v1{ table = Table, fields = Fields } = DDL) ->
     end.
 
 %% Compile the module, write it to /tmp then load it into the VM.
--spec compile_and_load_from_tmp(#ddl_v1{}) ->
+-spec compile_and_load_from_tmp(?DDL{}) ->
         {module, atom()} | {error, tuple()}.
-compile_and_load_from_tmp({ok, #ddl_v1{} = DDL}) ->
+compile_and_load_from_tmp({ok, {?DDL{} = DDL, _Props}}) ->
     % handle output directly from riak_ql_parser
     compile_and_load_from_tmp(DDL);
-compile_and_load_from_tmp(#ddl_v1{} = DDL) ->
+compile_and_load_from_tmp(?DDL{} = DDL) ->
     {Module, AST} = compile(DDL),
     {ok, Module, Bin} = compile:forms(AST),
     BeamFileName = "/tmp/" ++ atom_to_list(Module) ++ ".beam",
     {module, Module} = code:load_binary(Module, BeamFileName, Bin).
 
 %% Write the AST and erlang source derived from the AST to disk for debugging.
--spec write_source_to_files(string(), #ddl_v1{}, ast()) -> ok.
-write_source_to_files(OutputDir, #ddl_v1{ table = Table } = DDL, AST) ->
+-spec write_source_to_files(string(), ?DDL{}, ast()) -> ok.
+write_source_to_files(OutputDir, ?DDL{ table = Table } = DDL, AST) ->
     ModName = riak_ql_ddl:make_module_name(Table),
     ASTFileName = filename:join([OutputDir, ModName]) ++ ".ast",
     SrcFileName = filename:join([OutputDir, ModName]) ++ ".erl",
@@ -126,9 +129,9 @@ build_erlang_source(AST1) ->
     erl_prettypr:format(Syntax).
 
 %%
-build_debug_header_text(#ddl_v1{ table = Table, fields = Fields,
-                                 partition_key = PartitionKey,
-                                 local_key = LocalKey }) ->
+build_debug_header_text(?DDL{table = Table, fields = Fields,
+                             partition_key = PartitionKey,
+                             local_key = LocalKey}) ->
     io_lib:format(
         "%%% Generated Module, DO NOT EDIT~n~n"
         "%%% Validates the DDL~n~n"
@@ -168,7 +171,7 @@ make_extract_cls([], LineNo, _Prefix, Acc) ->
 make_extract_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
     NPref  = [H | Prefix],
     Args   = [make_string(binary_to_list(Nm), LineNo)
-	      || #riak_field_v1{name = Nm} <- NPref],
+              || #riak_field_v1{name = Nm} <- NPref],
     Poses  = [make_integer(P,  LineNo) || #riak_field_v1{position = P}  <- NPref],
     Conses = make_conses(Args, LineNo, {nil, LineNo}),
     Var    = make_var('Obj', LineNo),
@@ -188,27 +191,27 @@ make_extract_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
     make_extract_cls(T, NewLineNo, Prefix, NewA).
 
 %% this is gnarly because the field order is compile-time dependent
--spec build_get_ddl_fn(#ddl_v1{}, pos_integer(), ast()) ->
-			      {expr(), pos_integer()}.
-build_get_ddl_fn(#ddl_v1{table         = T,
-			 fields        = F,
-			 partition_key = PK,
-			 local_key     = LK}, LineNo, []) ->
-    PosT  = #ddl_v1.table,
-    PosF  = #ddl_v1.fields,
-    PosPK = #ddl_v1.partition_key,
-    PosLK = #ddl_v1.local_key,
+-spec build_get_ddl_fn(?DDL{}, pos_integer(), ast()) ->
+                              {expr(), pos_integer()}.
+build_get_ddl_fn(?DDL{table         = T,
+                      fields        = F,
+                      partition_key = PK,
+                      local_key     = LK}, LineNo, []) ->
+    PosT     = ?DDL.table,
+    PosF     = ?DDL.fields,
+    PosPK    = ?DDL.partition_key,
+    PosLK    = ?DDL.local_key,
     %% the order is dependent on the order the fields are listed in the record at
     %% compile time hence this rather obscure dance of the positions
     %% The record name is deliberatly put last in the list to check it is
     %% actually working ;-)
-    {_Poses, List} = lists:unzip(lists:sort([
-					     {PosT,  make_binary(T, LineNo)},
-					     {PosF,  expand_fields(F, LineNo)},
-					     {PosPK, expand_key(PK, LineNo)},
-					     {PosLK, expand_key(LK, LineNo)},
-					     {1,     make_atom(ddl_v1, LineNo)}
-					    ])),
+    {_Poses, List} =
+        unzip_sorted(
+          [{PosT,  make_binary(T, LineNo)},
+           {PosF,  expand_fields(F, LineNo)},
+           {PosPK, expand_key(PK, LineNo)},
+           {PosLK, expand_key(LK, LineNo)},
+           {1,     make_atom(?DDL_RECORD_NAME, LineNo)}]),
     Body = make_tuple(List, LineNo),
     Cl = make_clause([], [], Body, LineNo),
     Fn = make_fun(get_ddl, 0, [Cl], LineNo),
@@ -219,26 +222,26 @@ expand_fields(Fs, LineNo) ->
     make_conses(lists:reverse(Fields), LineNo, {nil, LineNo}).
 
 expand_field(#riak_field_v1{name     = Nm,
-			    position = Pos,
-			    type     = Ty,
-			    optional = Opt}, LineNo) ->
+                            position = Pos,
+                            type     = Ty,
+                            optional = Opt}, LineNo) ->
     PosNm  =  #riak_field_v1.name,
     PosPos =  #riak_field_v1.position,
     PosTy  =  #riak_field_v1.type,
-    PosOpt = #riak_field_v1.optional,
-    {_Poses, List} = lists:unzip(lists:sort([
-					     {PosNm,  make_binary(Nm, LineNo)},
-					     {PosPos, make_integer(Pos, LineNo)},
-					     {PosTy,  expand_type(Ty, LineNo)},
-					     {PosOpt, make_atom(Opt, LineNo)},
-					     {1,      make_atom(riak_field_v1, LineNo)}
-					    ])),
+    PosOpt =  #riak_field_v1.optional,
+    {_Poses, List} =
+        unzip_sorted(
+            [{PosNm,  make_binary(Nm, LineNo)},
+             {PosPos, make_integer(Pos, LineNo)},
+             {PosTy,  expand_type(Ty, LineNo)},
+             {PosOpt, make_atom(Opt, LineNo)},
+             {1,      make_atom(riak_field_v1, LineNo)}]),
     make_tuple(List, LineNo).
 
 expand_key(none, LineNo) ->
     make_atom(none, LineNo);
 expand_key(#key_v1{ast = []}, LineNo) ->
-    make_tuple([make_atom(key_v1, LineNo) ,{nil, LineNo}], LineNo);
+    make_tuple([make_atom(key_v1, LineNo), {nil, LineNo}], LineNo);
 expand_key(#key_v1{ast = AST}, LineNo) ->
     Rest = expand_ast(AST, LineNo),
     make_tuple([make_atom(key_v1, LineNo) | [Rest]], LineNo).
@@ -252,20 +255,20 @@ expand_a2(#param_v1{name = Nm}, LineNo) ->
     Conses = make_conses(Bins, LineNo, {nil, LineNo}),
     make_tuple([make_atom(param_v1, LineNo) | [Conses]], LineNo);
 expand_a2(#hash_fn_v1{mod  = Mod,
-		      fn   = Fn,
-		      args = Args,
-		      type = Ty}, LineNo) ->
+                      fn   = Fn,
+                      args = Args,
+                      type = Ty}, LineNo) ->
     PosMod  = #hash_fn_v1.mod,
     PosFn   = #hash_fn_v1.fn,
     PosArgs = #hash_fn_v1.args,
     PosType = #hash_fn_v1.type,
-    {_Pos, List} = lists:unzip(lists:sort([
-					   {PosMod,  make_atom(Mod, LineNo)},
-					   {PosFn,   make_atom(Fn, LineNo)},
-					   {PosArgs, expand_args(Args, LineNo)},
-					   {PosType, make_atom(Ty, LineNo)},
-					   {1,       make_atom(hash_fn_v1, LineNo)}
-					  ])),
+    {_Pos, List} =
+        unzip_sorted(
+          [{PosMod,  make_atom(Mod, LineNo)},
+           {PosFn,   make_atom(Fn, LineNo)},
+           {PosArgs, expand_args(Args, LineNo)},
+           {PosType, make_atom(Ty, LineNo)},
+           {1,       make_atom(hash_fn_v1, LineNo)}]),
     make_tuple(List, LineNo).
 
 expand_args(Args, LineNo) ->
@@ -287,6 +290,7 @@ expand_args2(Arg, LineNo) when is_list(Arg) ->
 expand_args2(Arg, LineNo) when is_atom(Arg) ->
     make_atom(Arg, LineNo).
 
+
 expand_type({map, Fs}, LineNo) ->
     Fields = lists:reverse([expand_field(X, LineNo) || X <- Fs]),
     Conses = make_conses(Fields, LineNo, {nil, LineNo}),
@@ -295,7 +299,7 @@ expand_type(Type, LineNo) ->
     make_atom(Type, LineNo).
 
 -spec build_is_valid_fn([[#riak_field_v1{}]], pos_integer(), ast()) ->
-			       {expr(), pos_integer()}.
+                               {expr(), pos_integer()}.
 build_is_valid_fn([], LineNo, Acc) ->
     {Fail, NewLineNo} = make_fail_clause(LineNo),
     Clauses = lists:flatten(lists:reverse([Fail | Acc])),
@@ -308,7 +312,7 @@ build_is_valid_fn([Fields | T], LineNo, Acc) ->
 make_is_valid_cls([], LineNo, Prefix, Acc) ->
     %% handle the prefixes slightly differently here than to the next clause
     Args = [make_string(binary_to_list(Nm), LineNo)
-	    || #riak_field_v1{name = Nm} <- Prefix],
+            || #riak_field_v1{name = Nm} <- Prefix],
     WildArgs = [make_string("*", LineNo) | Args],
     WildConses = make_conses(WildArgs, LineNo, {nil, LineNo}),
     Body = make_atom(true, LineNo),
@@ -319,7 +323,7 @@ make_is_valid_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
     %% handle the prefixes slightly differently here than to the perviousls clause
     NPref  = [H | Prefix],
     Args   = [make_string(binary_to_list(Nm), LineNo)
-	      || #riak_field_v1{name = Nm} <- NPref],
+              || #riak_field_v1{name = Nm} <- NPref],
     Conses = make_conses(Args, LineNo, {nil, LineNo}),
     %% you need to reverse the lists of the positions to
     %% get the calls to element to nest correctly
@@ -337,7 +341,7 @@ make_is_valid_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
     make_is_valid_cls(T, NewLineNo, Prefix, NewA).
 
 -spec build_get_type_fn([[#riak_field_v1{}]], pos_integer(), ast()) ->
-			       {expr(), pos_integer()}.
+                               {expr(), pos_integer()}.
 build_get_type_fn([], LineNo, Acc) ->
     Clauses = lists:flatten(lists:reverse(Acc)),
     Fn = make_fun(get_field_type, 1, Clauses, LineNo),
@@ -351,14 +355,14 @@ make_get_type_cls([], LineNo, _Prefix, Acc) ->
 make_get_type_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
     NPref  = [H | Prefix],
     Args   = [make_string(binary_to_list(Nm), LineNo)
-	      || #riak_field_v1{name = Nm} <- NPref],
+              || #riak_field_v1{name = Nm} <- NPref],
     Conses = make_conses(Args, LineNo, {nil, LineNo}),
     %% you need to reverse the lists of the positions to
     %% get the calls to element to nest correctly
     Body = case Ty of
-	       {map, _}  -> make_atom(map, LineNo);
-	       _         -> make_atom(Ty, LineNo)
-	   end,
+               {map, _}  -> make_atom(map, LineNo);
+               _         -> make_atom(Ty, LineNo)
+           end,
     Guard = [],
     Cl = make_clause([Conses], Guard, Body, LineNo),
     {NewA, NewLineNo} =
@@ -370,6 +374,31 @@ make_get_type_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
                 {[Cl | Acc], LineNo}
         end,
     make_get_type_cls(T, NewLineNo, Prefix, NewA).
+
+%% NOTE: build_get_posn_fn does not support maps
+-spec build_get_posn_fn([#riak_field_v1{}], pos_integer(), ast()) ->
+    {expr(), pos_integer()}.
+build_get_posn_fn([], LineNo, Acc) ->
+    Fn = Acc ++ "get_field_position(_Other) -> undefined.",
+    {?Q(Fn), LineNo + 1};
+
+build_get_posn_fn([#riak_field_v1{name = Name, position = Pos} | T], LineNo, Acc) ->
+    Clause = flat_format("get_field_position([<<\"~s\">>]) -> ~p;", [Name, Pos]),
+    build_get_posn_fn(T, LineNo, Acc ++ Clause).
+
+%% NOTE: build_get_posns_fn does not support maps
+-spec build_get_posns_fn([#riak_field_v1{}], pos_integer(), ast()) ->
+    {expr(), pos_integer()}.
+build_get_posns_fn([], LineNo, Acc) ->
+    Header = "get_field_positions() -> [",
+    Body = string:strip(Acc, right, $,),
+    End = "].",
+    Fn = flat_format("~s~s~s", [Header, Body, End]),
+    {?Q(Fn), LineNo + 1};
+
+build_get_posns_fn([#riak_field_v1{name = Name, position = Pos} | T], LineNo, Acc) ->
+    Clause = flat_format("{[<<\"~s\">>], ~p},", [Name, Pos]),
+    build_get_posns_fn(T, LineNo, Acc ++ Clause).
 
 make_conses([], _LineNo, Conses)  -> Conses;
 make_conses([H | T], LineNo, Acc) -> NewAcc = {cons, LineNo, H, Acc},
@@ -393,7 +422,7 @@ make_ar2([], LineNo, Acc1, Acc2) ->
     {make_tuple(lists:flatten(lists:reverse(Acc1)), LineNo),
      make_conses(lists:flatten(Acc2), LineNo, {nil, LineNo})};
 make_ar2([#riak_field_v1{name = Nm,
-			 type = {map, M}} | T], LineNo, Acc1, Acc2) ->
+                         type = {map, M}} | T], LineNo, Acc1, Acc2) ->
     {NewArg1, NewF1} = make_args_and_fields(M, LineNo),
     NewNm = make_string(binary_to_list(Nm), LineNo),
     NewF2 = make_tuple([NewNm, NewF1], LineNo),
@@ -512,7 +541,7 @@ make_v_gds2([#riak_field_v1{name     = Name,
 -spec make_op(atom(), expr(), expr(), pos_integer()) -> expr().
 make_op(Op, LHS, RHS, LineNo) -> {op, LineNo, Op, LHS, RHS}.
 
--spec make_validation_guard(expr(), simple_field_type(), pos_integer()) -> expr().
+-spec make_validation_guard(expr(), riak_ql_ddl:simple_field_type(), pos_integer()) -> expr().
 make_validation_guard(Nm, varchar, LNo) ->
     {call, LNo, make_atom(is_binary,  LNo), [Nm]};
 make_validation_guard(Nm, sint64, LNo) ->
@@ -591,7 +620,7 @@ make_fail_clause(LineNo) ->
 get_fn_name(Root, 1) when is_atom(Root) ->
     Root;
 get_fn_name(Root, FunNo) when is_atom(Root) andalso
-			      is_integer(FunNo) ->
+                              is_integer(FunNo) ->
     list_to_atom(atom_to_list(Root) ++ integer_to_list(FunNo)).
 
 -spec make_clause(ast(), guards(), expr(), pos_integer()) -> expr().
@@ -612,13 +641,24 @@ make_module_attr(ModName, LineNo) ->
 
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
-                                  {validate_obj,    1},
-				  {add_column_info, 1},
-                                  {get_field_type,  1},
-                                  {is_field_valid,  1},
-                                  {extract,         2},
-                                  {get_ddl,         0}
+                                  {validate_obj,        1},
+                                  {add_column_info,     1},
+                                  {get_field_type,      1},
+                                  {get_field_position,  1},
+                                  {get_field_positions, 0},
+                                  {is_field_valid,      1},
+                                  {extract,             2},
+                                  {get_ddl,             0}
                                  ]}, LineNo + 1}.
+
+
+%% supporting functions
+
+flat_format(Format, Args) ->
+    lists:flatten(io_lib:format(Format, Args)).
+
+unzip_sorted(L) ->
+    lists:unzip(lists:sort(L)).
 
 -ifdef(TEST).
 -compile(export_all).
@@ -632,11 +672,11 @@ make_export_attr(LineNo) ->
 %% Helper fns
 %%
 
-make_ddl(#ddl_v1{table = Table,
-                 fields = Fields,
-                 partition_key = PK,
-                 local_key = LK
-                }) ->
+make_ddl(?DDL{table = Table,
+              fields = Fields,
+              partition_key = PK,
+              local_key = LK
+             }) ->
     make_ddl(Table, Fields, PK, LK).
 
 make_ddl(Table, Fields) when is_binary(Table) ->
@@ -647,10 +687,10 @@ make_ddl(Table, Fields, PK) when is_binary(Table) ->
 
 make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
   when is_binary(Table) ->
-    #ddl_v1{table         = Table,
-            fields        = Fields,
-            partition_key = PK,
-            local_key     = LK}.
+    ?DDL{table         = Table,
+         fields        = Fields,
+         partition_key = PK,
+         local_key     = LK}.
 
 %%
 %% Unit Tests
@@ -664,11 +704,11 @@ simplest_valid_test() ->
 
 make_simplest_valid_ddl() ->
     make_ddl(<<"simplest_valid_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = varchar}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = varchar}
+             ]).
 
 simple_valid_varchar_test() ->
     DDL = make_simple_valid_varchar_ddl(),
@@ -678,14 +718,14 @@ simple_valid_varchar_test() ->
 
 make_simple_valid_varchar_ddl() ->
     make_ddl(<<"simple_valid_varchar_test">>,
-	     [
-	      #riak_field_v1{name     = <<"yando">>,
-			     position = 1,
-			     type     = varchar},
-	      #riak_field_v1{name     = <<"erko">>,
-			     position = 2,
-			     type     = varchar}
-	     ]).
+             [
+              #riak_field_v1{name     = <<"yando">>,
+                             position = 1,
+                             type     = varchar},
+              #riak_field_v1{name     = <<"erko">>,
+                             position = 2,
+                             type     = varchar}
+             ]).
 
 simple_valid_sint64_test() ->
     DDL = make_simple_valid_sint64_ddl(),
@@ -1507,41 +1547,41 @@ complex_ddl_test() ->
     ?assertEqual(?VALID, Result).
 
 make_complex_ddl_ddl() ->
-    #ddl_v1{
+    ?DDL{
        table = <<"temperatures">>,
        fields = [
-		 #riak_field_v1{
-		    name     = <<"time">>,
-		    position = 1,
-		    type     = timestamp,
-		    optional = false},
-		 #riak_field_v1{
-		    name     = <<"user_id">>,
-		    position = 2,
-		    type     = varchar,
-		    optional = false}
-		],
+                 #riak_field_v1{
+                    name     = <<"time">>,
+                    position = 1,
+                    type     = timestamp,
+                    optional = false},
+                 #riak_field_v1{
+                    name     = <<"user_id">>,
+                    position = 2,
+                    type     = varchar,
+                    optional = false}
+                ],
        partition_key = #key_v1{ast = [
-				      #param_v1{name = [<<"time">>]},
-				      #hash_fn_v1{mod  = crypto,
-						  fn   = hash,
-						  %% list isn't a valid arg
-						  %% type output from the
-						  %% lexer/parser
-						  args = [
-							  sha512,
-							  true,
-							  1,
-							  1.0,
-							  <<"abc">>
-							 ]}
-				     ]},
+                                      #param_v1{name = [<<"time">>]},
+                                      #hash_fn_v1{mod  = crypto,
+                                                  fn   = hash,
+                                                  %% list isn't a valid arg
+                                                  %% type output from the
+                                                  %% lexer/parser
+                                                  args = [
+                                                          sha512,
+                                                          true,
+                                                          1,
+                                                          1.0,
+                                                          <<"abc">>
+                                                         ]}
+                                     ]},
        local_key = #key_v1{ast = [
-				  #hash_fn_v1{mod  = crypto,
-					      fn   = hash,
-					      args = [ripemd]},
-				  #param_v1{name = [<<"time">>]}
-				 ]}}.
+                                  #hash_fn_v1{mod  = crypto,
+                                              fn   = hash,
+                                              args = [ripemd]},
+                                  #param_v1{name = [<<"time">>]}
+                                 ]}}.
 
 %%
 %% Test the add column info functionality
@@ -1649,44 +1689,44 @@ timeseries_ddl_get_test() ->
 
 make_timeseries_ddl() ->
     Fields = [
-	      #riak_field_v1{name     = <<"geohash">>,
-			     position = 1,
-			     type     = varchar,
-			     optional = false},
-	      #riak_field_v1{name     = <<"user">>,
-			     position = 2,
-			     type     = varchar,
-			     optional = false},
-	      #riak_field_v1{name     = <<"time">>,
-			     position = 3,
-			     type     = timestamp,
-			     optional = false},
-	      #riak_field_v1{name     = <<"weather">>,
-			     position = 4,
-			     type     = varchar,
-			     optional = false},
-	      #riak_field_v1{name     = <<"temperature">>,
-			     position = 5,
-			     type     = varchar,
-			     optional = true}
-	     ],
+              #riak_field_v1{name     = <<"geohash">>,
+                             position = 1,
+                             type     = varchar,
+                             optional = false},
+              #riak_field_v1{name     = <<"user">>,
+                             position = 2,
+                             type     = varchar,
+                             optional = false},
+              #riak_field_v1{name     = <<"time">>,
+                             position = 3,
+                             type     = timestamp,
+                             optional = false},
+              #riak_field_v1{name     = <<"weather">>,
+                             position = 4,
+                             type     = varchar,
+                             optional = false},
+              #riak_field_v1{name     = <<"temperature">>,
+                             position = 5,
+                             type     = varchar,
+                             optional = true}
+             ],
     PK = #key_v1{ ast = [
-			 #hash_fn_v1{mod  = riak_ql_quanta,
-				     fn   = quantum,
-				     args = [
-					     #param_v1{name = [<<"time">>]},
-					     15,
-					     s
-					    ]}
-			]},
+                         #hash_fn_v1{mod  = riak_ql_quanta,
+                                     fn   = quantum,
+                                     args = [
+                                             #param_v1{name = [<<"time">>]},
+                                             15,
+                                             s
+                                            ]}
+                        ]},
     LK = #key_v1{ast = [
-			#param_v1{name = [<<"time">>]},
-			#param_v1{name = [<<"user">>]}]
-		},
-    _DDL = #ddl_v1{table         = <<"timeseries_filter_test">>,
-		   fields        = Fields,
-		   partition_key = PK,
-		   local_key     = LK
-		  }.
+                        #param_v1{name = [<<"time">>]},
+                        #param_v1{name = [<<"user">>]}]
+                },
+    _DDL = ?DDL{table         = <<"timeseries_filter_test">>,
+                fields        = Fields,
+                partition_key = PK,
+                local_key     = LK
+               }.
 
 -endif.

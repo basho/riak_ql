@@ -23,14 +23,46 @@
 
 -include("riak_ql_ddl.hrl").
 
-%% this function can be used to work out which Module to use
 -export([
-         make_module_name/1, make_module_name/2,
-         get_version/0
+         get_version/0,
+         make_module_name/1, make_module_name/2
         ]).
 
--type ddl() :: #ddl_v1{}.
--export_type([ddl/0]).
+-type simple_field_type()  :: varchar | sint64 | double | timestamp | boolean | set.
+-type complex_field_type() :: {map, [#riak_field_v1{}]} | any().
+-type field_type()         :: simple_field_type() | complex_field_type().
+
+%% Relational operators allowed in a where clause.
+-type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
+
+-type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
+-type data_value()       :: {integer, integer()}
+                          | {float, float()}
+                          | {boolean, boolean()}
+                          | {binary, binary()}.
+-type field_identifier() :: {identifier, [binary()]}.
+-type selection()  :: field_identifier()
+                    | data_value()
+                    | selection_function()
+                    | {expr, selection()}
+                    | {negate, selection()}
+                    | {relational_op(), selection(), selection()}.
+
+-type insertion()  :: field_identifier().
+-type filter()     :: term().
+
+-type ddl() :: ?DDL{}.
+
+-export_type([
+              data_value/0,
+              ddl/0,
+              field_identifier/0,
+              field_type/0,
+              filter/0,
+              selection/0,
+              selection_function/0,
+              simple_field_type/0
+             ]).
 
 
 %% a helper function for destructuring data objects
@@ -40,20 +72,27 @@
 %% so this function can be called out to to pick
 %% apart the DDL records
 
--export([get_local_key/2, get_local_key/3]).
--export([get_partition_key/2, get_partition_key/3]).
--export([is_query_valid/3]).
+-export([
+         get_local_key/2, get_local_key/3,
+         get_partition_key/2, get_partition_key/3,
+         insert_sql_columns/2,
+         is_insert_valid/3,
+         is_query_valid/3,
+         make_key/3,
+         syntax_error_to_msg/1
+        ]).
 %%-export([get_return_types_and_col_names/2]).
--export([make_key/3]).
--export([syntax_error_to_msg/1]).
 
 -type query_syntax_error() ::
         {bucket_type_mismatch, DDL_bucket::binary(), Query_bucket::binary()} |
         {incompatible_type, Field::binary(), simple_field_type(), atom()} |
         {incompatible_operator, Field::binary(), simple_field_type(), relational_op()}  |
         {unexpected_where_field, Field::binary()} |
+        {unexpected_insert_field, Field::binary()} |
         {unexpected_select_field, Field::binary()} |
-        {selections_cant_be_blank, []}.
+        {unknown_column_type, term()} |
+        {selections_cant_be_blank, []} |
+        {insertions_cant_be_blank, []}.
 
 -export_type([query_syntax_error/0]).
 
@@ -98,26 +137,26 @@ maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
 
--spec get_partition_key(#ddl_v1{}, tuple(), module()) -> term().
-get_partition_key(#ddl_v1{partition_key = PK}, Obj, Mod)
+-spec get_partition_key(?DDL{}, tuple(), module()) -> term().
+get_partition_key(?DDL{partition_key = PK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = PK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_partition_key(#ddl_v1{}, tuple()) -> term().
-get_partition_key(#ddl_v1{table = T}=DDL, Obj)
+-spec get_partition_key(?DDL{}, tuple()) -> term().
+get_partition_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_partition_key(DDL, Obj, Mod).
 
--spec get_local_key(#ddl_v1{}, tuple(), module()) -> term().
-get_local_key(#ddl_v1{local_key = LK}, Obj, Mod)
+-spec get_local_key(?DDL{}, tuple(), module()) -> term().
+get_local_key(?DDL{local_key = LK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_local_key(#ddl_v1{}, tuple()) -> term().
-get_local_key(#ddl_v1{table = T}=DDL, Obj)
+-spec get_local_key(?DDL{}, tuple()) -> term().
+get_local_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_local_key(DDL, Obj, Mod).
@@ -197,6 +236,11 @@ syntax_error_to_msg2({bucket_type_mismatch, B1, B2}) ->
 syntax_error_to_msg2({incompatible_type, Field, Expected, Actual}) ->
     {"incompatible_type: field ~s with type ~p cannot be compared "
      "to type ~p in where clause.", [Field, Expected, Actual]};
+syntax_error_to_msg2({incompatible_insert_type, Field, Expected, Actual}) ->
+    {"incompatible_insert_type: field ~s with type ~p cannot be inserted "
+    "to type ~p .", [Field, Actual, Expected]};
+syntax_error_to_msg2({incompatible_insert_type}) ->
+    {"incompatible_insert_type: bad type for inserted field"};
 syntax_error_to_msg2({incompatible_operator, Field, ColType, Op}) ->
     {"incompatible_operator: field ~s with type ~p cannot use "
      "operator ~p in where clause.", [Field, ColType, Op]};
@@ -205,6 +249,9 @@ syntax_error_to_msg2({unexpected_where_field, Field}) ->
      [Field]};
 syntax_error_to_msg2({unexpected_select_field, Field}) ->
     {"unexpected_select_field: unexpected field ~s in select clause.",
+     [Field]};
+syntax_error_to_msg2({unexpected_insert_field, Field}) ->
+    {"unexpected_select_field: unexpected field ~s in insert clause.",
      [Field]};
 syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
     {"subexpressions_not_supported: expressions in where clause operators"
@@ -224,15 +271,29 @@ syntax_error_to_msg2({operator_type_mismatch, Fn, Type1, Type2}) ->
 unquote_fn(Fn) when is_atom(Fn) ->
     string:strip(atom_to_list(Fn), both, $').
 
--spec is_query_valid(module(), #ddl_v1{}, {term(), term(), term()}) ->
+-spec is_query_valid(module(), ?DDL{}, {term(), term(), term()}) ->
                             true | {false, [query_syntax_error()]}.
-is_query_valid(_, #ddl_v1{ table = T1 },
+is_query_valid(_, ?DDL{ table = T1 },
                {T2, _Select, _Where}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _, {_Table, Selection, Where}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
+
+-spec is_insert_valid(module(), #ddl_v1{}, {term(), term(), term()}) ->
+                      true | {false, [query_syntax_error()]}.
+is_insert_valid(_, #ddl_v1{ table = T1 },
+                {T2, _Fields, _Values}) when T1 /= T2 ->
+    {false, [{bucket_type_mismatch, {T1, T2}}]};
+is_insert_valid(Mod, _DDL, {_Table, Fields, Values}) ->
+    ValidColumns = are_insert_columns_valid(Mod, Fields, ?CANTBEBLANK),
+    case ValidColumns of
+        true ->
+            are_insert_types_valid(Mod, Fields, Values);
+        _ ->
+            ValidColumns
+    end.
 
 %%
 is_query_valid_result(true,        true)        -> true;
@@ -389,6 +450,109 @@ fold_where_tree({Op, LHS, RHS}, Acc1, Fn) when Op == and_; Op == or_ ->
 fold_where_tree(Clause, Acc, Fn) ->
     Fn(Clause, Acc).
 
+-spec are_insert_columns_valid(module(), [insertion()], boolean()) ->
+    true | {false, [query_syntax_error()]}.
+are_insert_columns_valid(_, [], ?CANTBEBLANK) ->
+    {false, [{insertions_cant_be_blank, []}]};
+are_insert_columns_valid(Mod, Columns, _) ->
+    CheckFn =
+        fun(E, Acc) ->
+            is_insert_column_valid(Mod, E, Acc)
+        end,
+    case lists:foldl(CheckFn, [], Columns) of
+        []     -> true;
+        Errors -> {false, lists:reverse(Errors)}
+    end.
+
+%% Reported error types must be supported by the function syntax_error_to_msg2
+-spec is_insert_column_valid(module(), field_identifier(), list()) ->
+                             list(true | query_syntax_error()).
+is_insert_column_valid(Mod, {identifier, X}, Acc) ->
+    case Mod:is_field_valid(X) of
+        true  ->
+            Acc;
+        false ->
+            [{unexpected_insert_field, hd(X)} | Acc]
+    end;
+is_insert_column_valid(_, Other, Acc) ->
+    [{unexpected_insert_field, Other} | Acc].
+
+-spec are_insert_types_valid(module(), [insertion()], [[data_value()]]) ->
+    true | {false, [true | query_syntax_error()]}.
+are_insert_types_valid(Mod, Columns, Values) ->
+    VerifyRowFn =
+        fun(RowValues, Acc) ->
+            [is_insert_row_type_valid(Mod, Columns, RowValues) | Acc]
+        end,
+    InvalidRows = lists:foldl(VerifyRowFn, [], Values),
+    case lists:member(false, InvalidRows) of
+        true  -> incompatible_insert_type;
+        false -> true
+    end.
+
+-spec is_insert_row_type_valid(module(), [insertion()], [data_value()]) ->
+    [] | [false].
+is_insert_row_type_valid(Mod, Columns, RowValues) ->
+    ColPos = build_insert_col_positions(Mod, Columns, RowValues),
+    DataRow = build_insert_validation_obj(Mod, ColPos),
+    Mod:validate_obj(DataRow).
+
+-spec build_insert_col_positions(module(), [insertion()], [data_value()]) ->
+    [{pos_integer(), term()}].
+build_insert_col_positions(Mod, Columns, RowValues) ->
+    BuildListFn =
+        fun({{identifier, Col}, {_Type, Val}}, Acc) ->
+            Pos = Mod:get_field_position(Col),
+            [{Pos, Val} | Acc]
+        end,
+    Unsorted = lists:foldl(BuildListFn, [], match_columns_to_values(Columns, RowValues)),
+    lists:keysort(1, Unsorted).
+
+%% Make the list lengths match to allow construction of validation object
+-spec match_columns_to_values([field_identifier()], [data_value()]) ->
+                           [{field_identifier(), data_value()}].
+match_columns_to_values(Cols, Vals) when length(Cols) == length(Vals) ->
+    lists:zip(Cols, Vals);
+match_columns_to_values(Cols, Vals) when length(Cols) > length(Vals) ->
+    lists:zip(lists:sublist(Cols, 1, length(Vals)), Vals);
+match_columns_to_values(Cols, Vals) when length(Cols) < length(Vals) ->
+    lists:zip(Cols, lists:sublist(Vals, 1, length(Cols))).
+
+-spec build_insert_validation_obj(module(), [{pos_integer(), term()}]) ->
+    tuple().
+build_insert_validation_obj(Mod, ColPos) ->
+    Row = make_empty_insert_row(Mod),
+    ExtractFn = fun({Pos, Val}, Acc) ->
+        case is_integer(Pos) of
+            true -> setelement(Pos, Acc, Val);
+            _ -> Acc
+        end
+    end,
+    lists:foldl(ExtractFn, Row, ColPos).
+
+make_empty_insert_row(Mod) ->
+    Positions = Mod:get_field_positions(),
+    list_to_tuple(lists:duplicate(length(Positions), [])).
+
+%% If the INSERT command does not specify a list of columns
+%% the expected behaviour is that ALL columns are specified
+%% in the VALUES clause, so we insert a list of all columns
+%% for validation purposes
+-spec insert_sql_columns(module(), [field_identifier()]) -> [field_identifier()].
+insert_sql_columns(Mod, []) when is_atom(Mod) ->
+    default_insert_columns(Mod);
+insert_sql_columns(_Mod, Fields) ->
+    Fields.
+
+%% Build the default column list, if none is specified
+-spec default_insert_columns(module()) -> [field_identifier()].
+default_insert_columns(Mod) when is_atom(Mod) ->
+    ColPos = Mod:get_field_positions(),
+    FormatFn = fun({Col, _Pos}) when is_list(Col) ->
+                    {identifier, Col}
+               end,
+    lists:map(FormatFn, ColPos).
+
 -ifdef(TEST).
 -compile(export_all).
 
@@ -417,10 +581,10 @@ make_ddl(Table, Fields, PK) when is_binary(Table) ->
 
 make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
   when is_binary(Table) ->
-    #ddl_v1{table         = Table,
-            fields        = Fields,
-            partition_key = PK,
-            local_key     = LK}.
+    ?DDL{table         = Table,
+         fields        = Fields,
+         partition_key = PK,
+         local_key     = LK}.
 
 %%
 %% get partition_key tests
@@ -971,11 +1135,11 @@ timeseries_filter_test() ->
                         #param_v1{name = [<<"time">>]},
                         #param_v1{name = [<<"user">>]}]
                 },
-    DDL = #ddl_v1{table         = <<"timeseries_filter_test">>,
-                  fields        = Fields,
-                  partition_key = PK,
-                  local_key     = LK
-                 },
+    DDL = ?DDL{table         = <<"timeseries_filter_test">>,
+               fields        = Fields,
+               partition_key = PK,
+               local_key     = LK
+              },
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     Expected = true,
@@ -989,19 +1153,39 @@ parsed_sql_to_query(Proplist) ->
       proplists:get_value(where, Proplist, [])
     }.
 
-test_parse(SQL) ->
-    element(2,
-            riak_ql_parser:parse(
-              riak_ql_lexer:get_tokens(SQL))).
+%% is_query_valid expects a 3-tuple: table name, fields, values
+parsed_sql_to_insert(Mod, Proplist) ->
+    {
+        proplists:get_value(table, Proplist, <<>>),
+        insert_sql_columns(Mod, proplists:get_value(fields, Proplist, [])),
+        proplists:get_value(values, Proplist, [])
+    }.
 
-is_query_valid_test_helper(Table_name, Table_def, Query) ->
+test_parse(SQL) ->
+    case riak_ql_parser:ql_parse(
+           riak_ql_lexer:get_tokens(SQL)) of
+        {ddl, Parsed, _Props} ->
+            Parsed;
+        {_Species, Parsed} ->
+            Parsed
+    end.
+
+is_sql_valid_test_helper(Table_name, Table_def) ->
     Mod_name = make_module_name(iolist_to_binary(Table_name)),
     catch code:purge(Mod_name),
     catch code:purge(Mod_name),
     DDL = test_parse(Table_def),
     %% ?debugFmt("QUERY is ~p", [test_parse(Query)]),
-    {module,Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
+    {DDL, Mod}.
+
+is_query_valid_test_helper(Table_name, Table_def, Query) ->
+    {DDL, Mod} = is_sql_valid_test_helper(Table_name, Table_def),
     is_query_valid(Mod, DDL, parsed_sql_to_query(test_parse(Query))).
+
+is_insert_valid_test_helper(Table_name, Table_def, Insert) ->
+    {DDL, Mod} = is_sql_valid_test_helper(Table_name, Table_def),
+    is_insert_valid(Mod, DDL, parsed_sql_to_insert(Mod, test_parse(Insert))).
 
 -define(LARGE_TABLE_DEF,
         "CREATE TABLE mytab"
@@ -1170,6 +1354,61 @@ is_query_valid_no_subexpressions_1_test() ->
                                   "WHERE time > 1 + 2 AND time < 10 "
                                   "AND myfamily = 'bob' ")
       ).
+
+is_insert_valid_1_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, time, weather) VALUES"
+            "('hazen', 'world', 15, 'sunny')")).
+
+
+is_insert_valid_2_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 69, 'sunny', 45.0)")).
+
+is_insert_valid_out_of_order_1_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, weather, time) VALUES"
+            "('hazen', 'world', 'sunny', 15)")).
+
+is_insert_valid_wrong_type_1_test() ->
+    ?assertEqual(
+        incompatible_insert_type,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, weather, time) VALUES"
+            "('hazen', 'world', 4.5, 15)")).
+
+is_insert_valid_wrong_type_2_test() ->
+    ?assertEqual(
+        incompatible_insert_type,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 4.5, 15)")).
+
+is_insert_valid_too_many_1_test() ->
+    ?assertEqual(
+        incompatible_insert_type,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 4.5, 15, 'haggis', 'kilt')")).
+
+is_insert_valid_invalid_column_1_test() ->
+    ?assertEqual(
+        {false, [
+                 {unexpected_insert_field,<<"peppermint">>}]},
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, peppermint, time) VALUES"
+            "('hazen', 'world', 'cloudy', 15)")).
 
 fold_where_tree_test() ->
     Parsed = test_parse(
