@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_kv_ddl: defines records used in the data description language
+%% riak_ql_ddl.hrl: defines records used in the data description language
 %%
 %% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
@@ -54,5 +54,8 @@
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
          }).
+
+-define(DDL, #ddl_v1).
+-define(DDL_RECORD_NAME, ddl_v1).
 
 -endif.

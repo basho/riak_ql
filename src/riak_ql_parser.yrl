@@ -29,6 +29,10 @@ TableContentsSource
 TableElementList
 TableElements
 TableElement
+TableProperties
+TablePropertyList
+TableProperty
+TablePropertyValue
 ColumnDefinition
 ColumnConstraint
 KeyDefinition
@@ -114,6 +118,7 @@ true
 values
 varchar
 where
+with
 .
 
 Rootsymbol Statement.
@@ -271,6 +276,9 @@ BooleanPredicand ->
 TableDefinition ->
     CreateTable Bucket TableContentsSource :
         make_table_definition('$2', '$3').
+TableDefinition ->
+    CreateTable Bucket TableContentsSource with TableProperties :
+        make_table_definition('$2', '$3', '$5').
 
 TableContentsSource -> TableElementList : '$1'.
 TableElementList -> left_paren TableElements right_paren : '$2'.
@@ -325,7 +333,6 @@ KeyFieldArg -> CharacterLiteral    : '$1'.
 KeyFieldArg -> Identifier : '$1'.
 %% KeyFieldArg -> atom left_paren Word right_paren : make_atom('$3').
 
-
 OptFieldList -> left_paren IdentifierList right_paren : '$2'.
 OptFieldList -> '$empty' : undefined.
 
@@ -344,6 +351,26 @@ FieldValue -> float : '$1'.
 FieldValue -> CharacterLiteral : '$1'.
 FieldValue -> Identifier : '$1'.
 
+TableProperties ->
+    left_paren TablePropertyList right_paren : '$2'.
+
+TablePropertyList ->
+    '$empty' : [].
+TablePropertyList ->
+    TableProperty : prepend_table_proplist([], '$1').
+TablePropertyList ->
+    TableProperty comma TablePropertyList : prepend_table_proplist('$3', '$1').
+
+TableProperty ->
+    identifier equals_operator TablePropertyValue :
+        make_table_property('$1', '$3').
+
+TablePropertyValue -> identifier : '$1'.   %% this is not valid
+%% the above rule is just to produce a specific error message
+TablePropertyValue -> TruthValue : '$1'.
+TablePropertyValue -> integer : '$1'.
+TablePropertyValue -> float : '$1'.
+TablePropertyValue -> character_literal : '$1'.
 
 Erlang code.
 
@@ -375,8 +402,8 @@ ql_parse(Tokens) ->
 
 interpret_parse_result({error, _}=Err) ->
     Err;
-interpret_parse_result({ok, #ddl_v1{}=DDL}) ->
-    {ddl, DDL};
+interpret_parse_result({ok, {?DDL{}=DDL, Props}}) ->
+    {ddl, DDL, Props};
 interpret_parse_result({ok, Proplist}) ->
     extract_type(proplists:get_value(type, Proplist), Proplist).
 
@@ -384,8 +411,8 @@ extract_type(Type, Proplist) ->
     {Type, Proplist -- [{type, Type}]}.
 
 %% if no partition key is specified hash on the local key
-fix_up_keys(#ddl_v1{partition_key = none, local_key = LK} = DDL) ->
-    DDL#ddl_v1{partition_key = LK, local_key = LK};
+fix_up_keys(?DDL{partition_key = none, local_key = LK} = DDL) ->
+    DDL?DDL{partition_key = LK, local_key = LK};
 fix_up_keys(A) ->
     A.
 
@@ -738,13 +765,15 @@ make_table_element_list(A, {table_element_list, B}) ->
 make_table_element_list(A, B) ->
     {table_element_list, lists:flatten([A, B])}.
 
-make_table_definition({identifier, Table}, Contents) ->
-    validate_ddl(
-      #ddl_v1{
-         table = Table,
-         partition_key = find_partition_key(Contents),
-         local_key = find_local_key(Contents),
-         fields = find_fields(Contents)}).
+make_table_definition(TableName, Contents) ->
+    make_table_definition(TableName, Contents, []).
+make_table_definition({identifier, Table}, Contents, Properties) ->
+    {validate_ddl(
+       ?DDL{table = Table,
+            partition_key = find_partition_key(Contents),
+            local_key = find_local_key(Contents),
+            fields = find_fields(Contents)}),
+     validate_table_properties(Properties)}.
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
@@ -784,6 +813,27 @@ find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
 find_fields(Count, [_Head | Rest], Elements) ->
     find_fields(Count, Rest, Elements).
 
+prepend_table_proplist(L, P) ->
+    [P | L].
+
+make_table_property({identifier, K}, {Type, _V})
+  when Type == identifier ->
+    return_error(
+      0, iolist_to_binary(
+           io_lib:format("Expecting a numeric, boolean or string value for WITH property \"~s\""
+                         " (did you forget to quote a string?)", [K])));
+make_table_property({identifier, K}, {Type, V})
+  when Type == boolean;
+       Type == integer;
+       Type == float;
+       Type == character_literal ->
+    {K, V}.
+
+validate_table_properties(Properties) ->
+    %% We let all k=v in: there's more substantial validation and
+    %% enrichment happening in riak_kv_wm_utils:erlify_bucket_prop
+    Properties.
+
 
 %% DDL validation
 
@@ -797,8 +847,8 @@ validate_ddl(DDL) ->
     ok = assert_partition_key_fields_not_descending(DDL),
     DDL.
 
-%% @doc Ensure DDL can haz keys
-assert_keys_present(#ddl_v1{local_key = LK, partition_key = PK})
+%% @doc Ensure DDL has keys
+assert_keys_present(?DDL{local_key = LK, partition_key = PK})
   when LK == none;
        PK == none ->
     return_error_flat("Missing primary key");
@@ -806,8 +856,8 @@ assert_keys_present(_GoodDDL) ->
     ok.
 
 %% @doc Ensure all fields appearing in PRIMARY KEY are not null.
-assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
-                                           fields = Fields}) ->
+assert_primary_key_fields_non_null(?DDL{local_key = #key_v1{ast = LK},
+                                        fields = Fields}) ->
     PKFieldNames = [N || #param_v1{name = [N]} <- LK],
     OnlyPKFields = [F || #riak_field_v1{name = N} = F <- Fields,
                          lists:member(N, PKFieldNames)],
@@ -823,14 +873,14 @@ assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
     end.
 
 %% @doc Assert that the partition key has at least one field.
-assert_partition_key_length(#ddl_v1{partition_key = {key_v1, [_|_]}}) ->
+assert_partition_key_length(?DDL{partition_key = {key_v1, [_|_]}}) ->
     ok;
-assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) ->
+assert_partition_key_length(?DDL{partition_key = {key_v1, Key}}) ->
     return_error_flat("Primary key must have one or more fields ~p", [Key]).
 
 %% @doc Verify primary key and local partition have the same elements
-assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primary},
-                                            local_key = #key_v1{ast = Local}}) ->
+assert_primary_and_local_keys_match(?DDL{partition_key = #key_v1{ast = Primary},
+                                         local_key = #key_v1{ast = Local}}) ->
     PrimaryList = [query_field_name(F) || F <- Primary],
     LocalList = [query_field_name(F) || F <- lists:sublist(Local, length(PrimaryList))],
     case PrimaryList == LocalList of
@@ -850,8 +900,8 @@ assert_partition_key_fields_not_descending(#ddl_v1{ partition_key = #key_v1{ ast
 ordering_in_partition_key_error(N, Ordering) when is_binary(N) ->
     return_error_flat("Order can only be used in the local key, '~s' set to ~p", [N, Ordering]).
 
-
-assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
+%%
+assert_unique_fields_in_pk(?DDL{local_key = #key_v1{ast = LK}}) ->
     Fields = [N || #param_v1{name = [N]} <- LK],
     case length(Fields) == length(lists:usort(Fields)) of
         true ->
@@ -867,16 +917,15 @@ assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
     end.
 
 %% Ensure that all fields in the primary key exist in the table definition.
-assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,
-                                           partition_key =
-                                               #key_v1{ ast = PK } }) ->
+assert_partition_key_fields_exist(?DDL{fields = Fields,
+                                       partition_key = #key_v1{ast = PK}}) ->
     MissingFields =
         [binary_to_list(name_of(F)) || F <- PK, not is_field(F, Fields)],
     case MissingFields of
         [] ->
             ok;
         _ ->
-            return_error_flat("Primary key fields do not exist (~s).",
+            return_error_flat("Primary key includes non-existent fields (~s).",
                               [string:join(MissingFields, ", ")])
     end.
 
