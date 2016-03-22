@@ -354,6 +354,97 @@ no_quanta_in_primary_key_is_ok_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
+multiple_quantum_functions_not_allowed_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(a, 15, 'm'),b,quantum(c, 15, 'm')), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"More than one quantum function in the partition key.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_field_must_exist_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(eh, 15, s)), a,b,eh))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Primary key includes non-existent fields (eh).">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_second_arg_must_be_positive_integer_1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, s, s)), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum time unit must be a positive integer.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_second_arg_must_be_positive_integer_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, -15, s)), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum time unit must be a positive integer.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_second_arg_must_be_positive_integer_3_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15.5, s)), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum time unit must be a positive integer.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_last_arg_must_be_supported_quanta_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 'y')), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum time measure was y but must be d, h, m or s.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_last_arg_no_quotes_required_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b,c))",
+    {ok, {?DDL{ partition_key = #key_v1{ ast = PKAST } }, _}} =
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+        [#param_v1{name = [<<"a">>]},
+         #param_v1{name = [<<"b">>]},
+         #hash_fn_v1{mod = riak_ql_quanta,
+                     fn = quantum,
+                     args = [#param_v1{name = [<<"c">>]}, 15, s],
+                     type = timestamp}],
+        PKAST
+      ).
+
 create_with_1_test() ->
     Table_def =
         "CREATE TABLE temperatures ("

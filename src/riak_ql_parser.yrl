@@ -848,6 +848,8 @@ validate_ddl(DDL) ->
     ok = assert_primary_and_local_keys_match(DDL),
     ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
+    ok = assert_not_more_than_one_quantum(DDL),
+    ok = assert_quantum_fn_args(DDL),
     DDL.
 
 %% @doc Ensure DDL has keys
@@ -909,8 +911,8 @@ assert_unique_fields_in_pk(?DDL{local_key = #key_v1{ast = LK}}) ->
     end.
 
 %% Ensure that all fields in the primary key exist in the table definition.
-assert_partition_key_fields_exist(?DDL{fields = Fields,
-                                       partition_key = #key_v1{ast = PK}}) ->
+assert_partition_key_fields_exist(?DDL{ fields = Fields,
+                                         partition_key = #key_v1{ ast = PK } }) ->
     MissingFields =
         [binary_to_list(name_of(F)) || F <- PK, not is_field(F, Fields)],
     case MissingFields of
@@ -919,6 +921,37 @@ assert_partition_key_fields_exist(?DDL{fields = Fields,
         _ ->
             return_error_flat("Primary key includes non-existent fields (~s).",
                               [string:join(MissingFields, ", ")])
+    end.
+
+assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+    [assert_quantum_fn_args2(Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
+    ok.
+
+%% The param argument is validated by assert_partition_key_fields_exist/1.
+assert_quantum_fn_args2([_Param, Unit, Measure]) ->
+    case lists:member(Measure, [d,h,m,s]) of
+        true ->
+            ok;
+        false ->
+            return_error_flat("Quantum time measure was ~p but must be d, h, m or s.",
+                              [Measure])
+    end,
+    case is_integer(Unit) andalso Unit >= 1 of
+        true ->
+            ok;
+        false ->
+            return_error_flat("Quantum time unit must be a positive integer.", [])
+    end.
+
+assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+    QuantumFns =
+        [Fn || #hash_fn_v1{ } = Fn <- PKAST],
+    case length(QuantumFns) =< 1 of
+        true ->
+            ok;
+        false ->
+            return_error_flat(
+                "More than one quantum function in the partition key.", [])
     end.
 
 %% Check that the field name exists in the list of fields.
