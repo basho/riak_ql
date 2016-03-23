@@ -134,9 +134,14 @@ Erlang code.
 
 -compile([export_all]).
 
+-include_lib("profiler/include/profiler.hrl").
+
 get_tokens(X) ->
+    profiler:perf_profile({start, 15, ?FNNAME()}),
     Toks = lex(X),
-    post_process(Toks).
+    Ret = post_process(Toks),
+    profiler:perf_profile({stop, 15}),
+    Ret.
 
 post_process(X) ->
     post_p(X, []).

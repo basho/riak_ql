@@ -327,6 +327,8 @@ Erlang code.
          canonicalise_where/1
          ]).
 
+-include_lib("profiler/include/profiler.hrl").
+
 %% if no partition key is specified hash on the local key
 fix_up_keys(#ddl_v1{partition_key = none, local_key = LK} = DDL) ->
     DDL#ddl_v1{partition_key = LK, local_key = LK};
