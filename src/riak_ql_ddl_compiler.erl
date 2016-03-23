@@ -88,10 +88,12 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {GetPosnsFn, LineNo7} = build_get_posns_fn(Fields, LineNo6, []),
     {IsValidFn, LineNo8} = build_is_valid_fn([Fields], LineNo7, []),
     {GetDDLFn, LineNo9}  = build_get_ddl_fn(DDL, LineNo8, []),
+    {FieldOrdersFn, LineNo10} = build_field_orders_fn(DDL, LineNo9),
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, GetDDLFn, {eof, LineNo9}],
+        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn,
+            IsValidFn, GetDDLFn, FieldOrdersFn, {eof, LineNo10}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
@@ -216,6 +218,25 @@ build_get_ddl_fn(?DDL{table         = T,
     Cl = make_clause([], [], Body, LineNo),
     Fn = make_fun(get_ddl, 0, [Cl], LineNo),
     {Fn, LineNo + 1}.
+
+%% Build the AST for a function returning a list of the order
+%% of the table field orders
+%%     `field_orders() -> [ascending, descending, ascending].'
+build_field_orders_fn(DDL, LineNum) ->
+    {?Q(build_field_orders_fn_string(DDL)), LineNum+1}.
+
+%%
+build_field_orders_fn_string(?DDL{ local_key = #key_v1{ ast = AST } }) ->
+    Orders = [order_from_key_field(F) || F <- AST],
+    lists:flatten(io_lib:format("field_orders() -> ~p.",[Orders])).
+
+%%
+order_from_key_field(#param_v1{ ordering = undefined }) ->
+    ascending;
+order_from_key_field(#param_v1{ ordering = Ordering }) ->
+    Ordering;
+order_from_key_field(_) ->
+    ascending.
 
 expand_fields(Fs, LineNo) ->
     Fields = [expand_field(X, LineNo) || X <- Fs],
@@ -651,7 +672,8 @@ make_export_attr(LineNo) ->
                                   {get_field_positions, 0},
                                   {is_field_valid,      1},
                                   {extract,             2},
-                                  {get_ddl,             0}
+                                  {get_ddl,             0},
+                                  {field_orders,        0}
                                  ]}, LineNo + 1}.
 
 
@@ -1731,5 +1753,29 @@ make_timeseries_ddl() ->
                 partition_key = PK,
                 local_key     = LK
                }.
+
+build_field_orders_fn_string_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a,b,c))")),
+    ?assertEqual(
+        "field_orders() -> [ascending,ascending,ascending].",
+        build_field_orders_fn_string(DDL )
+    ).
+
+build_field_orders_fn_string_asc_desc_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
+    ?assertEqual(
+        "field_orders() -> [ascending,descending,ascending].",
+        build_field_orders_fn_string(DDL)
+    ).
 
 -endif.
