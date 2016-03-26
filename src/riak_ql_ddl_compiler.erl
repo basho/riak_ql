@@ -87,11 +87,12 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {GetPosnFn, LineNo6} = build_get_posn_fn(Fields, LineNo5, []),
     {GetPosnsFn, LineNo7} = build_get_posns_fn(Fields, LineNo6, []),
     {IsValidFn, LineNo8} = build_is_valid_fn([Fields], LineNo7, []),
-    {GetDDLFn, LineNo9}  = build_get_ddl_fn(DDL, LineNo8, []),
+    {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8, []),
+    {GetDDLFn, LineNo10}  = build_get_ddl_fn(DDL, LineNo9, []),
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, GetDDLFn, {eof, LineNo9}],
+        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn, GetDDLFn, {eof, LineNo10}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
@@ -189,6 +190,13 @@ make_extract_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
                 {[Cl | Acc], LineNo}
         end,
     make_extract_cls(T, NewLineNo, Prefix, NewA).
+
+-spec build_get_ddl_compiler_version_fn(LineNo :: pos_integer(), Acc :: ast()) ->
+    {expr(), pos_integer()}.
+build_get_ddl_compiler_version_fn(LineNo, Acc) ->
+    Fn = Acc ++ flat_format("get_ddl_compiler_version() -> ~b.",
+                            [?RIAK_QL_DDL_COMPILER_VERSION]),
+    {?Q(Fn), LineNo + 1}.
 
 %% this is gnarly because the field order is compile-time dependent
 -spec build_get_ddl_fn(?DDL{}, pos_integer(), ast()) ->
@@ -641,14 +649,15 @@ make_module_attr(ModName, LineNo) ->
 
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
-                                  {validate_obj,        1},
-                                  {add_column_info,     1},
-                                  {get_field_type,      1},
-                                  {get_field_position,  1},
-                                  {get_field_positions, 0},
-                                  {is_field_valid,      1},
-                                  {extract,             2},
-                                  {get_ddl,             0}
+                                  {validate_obj,             1},
+                                  {add_column_info,          1},
+                                  {get_ddl_compiler_version, 0},
+                                  {get_field_type,           1},
+                                  {get_field_position,       1},
+                                  {get_field_positions,      0},
+                                  {is_field_valid,           1},
+                                  {extract,                  2},
+                                  {get_ddl,                  0}
                                  ]}, LineNo + 1}.
 
 
