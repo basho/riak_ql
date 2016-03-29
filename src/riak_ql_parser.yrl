@@ -357,9 +357,7 @@ Erlang code.
          post_process_TEST/3
         ]).
 
-%% emit_vsn() -> "1.3".
-
-get_version() -> "1.3".
+get_version() -> 1.
 
 parse_TEST(Tokens) -> parse(Tokens).
 

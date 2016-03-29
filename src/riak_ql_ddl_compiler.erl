@@ -73,7 +73,7 @@
 -type maps()   :: {maps, [[#riak_field_v1{}]]}.
 -type map()    :: {map,  [#riak_field_v1{}]}.
 
-get_version() -> "1.3".
+get_version() -> 1.
 
 %% Compile the DDL to its helper module AST.
 -spec compile(#ddl_v1{}) ->
