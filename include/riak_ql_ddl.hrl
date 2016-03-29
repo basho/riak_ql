@@ -34,7 +34,7 @@
 
 -record(param_v1, {
           name :: [binary()],
-          ordering = undefined :: ascending | descending
+          ordering = undefined :: undefined | ascending | descending
          }).
 
 -record(hash_fn_v1, {

@@ -897,6 +897,7 @@ assert_partition_key_fields_not_descending(#ddl_v1{ partition_key = #key_v1{ ast
     ok.
 
 %%
+-spec ordering_in_partition_key_error(binary(), atom()) -> no_return().
 ordering_in_partition_key_error(N, Ordering) when is_binary(N) ->
     return_error_flat("Order can only be used in the local key, '~s' set to ~p", [N, Ordering]).
 
