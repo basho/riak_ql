@@ -1164,9 +1164,10 @@ parsed_sql_to_insert(Mod, Proplist) ->
     }.
 
 test_parse(SQL) ->
-    element(2,
-            riak_ql_parser:parse(
-              riak_ql_lexer:get_tokens(SQL))).
+    Toks = riak_ql_lexer:get_tokens(SQL),
+    Interim = riak_ql_parser:parse_TEST(Toks),
+    {_Type, Result} = riak_ql_parser:post_process_TEST(Interim, {query_compiler, 1}, {query_coordinator, 1}),
+    Result.
 
 is_sql_valid_test_helper(Table_name, Table_def) ->
     Mod_name = make_module_name(iolist_to_binary(Table_name)),
@@ -1183,7 +1184,9 @@ is_query_valid_test_helper(Table_name, Table_def, Query) ->
 
 is_insert_valid_test_helper(Table_name, Table_def, Insert) ->
     {DDL, Mod} = is_sql_valid_test_helper(Table_name, Table_def),
-    is_insert_valid(Mod, DDL, parsed_sql_to_insert(Mod, test_parse(Insert))).
+    PropList = test_parse(Insert),
+    Insert2 = parsed_sql_to_insert(Mod, PropList),
+    is_insert_valid(Mod, DDL, Insert2).
 
 -define(LARGE_TABLE_DEF,
         "CREATE TABLE mytab"

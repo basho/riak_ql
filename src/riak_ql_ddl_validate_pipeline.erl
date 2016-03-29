@@ -23,8 +23,7 @@
 -module(riak_ql_ddl_validate_pipeline).
 
 -export([
-         validate_ddl/1,
-         get_version/0
+         validate_ddl/1
         ]).
 
 -include("riak_ql_ddl.hrl").
@@ -32,8 +31,8 @@
 %%
 %% API 
 %%
-get_version() -> "1.3".
 
+%% TODO better error handling here
 validate_ddl(DDL) ->
     ok = assert_keys_present(DDL),
     ok = assert_unique_fields_in_pk(DDL),
@@ -41,7 +40,7 @@ validate_ddl(DDL) ->
     ok = assert_primary_and_local_keys_match(DDL),
     ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
-    DDL.
+    {ddl, DDL}.
 
 %% @doc Ensure DDL can haz keys
 assert_keys_present(#ddl_v1{local_key = LK, partition_key = PK})

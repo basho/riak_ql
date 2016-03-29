@@ -34,8 +34,8 @@ window_aggregate_fn_1_test() ->
                    [{identifier, [<<"temp">>]}]}
                  ]},
         {tables, <<"details">>}
-       ]
-      ).
+       ],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 window_aggregate_fn_1a_test() ->
     ?sql_comp_assert_match(
@@ -45,8 +45,8 @@ window_aggregate_fn_1a_test() ->
                    [{identifier, [<<"temp">>]}]}
                  ]},
         {tables, <<"details">>}
-       ]
-      ).
+       ],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 window_aggregate_fn_2_test() ->
     ?sql_comp_assert_match(
@@ -58,8 +58,8 @@ window_aggregate_fn_2_test() ->
                    [{identifier, [<<"counts">>]}]}
                  ]},
         {tables, <<"details">>}
-       ]
-      ).
+       ],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 window_aggregate_fn_wildcard_count_test() ->
     ?sql_comp_assert_match(
@@ -69,8 +69,8 @@ window_aggregate_fn_wildcard_count_test() ->
                    [{identifier, [<<"*">>]}]}
                  ]},
         {tables, <<"details">>}
-       ]
-      ).
+       ],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 window_aggregate_fn_capitalisation_test() ->
     ?sql_comp_assert_match(
@@ -80,8 +80,8 @@ window_aggregate_fn_capitalisation_test() ->
                    [{identifier, [<<"temp">>]}]}
                  ]},
         {tables, <<"details">>}
-       ]
-      ).
+       ],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 window_aggregate_fn_all_funs_test() ->
     ?sql_comp_assert_match(
@@ -102,9 +102,8 @@ window_aggregate_fn_all_funs_test() ->
                    [{identifier, [<<"counts">>]}]}
                  ]},
         {tables, <<"details">>}
-       ]
-      ).
-
+       ],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 window_aggregate_fn_arithmetic_2_test() ->
     ?sql_comp_assert_match(
@@ -117,8 +116,8 @@ window_aggregate_fn_arithmetic_2_test() ->
                     [{identifier, [<<"temperature">>]}]}}
                  ]},
         {tables, <<"details">>}
-       ]
-      ).
+       ],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 window_aggregate_fn_arithmetic_3_test() ->
     ?sql_comp_assert_match(
@@ -130,8 +129,8 @@ window_aggregate_fn_arithmetic_3_test() ->
                   }]
         },
         {tables, <<"details">>}
-       ]
-      ).
+       ],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 %%
 %% TS 1.1 fail tests

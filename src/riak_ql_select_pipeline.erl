@@ -18,22 +18,22 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc This document implements the riak_ql SQL Select clause 
+%% @doc This document implements the riak_ql SQL Select clause
 %% in the query pipeline
 -module(riak_ql_select_pipeline).
 
 -export([
-         make_select/2,
-         get_version/0
-]).
+         make_select/4
+        ]).
 
 %%
 %% API
 %%
-
 make_select({Select,
              {Type,       D},
-             {_WhereType, E}}, Limit) ->
+             Where}, Limit,
+            {query_compiler,    _} = CompilerCapability,
+            {query_coordinator, _} = _QueryCapability) ->
     Bucket = case Type of
                  identifier -> D;
                  list   -> {list, [X || X <- D]};
@@ -45,18 +45,16 @@ make_select({Select,
                    end,
     FieldsWithoutExprs = [riak_ql_parser_util:remove_exprs(X) || X <- FieldsAsList],
     FieldsWrappedIdentifiers = [riak_ql_parser_util:wrap_identifier(X) || X <- FieldsWithoutExprs],
-    L = case Limit of 
+    L = case Limit of
             none         -> [];
             {integer, N} -> [{limit, N}]
-        end, 
-    [
-     {type,   select},
-     {fields, FieldsWrappedIdentifiers},
-     {tables, Bucket},
-     {where,  E}
-    ] ++ L.
-
-get_version() -> "1.3".
+        end,
+    W = riak_ql_where_pipeline:make_where(Where, CompilerCapability),
+    {select, [
+              {fields, FieldsWrappedIdentifiers},
+              {tables, Bucket},
+              {where,  W}
+             ] ++ L}.
 
 %%
 %% Internal Fns

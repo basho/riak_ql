@@ -42,11 +42,13 @@
 
 run_test(Name, CreateTable, SQLQuery, IsValid) ->
     Lexed = riak_ql_lexer:get_tokens(CreateTable),
-    {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+    Interim1 = riak_ql_parser:parse_TEST(Lexed),
+    {ddl, DDL} = riak_ql_parser:post_process_TEST(Interim1, {query_compiler, 1}, {query_coordinator, 1}),
     case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
         {module, Module} ->
             Lexed2 = riak_ql_lexer:get_tokens(SQLQuery),
-            Qry = riak_ql_parser:ql_parse(Lexed2),
+            Interim2 = riak_ql_parser:parse_TEST(Lexed2),
+            Qry = riak_ql_parser:post_process_TEST(Interim2, {query_compiler, 1}, {query_coordinator, 1}),
             case Qry of
                 {select, Q} -> case riak_ql_ddl:is_query_valid(Module, DDL, riak_ql_ddl:parsed_sql_to_query(Q)) of
                                    true ->

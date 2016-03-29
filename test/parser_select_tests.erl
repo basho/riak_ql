@@ -1,3 +1,4 @@
+
 %% -------------------------------------------------------------------
 %%
 %% SELECT command tests for the Parser
@@ -34,7 +35,8 @@ select_sql_test() ->
                  ]},
         {tables, <<"argle">>},
         {where, []}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_sql_with_semicolon_test() ->
     ?sql_comp_assert_match(
@@ -44,7 +46,8 @@ select_sql_with_semicolon_test() ->
                  ]},
         {tables, <<"argle">>},
         {where, []}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_sql_with_semicolons_in_quotes_test() ->
     ?sql_comp_assert_match(
@@ -54,7 +57,8 @@ select_sql_with_semicolons_in_quotes_test() ->
                  ]},
         {tables, <<"table;name">>},
         {where, [{'=', <<"asdf">>, {binary, <<";">>}}]}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_sql_semicolon_second_statement_test() ->
     ?sql_comp_fail("select * from asdf; select * from asdf").
@@ -70,7 +74,8 @@ select_quoted_sql_test() ->
                  ]},
         {tables, <<"argle">>},
         {where, []}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_quoted_keyword_sql_test() ->
     ?sql_comp_assert_match(
@@ -80,7 +85,8 @@ select_quoted_keyword_sql_test() ->
                  ]},
         {tables, <<"select">>},
         {where, []}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_nested_quotes_sql_test() ->
     ?sql_comp_assert_match(
@@ -90,7 +96,8 @@ select_nested_quotes_sql_test() ->
                  ]},
         {tables, <<"some \"quotes\" in me">>},
         {where, []}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_from_lists_sql_test() ->
     ?sql_comp_assert_match(
@@ -100,7 +107,8 @@ select_from_lists_sql_test() ->
                  ]},
         {tables, {list, [<<"events">>, <<"errors">>]}},
         {where, []}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_fields_from_lists_sql_test() ->
     ?sql_comp_assert_match(
@@ -113,7 +121,8 @@ select_fields_from_lists_sql_test() ->
                  ]},
         {tables, <<"events">>},
         {where, []}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_quoted_spaces_sql_test() ->
     ?sql_comp_assert_match(
@@ -123,7 +132,8 @@ select_quoted_spaces_sql_test() ->
                  ]},
         {tables, <<"table with spaces">>},
         {where, []}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_quoted_escape_sql_test() ->
     ?sql_comp_assert_match(
@@ -140,4 +150,5 @@ select_quoted_escape_sql_test() ->
                   {'=', <<"co\"or">>, {binary, <<"klingon'name">>}}
                  }
                 ]}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).

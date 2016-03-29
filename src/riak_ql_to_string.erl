@@ -87,105 +87,97 @@ flat_format(Format, Args) ->
 -include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 
+lex_parse(SQL) ->
+    Toks = riak_ql_lexer:get_tokens(SQL),
+    Result = riak_ql_parser:parse_TEST(Toks),
+    {_Type, _Got} = riak_ql_parser:post_process_TEST(Result, {query_compiler, 1}, {query_coordinator, 1}).
+
 test_col_names(SQL, ColNames) ->
-    {ok, Parsed} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-        SQL)),
+    {_Type, Parsed} = lex_parse(SQL),
     ?assertEqual(
         ColNames,
         col_names_from_select(proplists:get_value(fields, Parsed))
     ).
 
 select_col_to_string_all_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select * from bendy")),
+    {select, SQL} = lex_parse("select * from bendy"),
     ?assertEqual(
        ["*"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_colname_1_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select mindy from bendy")),
+    {select, SQL} = lex_parse("select mindy from bendy"),
     ?assertEqual(
        ["mindy"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_colname_2_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select mindy, raymond from bendy")),
+    {select, SQL} = lex_parse("select mindy, raymond from bendy"),
     ?assertEqual(
        ["mindy", "raymond"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_integer_literal_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select 1 from bendy")),
+    {select, SQL} = lex_parse("select 1 from bendy"),
     ?assertEqual(
        ["1"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_boolean_true_literal_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select true from bendy")),
+    {select, SQL} = lex_parse("select true from bendy"),
     ?assertEqual(
        ["true"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_boolean_false_literal_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select false from bendy")),
+    {select, SQL} = lex_parse("select false from bendy"),
     ?assertEqual(
        ["false"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_double_literal_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select 7.2 from bendy")),
+    {select, SQL} = lex_parse("select 7.2 from bendy"),
     ?assertEqual(
        ["7.2"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_varchar_literal_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select 'derp' from bendy")),
+    {select, SQL} = lex_parse("select 'derp' from bendy"),
     ?assertEqual(
        ["'derp'"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_one_plus_one_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select 1+1 from bendy")),
+    {select, SQL} = lex_parse("select 1+1 from bendy"),
     ?assertEqual(
        ["(1+1)"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_four_div_two_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select 4/2 from bendy")),
+    {select, SQL} = lex_parse("select 4/2 from bendy"),
     ?assertEqual(
        ["(4/2)"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_four_times_ten_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select 4*10 from bendy")),
+    {select, SQL} = lex_parse("select 4*10 from bendy"),
     ?assertEqual(
        ["(4*10)"],
        col_names_from_select(proplists:get_value(fields, SQL))
       ).
 
 select_col_to_string_avg_funcall_test() ->
-    {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-                                       "select avg(mona) from bendy")),
+    {select, SQL} = lex_parse("select avg(mona) from bendy"),
     ?assertEqual(
        ["AVG(mona)"],
        col_names_from_select(proplists:get_value(fields, SQL))
@@ -194,7 +186,7 @@ select_col_to_string_avg_funcall_test() ->
 % mixed aggregate and arithmetic are not in 1.1
 %% select_col_to_string_avg_funcall_with_nested_maths_test() ->
 %%     {ok, SQL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(
-%%                                        "select avg(10+5) from bendy")),
+%%                                        "select avg(10+5) from bendy"),
 %%     ?assertEqual(
 %%        ["AVG((10+5))"],
 %%        col_names_from_select(SQL)

@@ -37,7 +37,8 @@ select_arithmetic_test() ->
                                      ]},
                             {tables, <<"details">>},
                             {where, []}
-                           ]).
+                           ],
+                           {query_compiler, 2}, {query_coordinator, 1}).
 
 arithmetic_precedence_test() ->
     ?sql_comp_assert_match("select 1 * 2 + 3 / 4 - 5 * 6 from dual", select,
@@ -51,7 +52,8 @@ arithmetic_precedence_test() ->
                               }]},
                             {tables, <<"dual">>},
                             {where, []}
-                           ]).
+                           ],
+                           {query_compiler, 2}, {query_coordinator, 1}).
 
 parens_precedence_test() ->
     ?sql_comp_assert_match("select 1 * (2 + 3) / (4 - 5) * 6 from dual", select,
@@ -64,7 +66,8 @@ parens_precedence_test() ->
                                {integer,6}}]},
                             {tables, <<"dual">>},
                             {where, []}
-                           ]).
+                           ],
+                           {query_compiler, 2}, {query_coordinator, 1}).
 
 negated_parens_test() ->
     ?sql_comp_assert_match("select - (2 + 3) from dual", select,
@@ -75,8 +78,8 @@ negated_parens_test() ->
                              ]},
                             {tables, <<"dual">>},
                             {where, []}
-                           ]).
-
+                           ],
+                           {query_compiler, 2}, {query_coordinator, 1}).
 
 no_functions_in_where_test() ->
     ?sql_comp_fail("select * from dual where sin(4) > 4").
@@ -90,8 +93,8 @@ window_aggregate_fn_arithmetic_1_test() ->
                     },{integer,1}},
            {'/',{'*',{integer,2},{integer,3}},{integer,4}}}]
         },
-        {tables, <<"details">>}]
-      ).
+        {tables, <<"details">>}],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 window_aggregate_fn_arithmetic_2_test() ->
     ?sql_comp_assert_match(
@@ -101,8 +104,8 @@ window_aggregate_fn_arithmetic_2_test() ->
            [{'+',{expr,{'*',
                         {identifier,<<"temperature">>},{integer,2}}},{integer,32}}]}]
         },
-        {tables, <<"details">>}]
-      ).
+        {tables, <<"details">>}],
+       {query_compiler, 2}, {query_coordinator, 1}).
 
 window_aggregate_fn_arithmetic_3_test() ->
     ?sql_comp_assert_match(
@@ -112,5 +115,5 @@ window_aggregate_fn_arithmetic_3_test() ->
                 [{identifier,[<<"x">>]}]},
            {'/',{integer,1},
             {{window_agg_fn,'AVG'},[{identifier,[<<"y">>]}]}}}]},
-        {tables, <<"details">>}]
-      ).
+        {tables, <<"details">>}],
+       {query_compiler, 2}, {query_coordinator, 1}).

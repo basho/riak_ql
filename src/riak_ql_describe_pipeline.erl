@@ -23,14 +23,11 @@
 -module(riak_ql_describe_pipeline).
 
 -export([
-         make_describe/1,
-         get_version/0
+         make_describe/1
 ]).
 
 make_describe({identifier, D}) ->
-    [
-     {type, describe},
-     {identifier, D}
-    ].
-
-get_version() -> "1.3".
+    {describe,
+     [
+      {identifier, D}
+     ]}.

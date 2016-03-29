@@ -23,8 +23,7 @@
 -module(riak_ql_create_table_pipeline).
 
 -export([
-         make_create_table/2,
-         get_version/0
+         make_create_table/2
 ]).
 
 -include("riak_ql_ddl.hrl").
@@ -32,7 +31,6 @@
 %%
 %% API 
 %%
-get_version() -> "1.3".
 
 make_create_table({identifier, Table}, Contents) ->
     DDL = #ddl_v1{
@@ -40,7 +38,7 @@ make_create_table({identifier, Table}, Contents) ->
              partition_key = find_partition_key(Contents),
              local_key     = find_local_key(Contents),
              fields        = find_fields(Contents)},
-     riak_ql_ddl_validate_pipeline:validate_ddl(DDL).
+    riak_ql_ddl_validate_pipeline:validate_ddl(DDL).
 
 %%
 %% Internal Fns

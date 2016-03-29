@@ -23,9 +23,8 @@
 -module(riak_ql_insert_pipeline).
 
 -export([
-         make_insert/3,
-         get_version/0
-]).
+         make_insert/3
+        ]).
 
 make_insert({identifier, Table}, Fields, Values) ->
     FieldsAsList = case is_list(Fields) of
@@ -33,11 +32,8 @@ make_insert({identifier, Table}, Fields, Values) ->
                        false -> []
                    end,
     FieldsWrappedIdentifiers = [riak_ql_parser_util:wrap_identifier(X) || X <- FieldsAsList],
-    [
-     {type, insert},
-     {table, Table},
-     {fields, FieldsWrappedIdentifiers},
-     {values, Values}
-    ].
-
-get_version() -> "1.3".
+    {insert, [
+              {table, Table},
+              {fields, FieldsWrappedIdentifiers},
+              {values, Values}
+             ]}.

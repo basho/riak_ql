@@ -39,7 +39,8 @@
 -define(passing_test(Name, Query, Val, ExpectedPK, ExpectedLK),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               Interim = riak_ql_parser:parse_TEST(Lexed),
+               {ddl, DDL} = riak_ql_parser:post_process_TEST(Interim, {query_compiler, 1}, {query_coordinator, 1}),
                case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
@@ -56,7 +57,8 @@
 -define(passing_short_test(Name, Query, Val),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               Interim = riak_ql_parser:parse_TEST(Lexed),
+               {ddl, DDL} = riak_ql_parser:post_process_TEST(Interim, {query_compiler, 1}, {query_coordinator, 1}),
                case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
@@ -74,7 +76,8 @@
 -define(failing_test(Name, Query, Val),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               Interim = riak_ql_parser:parse_TEST(Lexed),
+               {ddl, DDL} = riak_ql_parser:post_process_TEST(Interim, {query_compiler, 1}, {query_coordinator, 1}),
                case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {module, Module}  ->
                        Result = Module:validate_obj(Val),
@@ -91,7 +94,8 @@
 -define(not_valid_test(Name, Query),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               Interim = riak_ql_parser:parse_TEST(Lexed),
+               {ddl, DDL} = riak_ql_parser:post_process_TEST(Interim, {query_compiler, 1}, {query_coordinator, 1}),
                case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
                    {error, _} ->
                        ?assertEqual(?VALID, true);
@@ -107,7 +111,8 @@
 -define(ddl_roundtrip_assert(Name, Query),
         Name() ->
                Lexed = riak_ql_lexer:get_tokens(Query),
-               {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+               Interim = riak_ql_parser:parse_TEST(Lexed),
+               {ddl, DDL} = riak_ql_parser:post_process_TEST(Interim, {query_compiler, 1}, {query_coordinator, 1}),
                %% ?debugFmt("in ~p~n- DDL is:~n -~p~n", [Name, DDL]),
                {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
                Got = Module:get_ddl(),

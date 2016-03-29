@@ -24,23 +24,33 @@
 
 -compile([export_all]).
 
--define(sql_comp_assert(String, Type, Expected),
+-define(sql_comp_assert(String, Type, Expected, CompilerCapability, QueryCapability),
         Toks = riak_ql_lexer:get_tokens(String),
-        {Type, Got} = riak_ql_parser:ql_parse(Toks),
+        Result = riak_ql_parser:parse_TEST(Toks),
+        {Type, Got} = riak_ql_parser:post_process_TEST(Result, CompilerCapability, QueryCapability),
         ?assertEqual(Expected, Got)).
 
 -define(where_test(Uncanonical, Expected),
         Got = riak_ql_where_pipeline:canonicalise_where_TEST(Uncanonical),
         ?assertEqual(Expected, Got)).
 
--define(sql_comp_assert_match(String, Type, Expected),
+-define(sql_comp_assert_match(String, Type, Expected, CompilerCapability, QueryCapability),
         Toks = riak_ql_lexer:get_tokens(String),
-        {Type, Got} = riak_ql_parser:ql_parse(Toks),
-        lists:foreach(
-          fun({Key, Value}) -> ?assertEqual(Value, proplists:get_value(Key, Got)) end,
-          Expected)).
+        Result = riak_ql_parser:parse_TEST(Toks),
+        {Type, Got} = riak_ql_parser:post_process_TEST(Result, CompilerCapability, QueryCapability),
+        %% only check the fields that the test has passed in
+        Got2 = [{K, V} || {K, V} <- Got,
+                          lists:keymember(K, 1, Expected)],
+        SGot = lists:sort(Got2),
+        SExpected = lists:sort(Expected),
+        ?assertEqual(SExpected, SGot)).
 
 -define(sql_comp_fail(QL_string),
         Toks = riak_ql_lexer:get_tokens(QL_string),
-        Got = riak_ql_parser:ql_parse(Toks),
+        Proplist = riak_ql_parser:parse_TEST(Toks),
+        Got = try
+                  riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1})
+              catch throw:Err ->
+                      Err
+              end,
         ?assertMatch({error, _}, Got)).

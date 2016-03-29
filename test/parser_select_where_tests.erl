@@ -39,7 +39,8 @@ select_where_1_sql_test() ->
                                       {'>', <<"time">>, {binary, <<"2013-08-12 23:32:01">>}}
                                      }
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_1_reverse_sql_test() ->
     ?sql_comp_assert_match("select value from response_times "
@@ -54,7 +55,8 @@ select_where_1_reverse_sql_test() ->
                                       {'>', <<"time">>, {binary, <<"2013-08-12 23:32:01">>}}
                                      }
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_3_sql_test() ->
     ?sql_comp_assert_match("select value from response_times where time > 1388534400", select,
@@ -65,7 +67,8 @@ select_where_3_sql_test() ->
                             {where, [
                                      {'>', <<"time">>, {integer, 1388534400}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_4_sql_test() ->
     ?sql_comp_assert_match("select value from response_times where time > 1388534400s", select,
@@ -76,7 +79,8 @@ select_where_4_sql_test() ->
                             {where, [
                                      {'>', <<"time">>, {integer, 1388534400000}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_5_sql_test() ->
     ?sql_comp_assert_match("select * from events where time = 1400497861762723 "
@@ -91,7 +95,8 @@ select_where_5_sql_test() ->
                                       {'=', <<"time">>,            {integer, 1400497861762723}}
                                      }
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_8_sql_test() ->
     ?sql_comp_assert_match("select * from events where state = 'NY'", select,
@@ -102,7 +107,8 @@ select_where_8_sql_test() ->
                             {where, [
                                      {'=', <<"state">>, {binary, <<"NY">>}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_approxmatch_sql_test() ->
     ?sql_comp_fail("select * from log_lines where line =~ /error/i").
@@ -119,7 +125,8 @@ select_where_10_sql_test() ->
                                       {'=', <<"type">>,        {binary, <<"click10">>}}
                                      }
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_11_sql_test() ->
     ?sql_comp_assert_match("select * from response_times where value > 500", select,
@@ -130,7 +137,8 @@ select_where_11_sql_test() ->
                             {where, [
                                      {'>', <<"value">>, {integer, 500}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_11a_sql_test() ->
     ?sql_comp_assert_match("select * from response_times where value >= 500", select,
@@ -141,7 +149,8 @@ select_where_11a_sql_test() ->
                             {where, [
                                      {'>=', <<"value">>, {integer, 500}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_11b_sql_test() ->
     ?sql_comp_assert_match("select * from response_times where value <= 500", select,
@@ -152,7 +161,8 @@ select_where_11b_sql_test() ->
                             {where, [
                                      {'<=', <<"value">>, {integer, 500}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_not_approx_sql_test() ->
     ?sql_comp_fail("select * from events where email !~ /.*gmail.*/").
@@ -169,7 +179,8 @@ select_where_14_sql_test() ->
                             {where, [
                                      {'=', <<"signed_in">>, {boolean, false}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_15_sql_test() ->
     ?sql_comp_assert_match("select * from events where signed_in = -3", select,
@@ -180,7 +191,8 @@ select_where_15_sql_test() ->
                             {where, [
                                      {'=', <<"signed_in">>, {integer, -3}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_approx_or_approx_sql_test() ->
     ?sql_comp_fail("select * from events where (email =~ /.*gmail.*/ or " ++
@@ -195,7 +207,8 @@ select_where_letters_nos_in_strings_1a_test() ->
                             {where, [
                                      {'=', <<"user">>, {binary, <<"user 1">>}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_letters_nos_in_strings_2a_test() ->
     ?sql_comp_assert_match(
@@ -213,7 +226,8 @@ select_where_letters_nos_in_strings_2a_test() ->
                   }
                  }
                 ]}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_single_quotes_test() ->
     ?sql_comp_assert_match(
@@ -228,7 +242,8 @@ select_where_single_quotes_test() ->
                   {'=', <<"user">>, {binary, <<"user_1">>}}
                  }
                 ]}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_ors_at_start_test() ->
     ?sql_comp_assert_match(
@@ -253,7 +268,8 @@ select_where_ors_at_start_test() ->
                       {'=', <<"d3">>, {float, 2.0}}
                      }}}}}
                 ]}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_ors_at_end_test() ->
     ?sql_comp_assert_match(
@@ -283,7 +299,8 @@ select_where_ors_at_end_test() ->
                         {'=', <<"d3">>, {float, 2.0}}
                        }}}}}}}
                 ]}
-       ]).
+       ],
+       {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_letters_nos_in_strings_2b_test() ->
     ?sql_comp_assert_match("select weather from GeoCheckin where time > 2000 and time < 8000 and user = 'user_1'", select,
@@ -300,7 +317,8 @@ select_where_letters_nos_in_strings_2b_test() ->
                                       }
                                      }
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_brackets_1_test() ->
     ?sql_comp_assert_match("select weather from GeoCheckin where (time > 2000 and time < 8000) and user = 'user_1'", select,
@@ -317,7 +335,8 @@ select_where_brackets_1_test() ->
                                       }
                                      }
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_brackets_2_test() ->
     ?sql_comp_assert_match("select weather from GeoCheckin where user = 'user_1' and (time > 2000 and time < 8000)", select,
@@ -334,7 +353,8 @@ select_where_brackets_2_test() ->
                                       }
                                      }
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_where_brackets_2a_test() ->
     ?sql_comp_assert_match("select weather from GeoCheckin where user = 'user_1' and (time > 2000 and (time < 8000))", select,
@@ -351,8 +371,8 @@ select_where_brackets_2a_test() ->
                                       }
                                      }
                                     ]}
-                           ]).
-
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).
 
 select_field_to_field_forbidden_test() ->
     ?sql_comp_fail("select * from table where time = time").
@@ -366,4 +386,5 @@ select_quoted_where_sql_test() ->
                             {where, [
                                      {'=', <<"color spaces">>, {binary, <<"someone had painted it blue">>}}
                                     ]}
-                           ]).
+                           ],
+                           {query_compiler, 1}, {query_coordinator, 1}).

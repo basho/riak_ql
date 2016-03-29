@@ -18,13 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc This document implements the riak_ql SQL Where clause 
+%% @doc This document implements the riak_ql SQL Where clause
 %% in the query pipeline
 -module(riak_ql_where_pipeline).
 
 -export([
-         make_where/2,
-         get_version/0
+         make_where/2
 ]).
 
 %% for testing
@@ -35,15 +34,41 @@
 %%
 %% API
 %%
-make_where({where, A}, {expr, B}) ->
+make_where({where, []}, _Capability) ->
+    [];
+make_where({{where, _A}, {expr, B}}, Capability) ->
     NewB = riak_ql_parser_util:remove_exprs(B),
-    {A, [canonicalise_where(NewB)]}.
-
-get_version() -> "1.3".
+    Canon = [canonicalise_where(NewB)],
+    case Capability of
+        {query_compiler, 2} -> make_clean_lisp(Canon);
+        {query_compiler, 1} -> Canon
+    end.
 
 %%
 %% Internal Functions
 %%
+make_clean_lisp([Tuple]) -> [make_clean_lisp(Tuple)];
+make_clean_lisp({Type, A, B}) when Type =:= and_ orelse
+                                   Type =:= or_  ->
+    {Type, [make_clean_lisp(A), make_clean_lisp(B)]};
+make_clean_lisp({Op, A, B}) when Op =:= '='  orelse
+                                 Op =:= '<'  orelse
+                                 Op =:= '>'  orelse
+                                 Op =:= '>=' orelse
+                                 Op =:= '<=' orelse
+                                 Op =:= '<>' orelse
+                                 Op =:= '=~' orelse
+                                 Op =:= '!~' orelse
+                                 Op =:= '!=' ->
+    {Op, [{identifier, A}, make_clean_lisp(B)]};
+make_clean_lisp({binary, B} = X) when is_binary(B) ->
+    X;
+make_clean_lisp({integer, I} = X) when is_integer(I) ->
+    X;
+make_clean_lisp({float, F} = X) when is_float(F) ->
+    X;
+make_clean_lisp({boolean, B} = X) when is_boolean(B) ->
+    X.
 
 %%
 %% rewrite the where clause to have a canonical form

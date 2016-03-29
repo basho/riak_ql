@@ -41,9 +41,10 @@ create_timeseries_sql_test() ->
         " temp varchar,"
         " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))",
     Toks = riak_ql_lexer:get_tokens(String),
-    Got = case riak_ql_parser:ql_parse(Toks) of
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = case riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1}) of
               {ddl, D} -> D;
-              _WC     -> wont_compile
+              _WC      -> wont_compile
           end,
     Expected = #ddl_v1{
                   table = <<"GeoCheckin">>,
@@ -112,9 +113,10 @@ create_all_types_sql_test() ->
         " PRIMARY KEY ((user, geohash, quantum(time, 15, 'm')),"
         " user, geohash, time))",
     Toks = riak_ql_lexer:get_tokens(String),
-    Got = case riak_ql_parser:ql_parse(Toks) of
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = case riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1}) of
               {ddl, D} -> D;
-              WC     -> WC
+              WC       -> WC
           end,
     Expected = #ddl_v1{
                   table = <<"GeoCheckin">>,
@@ -231,10 +233,16 @@ key_fields_must_exist_1_test() ->
         "series VARCHAR NOT NULL, "
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
+    Toks = riak_ql_lexer:get_tokens(Table_def),
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = try
+              riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1})
+          catch throw:Err ->
+                  Err
+          end,
     ?assertEqual(
        {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family).">>}},
-       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+       Got).
 
 key_fields_must_exist_2_test() ->
     Table_def =
@@ -242,10 +250,16 @@ key_fields_must_exist_2_test() ->
         "time TIMESTAMP NOT NULL, "
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
+    Toks = riak_ql_lexer:get_tokens(Table_def),
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = try
+              riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1})
+          catch throw:Err ->
+                  Err
+          end,
     ?assertEqual(
        {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family, series).">>}},
-       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+       Got).
 
 key_fields_must_exist_3_test() ->
     Table_def =
@@ -254,10 +268,16 @@ key_fields_must_exist_3_test() ->
         "series VARCHAR NOT NULL, "
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
+    Toks = riak_ql_lexer:get_tokens(Table_def),
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = try
+              riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1})
+          catch throw:Err ->
+                  Err
+          end,
     ?assertMatch(
        {error, {0, riak_ql_parser, <<"Primary key fields do not exist (time).">>}},
-       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+       Got).
 
 create_table_white_space_test() ->
     Table_def =
@@ -267,10 +287,12 @@ create_table_white_space_test() ->
         "time TIMESTAMP NOT NULL, "
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
+    Toks = riak_ql_lexer:get_tokens(Table_def),
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1}),
     ?assertMatch(
        {ddl, #ddl_v1{}},
-       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+       Got).
 
 primary_key_white_space_test() ->
     Table_def =
@@ -280,10 +302,12 @@ primary_key_white_space_test() ->
         "time TIMESTAMP NOT NULL, "
         "PRIMARY               \t  KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
+    Toks = riak_ql_lexer:get_tokens(Table_def),
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1}),
     ?assertMatch(
        {ddl, #ddl_v1{}},
-       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+       Got).
 
 not_null_white_space_test() ->
     Table_def =
@@ -293,10 +317,12 @@ not_null_white_space_test() ->
         "time TIMESTAMP NOT                NULL, "
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
+    Toks = riak_ql_lexer:get_tokens(Table_def),
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1}),
     ?assertMatch(
        {ddl, #ddl_v1{}},
-       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+       Got).
 
 short_key_1_test() ->
     Table_def =
@@ -306,10 +332,12 @@ short_key_1_test() ->
         "time TIMESTAMP NOT                NULL, "
         "PRIMARY KEY "
         " ((quantum(time, 15, 's')), time))",
+    Toks = riak_ql_lexer:get_tokens(Table_def),
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1}),
     ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+       {ddl, #ddl_v1{}},
+       Got).
 
 short_key_2_test() ->
     Table_def =
@@ -318,10 +346,12 @@ short_key_2_test() ->
         "b VARCHAR NOT NULL, "
         "c TIMESTAMP NOT NULL, "
         "PRIMARY KEY ((quantum(c, 15, 's')), c))",
+    Toks = riak_ql_lexer:get_tokens(Table_def),
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1}),
     ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
+       {ddl, #ddl_v1{}},
+       Got).
 
 no_quanta_in_primary_key_is_ok_test() ->
     Table_def =
@@ -330,8 +360,11 @@ no_quanta_in_primary_key_is_ok_test() ->
         "b VARCHAR NOT NULL, "
         "c SINT64 NOT NULL, "
         "PRIMARY KEY ((a,b), a,b,c))",
+    Toks = riak_ql_lexer:get_tokens(Table_def),
+    Proplist = riak_ql_parser:parse_TEST(Toks),
+    Got = riak_ql_parser:post_process_TEST(Proplist, {query_compiler, 2}, {query_coordinator, 1}),
     ?assertMatch(
-        {ok, #ddl_v1{
+        {ddl, #ddl_v1{
                 partition_key =
                     #key_v1{
                        ast = [
@@ -345,8 +378,4 @@ no_quanta_in_primary_key_is_ok_test() ->
                               #param_v1{name = [<<"b">>]},
                               #param_v1{name = [<<"c">>]}
                              ]}}},
-        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
-      ).
-
-% multiple quanta returns an error (but why not?)
-% 
+       Got).

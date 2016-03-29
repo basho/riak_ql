@@ -1,4 +1,4 @@
-%% -*- erlang -*-
+%%% -*- erlang -*-
 %%% @doc       Parser for the riak Time Series Query Language.
 %%% @author    gguthrie@basho.com
 %%% @copyright (C) 2016 Basho
@@ -125,21 +125,22 @@ StatementWithoutSemicolon -> TableDefinition : '$1'.
 StatementWithoutSemicolon -> Describe        : '$1'.
 StatementWithoutSemicolon -> Insert          : '$1'.
 
-Query -> Select limit integer : riak_ql_select_pipeline:make_select('$1', '$3').
-Query -> Select               : riak_ql_select_pipeline:make_select('$1', none).
+Query -> Select limit integer : {ql_select, '$1', '$3'}.
+Query -> Select               : {ql_select, '$1', none}.
 
 Select -> select Fields from Buckets Where : {'$2', '$4', '$5'}.
 Select -> select Fields from Buckets       : {'$2', '$4', {where, []}}.
 
-%% 20.9 DESCRIBE STATEMENTo
-Describe -> describe Bucket : riak_ql_describe_pipeline:make_describe('$2').
+%% 20.9 DESCRIBE STATEMENT
+Describe -> describe Bucket : {ql_describe, '$2'}.
 
-Insert -> insert into Identifier OptFieldList values RowValueList : riak_ql_insert_pipeline:make_insert('$3', '$4', '$6').
+Insert -> insert into Identifier OptFieldList values RowValueList : {ql_insert, '$3', '$4', '$6'}.
 
-Where -> where BooleanValueExpression : riak_ql_where_pipeline:make_where('$1', '$2').
+Where -> where BooleanValueExpression : {'$1', '$2'}.
+%%riak_ql_where_pipeline:make_where('$1', '$2', emit_vsn()).
 
-Fields -> Fields     comma   FieldElem   : concat_select('$1', '$3').
-Fields -> FieldElem                      : '$1'.
+Fields -> Fields    comma   FieldElem   : concat_select('$1', '$3').
+Fields -> FieldElem                     : '$1'.
 
 FieldElem -> Field : '$1'.
 FieldElem -> Val   : '$1'.
@@ -267,8 +268,7 @@ BooleanPredicand ->
 %% TABLE DEFINTITION
 
 TableDefinition ->
-    CreateTable Bucket TableContentsSource :
-        riak_ql_create_table_pipeline:make_create_table('$2', '$3').
+    CreateTable Bucket TableContentsSource : {ql_create_table, '$2', '$3'}.
 
 TableContentsSource -> TableElementList : '$1'.
 TableElementList -> left_paren TableElements right_paren : '$2'.
@@ -331,10 +331,10 @@ RowValueList -> RowValueList comma left_paren RowValue right_paren : '$1' ++ ['$
 RowValue -> RowValue comma FieldValue : '$1' ++ ['$3'].
 RowValue -> FieldValue : ['$1'].
 
-FieldValue -> integer : '$1'.
-FieldValue -> float : '$1'.
+FieldValue -> integer          : '$1'.
+FieldValue -> float            : '$1'.
 FieldValue -> CharacterLiteral : '$1'.
-FieldValue -> Identifier : '$1'.
+FieldValue -> Identifier       : '$1'.
 
 Erlang code.
 
@@ -352,22 +352,40 @@ Erlang code.
          get_version/0
         ]).
 
+-export([
+         parse_TEST/1,
+         post_process_TEST/3
+        ]).
+
+%% emit_vsn() -> "1.3".
+
 get_version() -> "1.3".
+
+parse_TEST(Tokens) -> parse(Tokens).
+
+post_process_TEST(Result, Capability1, Capability2) -> 
+    post_process(Result, Capability1, Capability2).
 
 %% Provide more useful success tuples
 ql_parse(Tokens) ->
     Result = parse(Tokens),
-    interpret_parse_result(Result).
+    CompilerCapability = riak_core_capability:get({query_pipeline, query_compiler}),
+    QueryCapability = riak_core_capability:get({query_pipeline, query_coordinator}),
+    post_process(Result, {query_compiler, CompilerCapability}, {query_coordinator, QueryCapability}).
 
-interpret_parse_result({error, _}=Err) ->
-    Err;
-interpret_parse_result({ok, #ddl_v1{}=DDL}) ->
-    {ddl, DDL};
-interpret_parse_result({ok, Proplist}) ->
-    extract_type(proplists:get_value(type, Proplist), Proplist).
-
-extract_type(Type, Proplist) ->
-    {Type, Proplist -- [{type, Type}]}.
+post_process(Result, CompilerCapability, QueryCapability) ->
+    case Result of
+        {error, _} = Err ->
+            Err;
+        {ok, {ql_create_table, Table, Contents}} ->
+            riak_ql_create_table_pipeline:make_create_table(Table, Contents);
+        {ok, {ql_select, Details, Limit}} ->
+            riak_ql_select_pipeline:make_select(Details, Limit, CompilerCapability, QueryCapability);
+        {ok, {ql_describe, Table}} ->
+            riak_ql_describe_pipeline:make_describe(Table);
+        {ok, {ql_insert, Table, Field, Values}} ->
+            riak_ql_insert_pipeline:make_insert(Table, Field, Values)
+    end.
 
 make_expr({LiteralFlavor, Literal},
           {Op, _},

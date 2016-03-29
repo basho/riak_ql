@@ -28,8 +28,10 @@
 
 simple_describe_test() ->
     ?sql_comp_assert("describe GeoCheckins", describe,
-                     [{identifier, <<"GeoCheckins">>}]).
+                     [{identifier, <<"GeoCheckins">>}],
+                     {query_compiler, 2}, {query_coordinator, 1}).
 
 uppercase_quoted_describe_test() ->
     ?sql_comp_assert("DESCRIBE \"GeoCheckins\"", describe,
-                     [{identifier, <<"GeoCheckins">>}]).
+                     [{identifier, <<"GeoCheckins">>}],
+                     {query_compiler, 2}, {query_coordinator, 1}).
