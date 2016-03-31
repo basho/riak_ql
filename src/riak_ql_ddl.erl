@@ -26,7 +26,6 @@
 -export([
          get_compiler_capabilities/0,
          get_compiler_version/0,
-         get_legacy_compiler_version/0,
          make_module_name/1, make_module_name/2
         ]).
 
@@ -115,13 +114,11 @@
 get_compiler_version() ->
     ?RIAK_QL_DDL_COMPILER_VERSION.
 
--spec get_legacy_compiler_version() -> compiler_version_type().
-get_legacy_compiler_version() ->
-    ?RIAK_QL_DDL_COMPILER_LEGACY_VERSION.
-
+%% Create a list of supported versions from the current one
+%% down to the original version 1
 -spec get_compiler_capabilities() -> [compiler_version_type()].
 get_compiler_capabilities() ->
-    lists:seq(get_compiler_version(), get_legacy_compiler_version(), -1).
+    lists:seq(get_compiler_version(), 1, -1).
 
 -spec make_module_name(Table::binary()) ->
                               module().
