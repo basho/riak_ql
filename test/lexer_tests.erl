@@ -250,11 +250,13 @@ not_a_date_test_() ->
     ?_assertEqual(Expected, Got).
 
 multiple_single_quotes_test_() ->
-    Got = riak_ql_lexer:get_tokens("'user_1' 'San Fierro' 'klingon''name'"),
+    Got = riak_ql_lexer:get_tokens("'user_1' 'San Fierro' 'klingon''name' '''a ' ''''"),
     Expected = [
                 {character_literal, <<"user_1">>},
                 {character_literal, <<"San Fierro">>},
-                {character_literal, <<"klingon'name">>}
+                {character_literal, <<"klingon'name">>},
+                {character_literal, <<"'a ">>},
+                {character_literal, <<"'">>}
                ],
     ?_assertEqual(Expected, Got).
 

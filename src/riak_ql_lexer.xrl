@@ -166,7 +166,7 @@ lex(String) ->
     Toks.
 
 clean_up_literal(Literal) ->
-    RemovedOutsideQuotes = string:strip(Literal, both, $'), %'
+    RemovedOutsideQuotes = accurate_strip(Literal, $'),
     DeDoubledInternalQuotes = re:replace(RemovedOutsideQuotes,
                                          "''", "'",
                                          [global, {return, list}]),
@@ -176,8 +176,18 @@ strip_quoted(QuotedString) ->
     % if there are unicode characters in the string, throw an error
     [error(unicode_in_quotes) || U <- QuotedString, U > 127],
 
-    StrippedOutsideQuotes = string:strip(QuotedString, both, $"),
+    StrippedOutsideQuotes = accurate_strip(QuotedString, $"),
     re:replace(StrippedOutsideQuotes, "\"\"", "\"", [global, {return, binary}]).
+
+%% only strip one quote, to accept Literals ending in the quote
+%% character being stripped
+accurate_strip(S, C) ->
+    case {hd(S), lists:last(S), length(S)} of
+        {C, C, Len} when Len > 2 ->
+            string:substr(S, 2, Len - 2);
+        _ ->
+            S
+    end.
 
 sci_to_float(Chars) ->
     [Mantissa, Exponent] = re:split(Chars, "E|e", [{return, list}]),
