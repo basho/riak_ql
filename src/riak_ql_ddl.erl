@@ -24,6 +24,7 @@
 -include("riak_ql_ddl.hrl").
 
 -export([
+         flip_binary/1,
          get_version/0,
          make_module_name/1, make_module_name/2
         ]).
@@ -228,6 +229,8 @@ apply_ordering(Val, descending) when is_binary(Val) ->
 apply_ordering(Val, _) -> % ascending or undefined
     Val.
 
+%%
+-spec flip_binary(binary()) -> binary().
 flip_binary(Val) ->
     list_to_binary([bnot Byte || Byte <- binary_to_list(Val)]).
     
@@ -890,7 +893,7 @@ make_plain_key_test() ->
     ?assertEqual(Expected, Got).
 
 make_functional_key_test() ->
-    Key = #key_v1{ast = [
+    PK = #key_v1{ast = [
                          #param_v1{name = [<<"user">>]},
                          #hash_fn_v1{mod  = ?MODULE,
                                      fn   = mock_partition_fn,
@@ -902,6 +905,10 @@ make_functional_key_test() ->
                                      type = timestamp
                                     }
                         ]},
+
+    LK = #key_v1{ast = [
+                         #param_v1{name = [<<"user">>]},
+                         #param_v1{name = [<<"time">>]} ]},
     DDL = make_ddl(<<"make_plain_key_test">>,
                    [
                     #riak_field_v1{name     = <<"user">>,
@@ -911,15 +918,15 @@ make_functional_key_test() ->
                                    position = 2,
                                    type     = timestamp}
                    ],
-                   Key, %% use the same key for both
-                   Key),
+                   PK,
+                   LK),
     Time = 12345,
     Vals = [
             {<<"user">>, <<"user_1">>},
             {<<"time">>, Time}
            ],
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Got = make_key(Mod, Key, Vals),
+    Got = make_key(Mod, PK, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
     ?assertEqual(Expected, Got).
 

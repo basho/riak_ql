@@ -89,11 +89,12 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {IsValidFn, LineNo8} = build_is_valid_fn([Fields], LineNo7, []),
     {GetDDLFn, LineNo9}  = build_get_ddl_fn(DDL, LineNo8, []),
     {FieldOrdersFn, LineNo10} = build_field_orders_fn(DDL, LineNo9),
+    {RevertOrderingFn, LineNo11} = build_revert_ordering_on_local_key_fn(DDL, LineNo10),
     AST = Attrs
         ++ VFns
         ++ ACFns
         ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn,
-            IsValidFn, GetDDLFn, FieldOrdersFn, {eof, LineNo10}],
+            IsValidFn, GetDDLFn, FieldOrdersFn, RevertOrderingFn, {eof, LineNo11}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
@@ -237,6 +238,52 @@ order_from_key_field(#param_v1{ ordering = Ordering }) ->
     Ordering;
 order_from_key_field(_) ->
     ascending.
+
+%% Convert a local key that has had the descending logic run on it to it's
+%% original value. Used to convert streamed list keys back to their original
+%% values.
+build_revert_ordering_on_local_key_fn(DDL, LineNum) ->
+    {?Q(build_revert_ordering_on_local_key_fn_string(DDL)), LineNum+1}.
+
+%%
+build_revert_ordering_on_local_key_fn_string(?DDL{ local_key = #key_v1{ ast = AST } } = DDL) ->
+    FieldNameArgs =
+        string:join([to_var_name_string(N) || #param_v1{ name = N } <- AST], ","),
+    Results =
+        string:join([revert_ordering_on_local_key_element(DDL, P) || P <- AST], ","),
+    lists:flatten(io_lib:format(
+        "revert_ordering_on_local_key({~s}) -> [~s].",[FieldNameArgs, Results])).
+
+%%
+revert_ordering_on_local_key_element(DDL, #param_v1{ name = N1, ordering = descending }) ->
+    N2 = to_var_name_string(N1),
+    case field_type(DDL, hd(N1)) of
+        varchar ->
+            "riak_ql_ddl:flip_binary(" ++ N2 ++ ")";
+        Type when Type == timestamp; Type == sint64 ->
+            %% in the case of integers we just negate the original negation
+            N2 ++ "*-1";
+        _ ->
+            N2
+    end;
+revert_ordering_on_local_key_element(_, #param_v1{ name = N }) ->
+    to_var_name_string(N).
+
+%%
+to_var_name_string([FieldName]) ->
+    to_var_name_string(FieldName);
+to_var_name_string(FieldName) when is_binary(FieldName) ->
+    [H|Tail] = binary_to_list(FieldName),
+    [string:to_upper([H]) | Tail].
+
+%%
+field_type(#ddl_v1{ fields = Fields }, FieldName) ->
+    #riak_field_v1{ type = Type } =
+        lists:keyfind(FieldName, #riak_field_v1.name, Fields),
+    Type.
+
+% revert_ordering_on_local_key({A,B,C,D}) ->
+%     [A,B,apply_ordering(C, descending)].
 
 expand_fields(Fs, LineNo) ->
     Fields = [expand_field(X, LineNo) || X <- Fs],
@@ -665,15 +712,16 @@ make_module_attr(ModName, LineNo) ->
 
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
-                                  {validate_obj,        1},
                                   {add_column_info,     1},
-                                  {get_field_type,      1},
+                                  {extract,             2},
+                                  {field_orders,        0},
+                                  {get_ddl,             0},
                                   {get_field_position,  1},
                                   {get_field_positions, 0},
+                                  {get_field_type,      1},
                                   {is_field_valid,      1},
-                                  {extract,             2},
-                                  {get_ddl,             0},
-                                  {field_orders,        0}
+                                  {revert_ordering_on_local_key,1},
+                                  {validate_obj,        1}
                                  ]}, LineNo + 1}.
 
 
@@ -1602,9 +1650,6 @@ make_complex_ddl_ddl() ->
                                                          ]}
                                      ]},
        local_key = #key_v1{ast = [
-                                  #hash_fn_v1{mod  = crypto,
-                                              fn   = hash,
-                                              args = [ripemd]},
                                   #param_v1{name = [<<"time">>]}
                                  ]}}.
 
@@ -1777,5 +1822,18 @@ build_field_orders_fn_string_asc_desc_test() ->
         "field_orders() -> [ascending,descending,ascending].",
         build_field_orders_fn_string(DDL)
     ).
+
+build_revert_ordering_on_local_key_fn_string_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
+    ?assertEqual(
+        "revert_ordering_on_local_key({A,B,C}) -> [A,riak_ql_ddl:flip_binary(B),C].",
+        build_revert_ordering_on_local_key_fn_string(DDL)
+    ).
+
 
 -endif.
