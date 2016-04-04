@@ -183,7 +183,7 @@ strip_quoted(QuotedString) ->
 %% character being stripped
 accurate_strip(S, C) ->
     case {hd(S), lists:last(S), length(S)} of
-        {C, C, Len} when Len > 2 ->
+        {C, C, Len} when Len > 1 ->
             string:substr(S, 2, Len - 2);
         _ ->
             S
