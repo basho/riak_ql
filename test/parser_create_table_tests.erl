@@ -466,9 +466,9 @@ create_with_2_test() ->
         "b VARCHAR NOT NULL, "
         "c TIMESTAMP NOT NULL, "
         "PRIMARY KEY ((quantum(c, 15, 's')), c))"
-        " with (a ='2a', c= 3, d=0.5, e=true)",
+        " with (a ='2a', c= 3, d=0.5, e=true, f='')",
     {ddl, _DDL, WithProps} =
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
     ?assertEqual(
-      [{<<"a">>, <<"2a">>}, {<<"c">>, 3}, {<<"d">>, 0.5}, {<<"e">>, true}],
+      [{<<"a">>, <<"2a">>}, {<<"c">>, 3}, {<<"d">>, 0.5}, {<<"e">>, true}, {<<"f">>, <<>>}],
       WithProps).
