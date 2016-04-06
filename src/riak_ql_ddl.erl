@@ -231,8 +231,8 @@ apply_ordering(Val, _) -> % ascending or undefined
 
 %%
 -spec flip_binary(binary()) -> binary().
-flip_binary(Val) ->
-    list_to_binary([bnot Byte || Byte <- binary_to_list(Val)]).
+flip_binary(V) when is_binary(V) ->
+    << <<(bnot X):8>> || <<X>> <= V >>.
     
 %% Convert an error emitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
