@@ -113,8 +113,8 @@
 make_module_name(Table) ->
     make_module_name(Table, ?DDL_RECORD_VERSION).
 
--spec make_module_name(Table::binary(),
-                       Version::riak_ql_ddl_compiler:compiler_version()) ->
+-spec make_module_name(Table   :: binary(),
+                       Version :: riak_ql_component:component_version()) ->
                        module().
 %% @doc Generate a unique, but readable and recognizable, module name
 %%      for Table at a certain Version, by 'escaping' non-ascii chars

@@ -75,16 +75,14 @@
 %% maps() are an aggregation of [map()]
 -type maps()   :: {maps, [[#riak_field_v1{}]]}.
 -type map()    :: {map,  [#riak_field_v1{}]}.
--type compiler_version() :: pos_integer().
--export_type([compiler_version/0]).
 
--spec get_compiler_version() -> compiler_version().
+-spec get_compiler_version() -> riak_ql_component:component_version().
 get_compiler_version() ->
     ?RIAK_QL_DDL_COMPILER_VERSION.
 
 %% Create a list of supported versions from the current one
 %% down to the original version 1
--spec get_compiler_capabilities() -> [compiler_version()].
+-spec get_compiler_capabilities() -> [riak_ql_component:component_version()].
 get_compiler_capabilities() ->
     lists:seq(get_compiler_version(), 1, -1).
 
