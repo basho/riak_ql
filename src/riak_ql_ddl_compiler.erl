@@ -51,9 +51,13 @@
 -include("riak_ql_ddl.hrl").
 -include_lib("merl/include/merl.hrl").
 
--export([compile/1]).
--export([compile_and_load_from_tmp/1]).
--export([write_source_to_files/3]).
+-export([
+         compile/1,
+         compile_and_load_from_tmp/1,
+         get_compiler_capabilities/0,
+         get_compiler_version/0,
+         write_source_to_files/3
+        ]).
 
 -define(IGNORE,        true).
 -define(DONTIGNORE,    false).
@@ -68,9 +72,21 @@
 -type exprs()  :: [expr()].
 -type guards() :: [exprs()].
 -type ast()    :: [expr() | exprs() | guards()].
-%% maps() are an aggregration of [map()]
+%% maps() are an aggregation of [map()]
 -type maps()   :: {maps, [[#riak_field_v1{}]]}.
 -type map()    :: {map,  [#riak_field_v1{}]}.
+-type compiler_version() :: pos_integer().
+-export_type([compiler_version/0]).
+
+-spec get_compiler_version() -> compiler_version().
+get_compiler_version() ->
+    ?RIAK_QL_DDL_COMPILER_VERSION.
+
+%% Create a list of supported versions from the current one
+%% down to the original version 1
+-spec get_compiler_capabilities() -> [compiler_version()].
+get_compiler_capabilities() ->
+    lists:seq(get_compiler_version(), 1, -1).
 
 %% Compile the DDL to its helper module AST.
 -spec compile(?DDL{}) ->

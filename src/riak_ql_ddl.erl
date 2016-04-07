@@ -24,8 +24,6 @@
 -include("riak_ql_ddl.hrl").
 
 -export([
-         get_compiler_capabilities/0,
-         get_compiler_version/0,
          make_module_name/1, make_module_name/2
         ]).
 
@@ -53,10 +51,8 @@
 -type filter()     :: term().
 
 -type ddl() :: ?DDL{}.
--type compiler_version_type() :: pos_integer().
 
 -export_type([
-              compiler_version_type/0,
               data_value/0,
               ddl/0,
               field_identifier/0,
@@ -110,16 +106,6 @@
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
 
--spec get_compiler_version() -> compiler_version_type().
-get_compiler_version() ->
-    ?RIAK_QL_DDL_COMPILER_VERSION.
-
-%% Create a list of supported versions from the current one
-%% down to the original version 1
--spec get_compiler_capabilities() -> [compiler_version_type()].
-get_compiler_capabilities() ->
-    lists:seq(get_compiler_version(), 1, -1).
-
 -spec make_module_name(Table::binary()) ->
                               module().
 %% @doc Generate a unique module name for Table at version 1. @see
@@ -127,8 +113,9 @@ get_compiler_capabilities() ->
 make_module_name(Table) ->
     make_module_name(Table, ?DDL_RECORD_VERSION).
 
--spec make_module_name(Table::binary(), Version::compiler_version_type()) ->
-                              module().
+-spec make_module_name(Table::binary(),
+                       Version::riak_ql_ddl_compiler:compiler_version()) ->
+                       module().
 %% @doc Generate a unique, but readable and recognizable, module name
 %%      for Table at a certain Version, by 'escaping' non-ascii chars
 %%      in Table a la C++.
