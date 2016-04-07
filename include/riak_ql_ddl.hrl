@@ -24,7 +24,6 @@
 -define(RIAK_QL_DDL_HRL, included).
 
 -define(RIAK_QL_DDL_COMPILER_VERSION, 2).
--define(RIAK_QL_DDL_COMPILER_LEGACY_VERSION, 1).
 
 -record(riak_field_v1, {
           name     = <<>>  :: binary(),
