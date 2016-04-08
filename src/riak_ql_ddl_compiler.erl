@@ -51,9 +51,13 @@
 -include("riak_ql_ddl.hrl").
 -include_lib("merl/include/merl.hrl").
 
--export([compile/1]).
--export([compile_and_load_from_tmp/1]).
--export([write_source_to_files/3]).
+-export([
+         compile/1,
+         compile_and_load_from_tmp/1,
+         get_compiler_capabilities/0,
+         get_compiler_version/0,
+         write_source_to_files/3
+        ]).
 
 -define(IGNORE,        true).
 -define(DONTIGNORE,    false).
@@ -68,9 +72,19 @@
 -type exprs()  :: [expr()].
 -type guards() :: [exprs()].
 -type ast()    :: [expr() | exprs() | guards()].
-%% maps() are an aggregration of [map()]
+%% maps() are an aggregation of [map()]
 -type maps()   :: {maps, [[#riak_field_v1{}]]}.
 -type map()    :: {map,  [#riak_field_v1{}]}.
+
+-spec get_compiler_version() -> riak_ql_component:component_version().
+get_compiler_version() ->
+    ?RIAK_QL_DDL_COMPILER_VERSION.
+
+%% Create a list of supported versions from the current one
+%% down to the original version 1
+-spec get_compiler_capabilities() -> [riak_ql_component:component_version()].
+get_compiler_capabilities() ->
+    lists:seq(get_compiler_version(), 1, -1).
 
 %% Compile the DDL to its helper module AST.
 -spec compile(?DDL{}) ->
@@ -87,11 +101,12 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {GetPosnFn, LineNo6} = build_get_posn_fn(Fields, LineNo5, []),
     {GetPosnsFn, LineNo7} = build_get_posns_fn(Fields, LineNo6, []),
     {IsValidFn, LineNo8} = build_is_valid_fn([Fields], LineNo7, []),
-    {GetDDLFn, LineNo9}  = build_get_ddl_fn(DDL, LineNo8, []),
+    {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8, []),
+    {GetDDLFn, LineNo10}  = build_get_ddl_fn(DDL, LineNo9, []),
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, GetDDLFn, {eof, LineNo9}],
+        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn, GetDDLFn, {eof, LineNo10}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
@@ -189,6 +204,13 @@ make_extract_cls([#riak_field_v1{type = Ty} = H | T], LineNo, Prefix, Acc) ->
                 {[Cl | Acc], LineNo}
         end,
     make_extract_cls(T, NewLineNo, Prefix, NewA).
+
+-spec build_get_ddl_compiler_version_fn(LineNo :: pos_integer(), Acc :: ast()) ->
+    {expr(), pos_integer()}.
+build_get_ddl_compiler_version_fn(LineNo, Acc) ->
+    Fn = Acc ++ flat_format("get_ddl_compiler_version() -> ~b.",
+                            [?RIAK_QL_DDL_COMPILER_VERSION]),
+    {?Q(Fn), LineNo + 1}.
 
 %% this is gnarly because the field order is compile-time dependent
 -spec build_get_ddl_fn(?DDL{}, pos_integer(), ast()) ->
@@ -641,14 +663,15 @@ make_module_attr(ModName, LineNo) ->
 
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
-                                  {validate_obj,        1},
-                                  {add_column_info,     1},
-                                  {get_field_type,      1},
-                                  {get_field_position,  1},
-                                  {get_field_positions, 0},
-                                  {is_field_valid,      1},
-                                  {extract,             2},
-                                  {get_ddl,             0}
+                                  {validate_obj,             1},
+                                  {add_column_info,          1},
+                                  {get_ddl_compiler_version, 0},
+                                  {get_field_type,           1},
+                                  {get_field_position,       1},
+                                  {get_field_positions,      0},
+                                  {is_field_valid,           1},
+                                  {extract,                  2},
+                                  {get_ddl,                  0}
                                  ]}, LineNo + 1}.
 
 
