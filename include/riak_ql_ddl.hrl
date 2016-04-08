@@ -23,6 +23,9 @@
 -ifndef(RIAK_QL_DDL_HRL).
 -define(RIAK_QL_DDL_HRL, included).
 
+%% NOTE: Every time there is a change to the DDL helper
+%% or anything related to DDL changes, this number must be
+%% incremented.  It is independent of the DDL record version (below).
 -define(RIAK_QL_DDL_COMPILER_VERSION, 2).
 
 -record(riak_field_v1, {
