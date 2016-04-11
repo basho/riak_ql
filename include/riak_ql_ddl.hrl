@@ -37,7 +37,7 @@
 
 
 -record(param_v1, {
-          name :: [binary()]
+          name = [<<>>] :: [binary()]
          }).
 
 -record(hash_fn_v1, {
