@@ -24,8 +24,12 @@
 -module(riak_ql_to_string).
 
 -export([
-         col_names_from_select/1
+         col_names_from_select/1,
+         ddl_rec_to_sql/1
         ]).
+
+-include("riak_ql_ddl.hrl").
+
 %% --------------------------
 %% local functions
 
@@ -82,6 +86,42 @@ op_to_string(Op) ->
 flat_format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
 
+ddl_rec_to_sql(#ddl_v1{table         = Tb,
+                       fields        = Fs,
+                       partition_key = PK,
+                       local_key     = LK}) ->
+    "CREATE TABLE " ++ binary_to_list(Tb) ++ " (" ++ make_fields(Fs) ++ "PRIMARY KEY ((" ++ pk_to_sql(PK) ++ "), " ++ lk_to_sql(LK) ++ "))".
+
+make_fields(Fs) ->
+    make_f2(Fs, []).
+
+make_f2([], Acc) ->
+    lists:flatten(lists:reverse(Acc));
+make_f2([#riak_field_v1{name    = Nm,
+                       type     = Ty,
+                       optional = IsOpt} | T], Acc) ->
+    Args = [
+            binary_to_list(Nm),
+            atom_to_list(Ty)
+           ] ++ case IsOpt of
+                    true  -> [];
+                    false -> ["not null"]
+                end,
+    NewAcc = string:join(Args, " ") ++ ", ",
+    make_f2(T, [NewAcc | Acc]).
+
+pk_to_sql(#key_v1{ast = [Fam, Series, TS]}) ->
+    string:join([binary_to_list(X#param_v1.name) || X <- [Fam, Series]] ++ [make_q(TS)], ", ").
+
+make_q(#hash_fn_v1{mod  = riak_ql_quanta,
+                   fn   = quantum,
+                   args = Args,
+                   type = timestamp}) ->
+              [#param_v1{name = Nm}, Unit, No] = Args,
+    _Q = "quantum(" ++ string:join([binary_to_list(Nm), integer_to_list(No), "'" ++ atom_to_list(Unit) ++ "'"], ", ") ++ ")".
+
+lk_to_sql(LK) ->
+    string:join([binary_to_list(X#param_v1.name) || X <- LK#key_v1.ast], ", ").
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
