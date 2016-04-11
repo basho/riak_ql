@@ -3,6 +3,8 @@
 %% riak_ql_sql_to_string: module that converts the output of the compiler
 %%                        back to the text representation
 %%
+%%                        Only works on a subset of outputs at the
+%%                        moment
 %%
 %% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
