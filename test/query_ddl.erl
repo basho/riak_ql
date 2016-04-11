@@ -42,7 +42,7 @@
 
 run_test(Name, CreateTable, SQLQuery, IsValid) ->
     Lexed = riak_ql_lexer:get_tokens(CreateTable),
-    {ddl, DDL} = riak_ql_parser:ql_parse(Lexed),
+    {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
     case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
         {module, Module} ->
             Lexed2 = riak_ql_lexer:get_tokens(SQLQuery),
@@ -77,19 +77,19 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
 
 
 -define(STANDARDTABLE,
-        "CREATE TABLE GeoCheckin "
-        ++ "(geohash varchar not null, "
-        ++ "user varchar not null, "
-        ++ "time timestamp not null, "
-        ++ "mytimestamp timestamp not null, "
-        ++ "myboolean boolean not null, "
-        ++ "mydouble double not null, "
-        ++ "mysint64 sint64 not null, "
-        ++ "myvarchar varchar not null, "
-        ++ "PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
+        "CREATE TABLE GeoCheckin"
+        " (geohash varchar not null,"
+        " user varchar not null,"
+        " time timestamp not null,"
+        " mytimestamp timestamp not null,"
+        " myboolean boolean not null,"
+        " mydouble double not null,"
+        " mysint64 sint64 not null,"
+        " myvarchar varchar not null,"
+        " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
 
--define(SQL, "SELECT * FROM GeoCheckin WHERE " ++
-            "geohash = 'erk' and user = 'berk' and time > 1 and time < 1000 and ").
+-define(SQL, "SELECT * FROM GeoCheckin WHERE "
+        "geohash = 'erk' and user = 'berk' and time > 1 and time < 1000 and ").
 
 %% Timestamps
 
