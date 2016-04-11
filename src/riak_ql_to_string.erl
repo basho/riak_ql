@@ -1,7 +1,7 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_ql_sql_to_string: module that converts the output of the compiler
-%%                        back to the text representation
+%% riak_ql_to_string: convert the output of the compiler
+%%                    back to the text representation
 %%
 %%
 %% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
@@ -38,6 +38,10 @@
 -spec col_names_from_select(list(term())) -> [string()].
 col_names_from_select(Select) ->
     [select_col_to_string(S) || S <- Select].
+
+%% --------------------------
+%% local functions
+
 
 %% Convert one column to a flat string.
 -spec select_col_to_string(any()) ->

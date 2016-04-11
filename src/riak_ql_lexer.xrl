@@ -29,6 +29,7 @@ TRUE = (T|t)(R|r)(U|u)(E|e)
 VALUES = (V|v)(A|a)(L|l)(U|u)(E|e)(S|s)
 VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
+WITH = (W|w)(I|i)(T|t)(H|h)
 
 CHARACTER_LITERAL = ('([^\']|(\'\'))*')
 
@@ -91,6 +92,7 @@ Rules.
 {VALUES} : {token, {values, list_to_binary(TokenChars)}}.
 {VARCHAR} : {token, {varchar, list_to_binary(TokenChars)}}.
 {WHERE} : {token, {where, list_to_binary(TokenChars)}}.
+{WITH} : {token, {with, list_to_binary(TokenChars)}}.
 
 {INTNUM}   : {token, {integer, list_to_integer(TokenChars)}}.
 
@@ -164,7 +166,7 @@ lex(String) ->
     Toks.
 
 clean_up_literal(Literal) ->
-    RemovedOutsideQuotes = string:strip(Literal, both, $'), %'
+    RemovedOutsideQuotes = accurate_strip(Literal, $'),
     DeDoubledInternalQuotes = re:replace(RemovedOutsideQuotes,
                                          "''", "'",
                                          [global, {return, list}]),
@@ -174,8 +176,18 @@ strip_quoted(QuotedString) ->
     % if there are unicode characters in the string, throw an error
     [error(unicode_in_quotes) || U <- QuotedString, U > 127],
 
-    StrippedOutsideQuotes = string:strip(QuotedString, both, $"),
+    StrippedOutsideQuotes = accurate_strip(QuotedString, $"),
     re:replace(StrippedOutsideQuotes, "\"\"", "\"", [global, {return, binary}]).
+
+%% only strip one quote, to accept Literals ending in the quote
+%% character being stripped
+accurate_strip(S, C) ->
+    case {hd(S), lists:last(S), length(S)} of
+        {C, C, Len} when Len > 1 ->
+            string:substr(S, 2, Len - 2);
+        _ ->
+            S
+    end.
 
 sci_to_float(Chars) ->
     [Mantissa, Exponent] = re:split(Chars, "E|e", [{return, list}]),

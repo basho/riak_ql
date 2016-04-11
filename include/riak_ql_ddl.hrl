@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_kv_ddl: defines records used in the data description language
+%% riak_ql_ddl.hrl: defines records used in the data description language
 %%
 %% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
@@ -23,7 +23,11 @@
 -ifndef(RIAK_QL_DDL_HRL).
 -define(RIAK_QL_DDL_HRL, included).
 
--define(RIAK_QL_DDL_VERSION, <<"1.3">>).
+%% NOTE: Every time there is a change to the DDL helper
+%% or anything related to DDL changes, this number must be
+%% incremented.  It is independent of the DDL record version (below).
+-define(RIAK_QL_DDL_COMPILER_VERSION, 2).
+
 -record(riak_field_v1, {
           name     = <<>>  :: binary(),
           position         :: undefined | pos_integer(),
@@ -53,5 +57,9 @@
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
          }).
+
+-define(DDL, #ddl_v1).
+-define(DDL_RECORD_NAME, ddl_v1).
+-define(DDL_RECORD_VERSION, 1).
 
 -endif.
