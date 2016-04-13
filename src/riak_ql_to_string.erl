@@ -92,6 +92,7 @@ op_to_string(Op) ->
 flat_format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
 
+-spec ddl_rec_to_sql(#ddl_v1{}) -> string().
 ddl_rec_to_sql(#ddl_v1{table         = Tb,
                        fields        = Fs,
                        partition_key = PK,
@@ -260,5 +261,46 @@ select_col_to_string_negated_parens_test() ->
                    ["-1",
                     "-asdf",
                     "-(3+-4)"]).
+
+ddl_rec_to_string_test() ->
+    DDL = #ddl_v1{
+              table = <<"Table_AXEJk46K4z1460_579957_990752">>,
+              fields = [
+                  #riak_field_v1{name      = <<"Key_D94iL22U6K">>,
+                                 position = 1,
+                                 type     = timestamp,
+                                 optional = false},
+                  #riak_field_v1{name     = <<"Key_A1F35cLu3Y">>,
+                                 position = 2,
+                                 type     = timestamp,
+                                 optional = false},
+                  #riak_field_v1{name     = <<"TSKey_U480s57Ahs">>,
+                                 position = 3,
+                                 type     = timestamp,
+                                 optional = false}
+              ],
+              partition_key = #key_v1{
+                  ast = [{param_v1,[<<"Key_D94iL22U6K">>]},
+                         {param_v1,[<<"Key_A1F35cLu3Y">>]},
+                         {hash_fn_v1,riak_ql_quanta,quantum,
+                             [{param_v1,[<<"TSKey_U480s57Ahs">>]},d,1],
+                              timestamp}]
+              },
+              local_key = #key_v1{
+                  ast = [{param_v1,[<<"Key_D94iL22U6K">>]},
+                         {param_v1,[<<"Key_A1F35cLu3Y">>]},
+                         {param_v1,[<<"TSKey_U480s57Ahs">>]}]
+              }
+    },
+    ?assertEqual(
+        "CREATE TABLE Table_AXEJk46K4z1460_579957_990752 "
+        "(Key_D94iL22U6K timestamp not null, "
+        "Key_A1F35cLu3Y timestamp not null, "
+        "TSKey_U480s57Ahs timestamp not null, "
+        "PRIMARY KEY ((Key_D94iL22U6K, Key_A1F35cLu3Y, "
+        "quantum(TSKey_U480s57Ahs, 1, 'd')), "
+        "Key_D94iL22U6K, Key_A1F35cLu3Y, TSKey_U480s57Ahs))",
+        ddl_rec_to_sql(DDL)
+    ).
 
 -endif.
