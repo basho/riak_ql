@@ -378,6 +378,24 @@ quantum_fn_field_must_exist_test() ->
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
+quantum_fn_field_must_be_timestamp_test() ->
+  Types = [boolean, double, sint64, varchar],
+  [quantum_fn_field_must_be_timestamp_test_helper(T) || T <- Types].
+
+quantum_fn_field_must_be_timestamp_test_helper(FieldType) ->
+    FieldTypeString = atom_to_list(FieldType),
+    FieldTypeBinary = atom_to_binary(FieldType, latin1),
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a SINT64 NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c " ++ FieldTypeString ++ " NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum field 'c' must be type of timestamp but was ", FieldTypeBinary/binary, ".">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
 quantum_fn_second_arg_must_be_positive_integer_1_test() ->
     Table_def =
         "CREATE TABLE temperatures ("
