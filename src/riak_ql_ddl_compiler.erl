@@ -90,7 +90,7 @@ get_compiler_capabilities() ->
 -spec compile(?DDL{}) ->
                      {module, ast()} | {error, tuple()}.
 compile({ok, ?DDL{} = DDL}) ->
-                                                % handle output directly from riak_ql_parser
+    %% handle output directly from riak_ql_parser
     compile(DDL);
 compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {ModName, Attrs, LineNo} = make_attrs(Table, ?LINENOSTART),
@@ -118,7 +118,7 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
 -spec compile_and_load_from_tmp(?DDL{}) ->
                                        {module, atom()} | {error, tuple()}.
 compile_and_load_from_tmp({ok, {?DDL{} = DDL, _Props}}) ->
-                                                % handle output directly from riak_ql_parser
+    %% handle output directly from riak_ql_parser
     compile_and_load_from_tmp(DDL);
 compile_and_load_from_tmp(?DDL{} = DDL) ->
     {Module, AST} = compile(DDL),
