@@ -23,11 +23,17 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_to_string).
 
+-include("riak_ql_ddl.hrl").
+
 -export([
+         to_string/1,
          col_names_from_select/1
         ]).
 %% --------------------------
 %% local functions
+
+to_string(#ddl_v1{} = _DDL) ->
+    "yerk".
 
 %% Convert the selection in select clause to a list of strings, one
 %% element for each column. White space in the original query is not reproduced.

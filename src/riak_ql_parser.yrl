@@ -359,6 +359,8 @@ Erlang code.
 
 get_version() -> 1.
 
+-define(BODGE_FOR_DEV, 1).
+
 parse_TEST(Tokens) -> parse(Tokens).
 
 post_process_TEST(Result, Capability1, Capability2) -> 
@@ -368,8 +370,8 @@ post_process_TEST(Result, Capability1, Capability2) ->
 ql_parse(Tokens) ->
     Result = parse(Tokens),
     CompilerCapability = riak_core_capability:get({query_pipeline, query_compiler}),
-    QueryCapability = riak_core_capability:get({query_pipeline, query_coordinator}),
-    post_process(Result, {query_compiler, CompilerCapability}, {query_coordinator, QueryCapability}).
+    %% QueryCapability = riak_core_capability:get({query_pipeline, query_coordinator}),
+    post_process(Result, {query_compiler, CompilerCapability}, {query_coordinator, ?BODGE_FOR_DEV}).
 
 post_process(Result, CompilerCapability, QueryCapability) ->
     case Result of

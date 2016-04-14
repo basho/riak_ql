@@ -35,7 +35,6 @@ select_where_1_sql_test() ->
                             {tables, <<"response_times">>},
                             {where, [
                                      {and_,
-                                      {'<', <<"time">>, {binary,<<"2013-08-13 12:34:56">>}},
                                       {'>', <<"time">>, {binary, <<"2013-08-12 23:32:01">>}}
                                      }
                                     ]}

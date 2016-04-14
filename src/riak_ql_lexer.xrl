@@ -117,8 +117,7 @@ Rules.
 {ASTERISK} : {token, {asterisk,   list_to_binary(TokenChars)}}.
 {SOLIDUS}  : {token, {solidus,    list_to_binary(TokenChars)}}.
 
-{CHARACTER_LITERAL} :
-  {token, {character_literal, clean_up_literal(TokenChars)}}.
+{CHARACTER_LITERAL} : {token, {character_literal, clean_up_literal(TokenChars)}}.
 
 {QUOTED} : {token, {identifier, strip_quoted(TokenChars)}}.
 

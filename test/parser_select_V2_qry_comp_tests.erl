@@ -21,7 +21,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(parser_select_qry_comp_1_3_tests).
+-module(parser_select_V2_qry_comp_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 -include("parser_test_utils.hrl").
@@ -35,19 +35,19 @@ select_quoted_escape_sql_test() ->
                   {identifier, [<<"jim">>]}
                  ]},
         {tables, <<"table with spaces">>},
-        {where, [
-                 {or_, 
-                  [
-                   {'=', [
-                          {identifier, <<"co\"or">>}, 
-                          {binary,     <<"\"">>}
-                         ]},
-                   {'=', [
-                          {identifier, <<"co\"or">>}, 
-                          {binary,    <<"klingon'name">>}
-                         ]}
-                  ]
-                 }
-                ]}
-       ], 
+        {where, {{vsn, 2}, [
+                            {or_, 
+                             [
+                              {'=', [
+                                     {identifier, <<"co\"or">>}, 
+                                     {binary,     <<"\"">>}
+                                    ]},
+                              {'=', [
+                                     {identifier, <<"co\"or">>}, 
+                                     {binary,    <<"klingon'name">>}
+                                    ]}
+                             ]
+                            }
+                           ]}}
+       ],
        {query_compiler, 2}, {query_coordinator, 1}).

@@ -47,7 +47,7 @@ make_where({{where, _A}, {expr, B}}, Capability) ->
 %%
 %% Internal Functions
 %%
-make_clean_lisp([Tuple]) -> [make_clean_lisp(Tuple)];
+make_clean_lisp([Tuple]) -> {{where_vsn, 2}, [make_clean_lisp(Tuple)]};
 make_clean_lisp({Type, A, B}) when Type =:= and_ orelse
                                    Type =:= or_  ->
     {Type, [make_clean_lisp(A), make_clean_lisp(B)]};

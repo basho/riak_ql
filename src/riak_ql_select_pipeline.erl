@@ -46,10 +46,13 @@ make_select({Select,
     FieldsWithoutExprs = [riak_ql_parser_util:remove_exprs(X) || X <- FieldsAsList],
     FieldsWrappedIdentifiers = [riak_ql_parser_util:wrap_identifier(X) || X <- FieldsWithoutExprs],
     L = case Limit of
-            none         -> [];
-            {integer, N} -> [{limit, N}]
+            none          -> [];
+            {integer, N1} -> [{limit, N1}]
         end,
-    W = riak_ql_where_pipeline:make_where(Where, CompilerCapability),
+    W = case riak_ql_where_pipeline:make_where(Where, CompilerCapability) of
+            {{where_vsn, N2}, Clause} -> {{vsn, N2}, Clause};
+            C                         -> C
+        end,
     {select, [
               {fields, FieldsWrappedIdentifiers},
               {tables, Bucket},
