@@ -621,7 +621,7 @@ flat_format(Format, Args) ->
 unzip_sorted(L) ->
     lists:unzip(lists:sort(L)).
 
-%-ifdef(TEST).
+-ifdef(TEST).
 -compile(export_all).
 
 -define(VALID,   true).
@@ -1236,5 +1236,4 @@ timeseries_hash_test() ->
         ++ "weather varchar not null: temperature varchar: PRIMARY KEY: time: user: riak_ql_quanta quantum time 15 s timestamp: LOCAL KEY: time: user",
     ?assertEqual(Expected, Result).
 
-
-%-endif.
+-endif.
