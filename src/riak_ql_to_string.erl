@@ -272,7 +272,6 @@ ddl_rec_to_string_test() ->
           "Uno, Dos, Tres))",
     Lexed = riak_ql_lexer:get_tokens(SQL),
     {ddl, DDL = #ddl_v1{}, _} = riak_ql_parser:ql_parse(Lexed),
-    io:format(user, "DDL = ~p~n", [DDL]),
     ?assertEqual(
         SQL,
         ddl_rec_to_sql(DDL)
