@@ -124,7 +124,7 @@ make_q(#hash_fn_v1{mod  = riak_ql_quanta,
                    fn   = quantum,
                    args = Args,
                    type = timestamp}) ->
-              [#param_v1{name = [Nm]}, Unit, No] = Args,
+              [#param_v1{name = [Nm]}, No, Unit] = Args,
     _Q = "quantum(" ++ string:join([binary_to_list(Nm), integer_to_list(No), "'" ++ atom_to_list(Unit) ++ "'"], ", ") ++ ")".
 
 extract([X]) -> X.
@@ -263,43 +263,18 @@ select_col_to_string_negated_parens_test() ->
                     "-(3+-4)"]).
 
 ddl_rec_to_string_test() ->
-    DDL = #ddl_v1{
-              table = <<"Table_AXEJk46K4z1460_579957_990752">>,
-              fields = [
-                  #riak_field_v1{name      = <<"Key_D94iL22U6K">>,
-                                 position = 1,
-                                 type     = timestamp,
-                                 optional = false},
-                  #riak_field_v1{name     = <<"Key_A1F35cLu3Y">>,
-                                 position = 2,
-                                 type     = timestamp,
-                                 optional = false},
-                  #riak_field_v1{name     = <<"TSKey_U480s57Ahs">>,
-                                 position = 3,
-                                 type     = timestamp,
-                                 optional = false}
-              ],
-              partition_key = #key_v1{
-                  ast = [{param_v1,[<<"Key_D94iL22U6K">>]},
-                         {param_v1,[<<"Key_A1F35cLu3Y">>]},
-                         {hash_fn_v1,riak_ql_quanta,quantum,
-                             [{param_v1,[<<"TSKey_U480s57Ahs">>]},d,1],
-                              timestamp}]
-              },
-              local_key = #key_v1{
-                  ast = [{param_v1,[<<"Key_D94iL22U6K">>]},
-                         {param_v1,[<<"Key_A1F35cLu3Y">>]},
-                         {param_v1,[<<"TSKey_U480s57Ahs">>]}]
-              }
-    },
+    SQL = "CREATE TABLE Mesa "
+          "(Uno timestamp not null, "
+          "Dos timestamp not null, "
+          "Tres timestamp not null, "
+          "PRIMARY KEY ((Uno, Dos, "
+          "quantum(Tres, 1, 'd')), "
+          "Uno, Dos, Tres))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = #ddl_v1{}, _} = riak_ql_parser:ql_parse(Lexed),
+    io:format(user, "DDL = ~p~n", [DDL]),
     ?assertEqual(
-        "CREATE TABLE Table_AXEJk46K4z1460_579957_990752 "
-        "(Key_D94iL22U6K timestamp not null, "
-        "Key_A1F35cLu3Y timestamp not null, "
-        "TSKey_U480s57Ahs timestamp not null, "
-        "PRIMARY KEY ((Key_D94iL22U6K, Key_A1F35cLu3Y, "
-        "quantum(TSKey_U480s57Ahs, 1, 'd')), "
-        "Key_D94iL22U6K, Key_A1F35cLu3Y, TSKey_U480s57Ahs))",
+        SQL,
         ddl_rec_to_sql(DDL)
     ).
 
