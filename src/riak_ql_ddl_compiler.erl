@@ -100,7 +100,7 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {IsValidFn,    LineNo8}  = build_is_valid_fn([Fields], LineNo7, []),
     {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8),
     {GetDDLFn,     LineNo10} = build_get_ddl_fn(DDL,   LineNo9,  []),
-    {HashFns,      LineNo11} = build_mdc_hash_fns(DDL, LineNo10),
+    {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
     AST = Attrs
         ++ VFns
         ++ ACFns
@@ -171,16 +171,16 @@ filter_ast([H | T], Acc) ->
         _         -> filter_ast(T, [H | Acc])
     end.
 
--spec build_mdc_hash_fns(?DDL{}, pos_integer()) ->
+-spec build_identity_hash_fns(?DDL{}, pos_integer()) ->
              {[expr()], pos_integer()}.
-build_mdc_hash_fns(?DDL{} = DDL, LineNo) ->
+build_identity_hash_fns(?DDL{} = DDL, LineNo) ->
     PlainText = make_plain_text(DDL),
     Hash = crypto:hash(md5, PlainText),
     %% we return a list of hashes - this means that going forward
     %% we can offer a remote cluster a set of valid hashes that it can use
     %% so that down-compatible DDLs etc can be replicated
-    HashFn  = flat_format("get_mdc_hash() -> [~p].", [Hash]),
-    DebugFn = flat_format("get_mdc_plaintext_DEBUG() -> ~s.", [PlainText]),
+    HashFn  = flat_format("get_identity_hashes() -> [~p].", [Hash]),
+    DebugFn = flat_format("get_identity_plaintext_DEBUG() -> ~s.", [PlainText]),
     {[?Q(HashFn), ?Q(DebugFn)], LineNo + 1}.
 
 %% not using DDL macro because this will be version specific
@@ -599,17 +599,17 @@ make_module_attr(ModName, LineNo) ->
 
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
-                                  {validate_obj,             1},
-                                  {add_column_info,          1},
-                                  {get_ddl_compiler_version, 0},
-                                  {get_field_type,           1},
-                                  {get_field_position,       1},
-                                  {get_field_positions,      0},
-                                  {is_field_valid,           1},
-                                  {extract,                  2},
-                                  {get_ddl,                  0},
-                                  {get_mdc_hash,             0},
-                                  {get_mdc_plaintext_DEBUG,  0}
+                                  {validate_obj,                 1},
+                                  {add_column_info,              1},
+                                  {get_ddl_compiler_version,     0},
+                                  {get_field_type,               1},
+                                  {get_field_position,           1},
+                                  {get_field_positions,          0},
+                                  {is_field_valid,               1},
+                                  {extract,                      2},
+                                  {get_ddl,                      0},
+                                  {get_identity_hashes,          0},
+                                  {get_identity_plaintext_DEBUG, 0}
                                  ]}, LineNo + 1}.
 
 
@@ -1224,14 +1224,14 @@ make_timeseries_ddl() ->
 simplest_hash_test() ->
     DDL = make_simplest_valid_ddl(),
     {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:get_mdc_plaintext_DEBUG(),
+    Result = Module:get_identity_plaintext_DEBUG(),
     Expected = "FIELDS: yando varchar not null: PRIMARY KEY: LOCAL KEY",
     ?assertEqual(Expected, Result).
 
 timeseries_hash_test() ->
     DDL = make_timeseries_ddl(),
     {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:get_mdc_plaintext_DEBUG(),
+    Result = Module:get_identity_plaintext_DEBUG(),
     Expected = "FIELDS: geohash varchar not null: user varchar not null: time timestamp not null: "
         ++ "weather varchar not null: temperature varchar: PRIMARY KEY: time: user: riak_ql_quanta quantum time 15 s timestamp: LOCAL KEY: time: user",
     ?assertEqual(Expected, Result).
