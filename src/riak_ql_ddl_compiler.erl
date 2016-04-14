@@ -1018,7 +1018,6 @@ simple_invalid_timestamp_3_test() ->
     Result = Module:validate_obj({234324, 0, 34636}),
     ?assertEqual(?INVALID, Result).
 
-
 %%% test the size of the tuples
 too_small_tuple_test() ->
     DDL = make_ddl(<<"simple_too_small_tuple_test">>,
