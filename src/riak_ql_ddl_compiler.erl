@@ -91,15 +91,15 @@ compile({ok, ?DDL{} = DDL}) ->
     compile(DDL);
 compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {ModName, Attrs, LineNo} = make_attrs(Table, ?LINENOSTART),
-    {VFns,         LineNo2}  = build_validn_fns(Fields,  LineNo),
+    {VFns,         LineNo2}  = build_validn_fns(Fields,    LineNo),
     {ACFns,        LineNo3}  = build_add_cols_fns(Fields,  LineNo2),
     {ExtractFn,    LineNo4}  = build_extract_fn([Fields],  LineNo3, []),
     {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),
     {GetPosnFn,    LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
     {GetPosnsFn,   LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
-    {IsValidFn,    LineNo8}  = build_is_valid_fn(Fields, LineNo7),
+    {IsValidFn,    LineNo8}  = build_is_valid_fn(Fields,   LineNo7),
     {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8),
-    {GetDDLFn,     LineNo10} = build_get_ddl_fn(DDL,   LineNo9,  []),
+    {GetDDLFn,     LineNo10} = build_get_ddl_fn(DDL, LineNo9, []),
     {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
     AST = Attrs
         ++ VFns
@@ -184,11 +184,14 @@ build_identity_hash_fns(?DDL{} = DDL, LineNo) ->
     {[?Q(HashFn), ?Q(DebugFn)], LineNo + 1}.
 
 %% not using DDL macro because this will be version specific
-make_plain_text(#ddl_v1{fields        = F,
+make_plain_text(#ddl_v1{table         = Table,
+                        fields        = Fields,
                         partition_key = PK,
                         local_key     = LK}) ->
-   string:join(["\"FIELDS"]
-               ++ canonical_fields(F)
+   string:join(["\"TABLE"]
+               ++ io_lib:format("~s", [Table])
+               ++ ["FIELDS"]
+               ++ canonical_fields(Fields)
                ++ ["PRIMARY KEY"]
                ++ canonical_key(PK)
                ++ ["LOCAL KEY"]
@@ -1211,20 +1214,5 @@ make_timeseries_ddl() ->
                 partition_key = PK,
                 local_key     = LK
                }.
-
-simplest_hash_test() ->
-    DDL = make_simplest_valid_ddl(),
-    {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:get_identity_plaintext_DEBUG(),
-    Expected = "FIELDS: yando varchar not null: PRIMARY KEY: LOCAL KEY",
-    ?assertEqual(Expected, Result).
-
-timeseries_hash_test() ->
-    DDL = make_timeseries_ddl(),
-    {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:get_identity_plaintext_DEBUG(),
-    Expected = "FIELDS: geohash varchar not null: user varchar not null: time timestamp not null: "
-        ++ "weather varchar not null: temperature varchar: PRIMARY KEY: time: user: riak_ql_quanta quantum time 15 s timestamp: LOCAL KEY: time: user",
-    ?assertEqual(Expected, Result).
 
 -endif.
