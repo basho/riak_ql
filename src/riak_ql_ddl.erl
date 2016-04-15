@@ -27,9 +27,7 @@
          make_module_name/1, make_module_name/2
         ]).
 
--type simple_field_type()  :: varchar | sint64 | double | timestamp | boolean | set.
--type complex_field_type() :: {map, [#riak_field_v1{}]} | any().
--type field_type()         :: simple_field_type() | complex_field_type().
+-type simple_field_type()         :: varchar | sint64 | double | timestamp | boolean.
 
 %% Relational operators allowed in a where clause.
 -type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
@@ -56,7 +54,6 @@
               data_value/0,
               ddl/0,
               field_identifier/0,
-              field_type/0,
               filter/0,
               selection/0,
               selection_function/0,
@@ -664,77 +661,6 @@ function_partition_key_test() ->
     Expected = [{varchar, <<"three">>}, {timestamp, mock_result}],
     ?assertEqual(Expected, Result).
 
-complex_partition_key_test() ->
-    Name0 = <<"yerp">>,
-    Name1 = <<"yando">>,
-    Name2 = <<"buckle">>,
-    Name3 = <<"doodle">>,
-    PK = #key_v1{ast = [
-                        #param_v1{name = [Name0, Name1]},
-                        #hash_fn_v1{mod  = ?MODULE,
-                                    fn   = mock_partition_fn,
-                                    args = [
-                                            #param_v1{name = [
-                                                              Name0,
-                                                              Name2,
-                                                              Name3
-                                                             ]},
-                                            "something",
-                                            pong
-                                           ],
-                                    type = poodle
-                                   },
-                        #hash_fn_v1{mod  = ?MODULE,
-                                    fn   = mock_partition_fn,
-                                    args = [
-                                            #param_v1{name = [
-                                                              Name0,
-                                                              Name1
-                                                             ]},
-                                            #param_v1{name = [
-                                                              Name0,
-                                                              Name2,
-                                                              Name3
-                                                             ]},
-                                            pang
-                                           ],
-                                    type = wombat
-                                   }
-                       ]},
-    Map3 = {map, [
-                  #riak_field_v1{name     = <<"in_Map_2">>,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map2 = {map, [
-                  #riak_field_v1{name     = Name3,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map1 = {map, [
-                  #riak_field_v1{name     = Name1,
-                                 position = 1,
-                                 type     = sint64},
-                  #riak_field_v1{name     = Name2,
-                                 position = 2,
-                                 type     = Map2},
-                  #riak_field_v1{name     = <<"Level_1_map2">>,
-                                 position = 3,
-                                 type     = Map3}
-                 ]},
-    DDL = make_ddl(<<"complex_partition_key_test">>,
-                   [
-                    #riak_field_v1{name     = Name0,
-                                   position = 1,
-                                   type     = Map1}
-                   ],
-                   PK),
-    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Obj = {{2, {3}, {4}}},
-    Result = (catch get_partition_key(DDL, Obj)),
-    Expected = [{sint64, 2}, {poodle, mock_result}, {wombat, mock_result}],
-    ?assertEqual(Expected, Result).
-
 %%
 %% get local_key tests
 %%
@@ -759,86 +685,6 @@ local_key_test() ->
     Result = (catch get_local_key(DDL, Obj)),
     ?assertEqual([{varchar, Name}], Result).
 
-%%
-%% Maps
-%%
-
-simple_valid_map_get_type_1_test() ->
-    Map = {map, [
-                 #riak_field_v1{name     = <<"yarple">>,
-                                position = 1,
-                                type     = sint64}
-                ]},
-    DDL = make_ddl(<<"simple_valid_map_get_type_1_test">>,
-                   [
-                    #riak_field_v1{name     = <<"yando">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"erko">>,
-                                   position = 2,
-                                   type     = Map},
-                    #riak_field_v1{name     = <<"erkle">>,
-                                   position = 3,
-                                   type     = double}
-                   ]),
-    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Result = (catch Module:get_field_type([<<"erko">>, <<"yarple">>])),
-    ?assertEqual(sint64, Result).
-
-simple_valid_map_get_type_2_test() ->
-    Map = {map, [
-                 #riak_field_v1{name     = <<"yarple">>,
-                                position = 1,
-                                type     = sint64}
-                ]},
-    DDL = make_ddl(<<"simple_valid_map_get_type_2_test">>,
-                   [
-                    #riak_field_v1{name     = <<"yando">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"erko">>,
-                                   position = 2,
-                                   type     = Map},
-                    #riak_field_v1{name     = <<"erkle">>,
-                                   position = 3,
-                                   type     = double}
-                   ]),
-    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Result = (catch Module:get_field_type([<<"erko">>])),
-    ?assertEqual(map, Result).
-
-complex_valid_map_get_type_test() ->
-    Map3 = {map, [
-                  #riak_field_v1{name     = <<"in_Map_2">>,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map2 = {map, [
-                  #riak_field_v1{name     = <<"in_Map_1">>,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map1 = {map, [
-                  #riak_field_v1{name     = <<"Level_1_1">>,
-                                 position = 1,
-                                 type     = sint64},
-                  #riak_field_v1{name     = <<"Level_1_map1">>,
-                                 position = 2,
-                                 type     = Map2},
-                  #riak_field_v1{name     = <<"Level_1_map2">>,
-                                 position = 3,
-                                 type     = Map3}
-                 ]},
-    DDL = make_ddl(<<"complex_valid_map_get_type_test">>,
-                   [
-                    #riak_field_v1{name     = <<"Top_Map">>,
-                                   position = 1,
-                                   type     = Map1}
-                   ]),
-    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Path = [<<"Top_Map">>, <<"Level_1_map1">>, <<"in_Map_1">>],
-    Res = (catch Module:get_field_type(Path)),
-    ?assertEqual(sint64, Res).
 
 %%
 %% make_key tests
@@ -959,61 +805,6 @@ simple_is_query_valid_test() ->
                     #riak_field_v1{name     = <<"geohash">>,
                                    position = 2,
                                    type     = sint64}
-                   ]),
-    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    ?assertEqual(
-       true,
-       riak_ql_ddl:is_query_valid(Mod, DDL, Query)
-      ).
-
-simple_is_query_valid_map_test() ->
-    Bucket = <<"simple_is_query_valid_map_test">>,
-    Name0 = <<"name">>,
-    Name1 = <<"temp">>,
-    Name2 = <<"geo">>,
-    Selections  = [{identifier, [<<"temp">>, <<"geo">>]},
-                   {identifier, [<<"name">>]}],
-    Query = {Bucket, Selections, []},
-    Map = {map, [
-                 #riak_field_v1{name     = Name2,
-                                position = 1,
-                                type     = sint64}
-                ]},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = Name0,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = Name1,
-                                   position = 2,
-                                   type     = Map}
-                   ]),
-    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    ?assertEqual(
-       true,
-       riak_ql_ddl:is_query_valid(Mod, DDL, Query)
-      ).
-
-simple_is_query_valid_map_wildcard_test() ->
-    Bucket = <<"simple_is_query_valid_map_wildcard_test">>,
-    Name0 = <<"name">>,
-    Name1 = <<"temp">>,
-    Name2 = <<"geo">>,
-    Selections  = [{identifier, [<<"temp">>, <<"*">>]}, {identifier, [<<"name">>]}],
-    Query = {Bucket, Selections, []},
-    Map = {map, [
-                 #riak_field_v1{name     = Name2,
-                                position = 1,
-                                type     = sint64}
-                ]},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = Name0,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = Name1,
-                                   position = 2,
-                                   type     = Map}
                    ]),
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
