@@ -490,3 +490,27 @@ create_with_2_test() ->
     ?assertEqual(
       [{<<"a">>, <<"2a">>}, {<<"c">>, 3}, {<<"d">>, 0.5}, {<<"e">>, true}, {<<"f">>, <<>>}],
       WithProps).
+
+partition_key_with_duplicate_fields_is_not_allowed_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,a,quantum(c, 15, s)), a,a,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Primary key has duplicate fields (a)">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+partition_key_quantum_with_duplicate_fields_is_not_allowed_test() ->
+    %% the quantum function uses the same field as another field in the
+    %% partition key
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,c,quantum(c, 15, s)), a,c,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Primary key has duplicate fields (c)">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
