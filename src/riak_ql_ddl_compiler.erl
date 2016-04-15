@@ -97,7 +97,7 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),
     {GetPosnFn,    LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
     {GetPosnsFn,   LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
-    {IsValidFn,    LineNo8}  = build_is_valid_fn([Fields], LineNo7, []),
+    {IsValidFn,    LineNo8}  = build_is_valid_fn(Fields, LineNo7),
     {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8),
     {GetDDLFn,     LineNo10} = build_get_ddl_fn(DDL,   LineNo9,  []),
     {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
@@ -225,6 +225,8 @@ canonical_arg_fmt_v1(N) when is_integer(N)   -> integer_to_list(N);
 canonical_arg_fmt_v1(A) when is_atom(A)      -> atom_to_list(A);
 canonical_arg_fmt_v1(#param_v1{name = [Nm]}) -> binary_to_list(Nm).
 
+%% the funny shape of this function is because it used to handle maps
+%% which needed recursion - not refactoring because it will be merled
 -spec build_extract_fn([[#riak_field_v1{}]], pos_integer(), ast()) ->
                               {expr(), pos_integer()}.
 build_extract_fn([], LineNo, Acc) ->
@@ -359,32 +361,26 @@ expand_args2(Arg, LineNo) when is_list(Arg) ->
 expand_args2(Arg, LineNo) when is_atom(Arg) ->
     make_atom(Arg, LineNo).
 
--spec build_is_valid_fn([[#riak_field_v1{}]], pos_integer(), ast()) ->
+-spec build_is_valid_fn([#riak_field_v1{}], pos_integer()) ->
                                {expr(), pos_integer()}.
-build_is_valid_fn([], LineNo, Acc) ->
-    {Fail, NewLineNo} = make_fail_clause(LineNo),
-    Clauses = lists:flatten(lists:reverse([Fail | Acc])),
+build_is_valid_fn(Fields, LineNo) ->
+    {Fns, LineNo2} = make_is_valid_cls(Fields, LineNo, []),
+    {Fail, LineNo3} = make_fail_clause(LineNo2),
+    Clauses = lists:flatten(lists:reverse([Fail | Fns])),
     Fn = make_fun(is_field_valid, 1, Clauses, LineNo),
-    {Fn, NewLineNo};
-build_is_valid_fn([Fields | T], LineNo, Acc) ->
-    {Fns, LineNo2} = make_is_valid_cls(Fields, LineNo, ?NOPREFIX, []),
-    build_is_valid_fn(T, LineNo2, [Fns | Acc]).
+    {Fn, LineNo3}.
 
-make_is_valid_cls([], LineNo, Prefix, Acc) ->
+make_is_valid_cls([], LineNo, Acc) ->
     %% handle the prefixes slightly differently here than to the next clause
-    Args = [make_string(binary_to_list(Nm), LineNo)
-            || #riak_field_v1{name = Nm} <- Prefix],
-    WildArgs = [make_string("*", LineNo) | Args],
+    WildArgs = [make_string("*", LineNo)],
     WildConses = make_conses(WildArgs, LineNo, {nil, LineNo}),
     Body = make_atom(true, LineNo),
     Guard = [],
     WildCl = make_clause([WildConses], Guard, Body, LineNo),
     {lists:reverse([WildCl | Acc]), LineNo};
-make_is_valid_cls([#riak_field_v1{} = H | T], LineNo, Prefix, Acc) ->
-    %% handle the prefixes slightly differently here than to the perviousls clause
-    NPref  = [H | Prefix],
-    Args   = [make_string(binary_to_list(Nm), LineNo)
-              || #riak_field_v1{name = Nm} <- NPref],
+make_is_valid_cls([#riak_field_v1{name = Nm} | T], LineNo, Acc) ->
+    %% handle the prefixes slightly differently here than to the previous clause
+    Args   = [make_string(binary_to_list(Nm), LineNo)],
     Conses = make_conses(Args, LineNo, {nil, LineNo}),
     %% you need to reverse the lists of the positions to
     %% get the calls to element to nest correctly
@@ -392,8 +388,10 @@ make_is_valid_cls([#riak_field_v1{} = H | T], LineNo, Prefix, Acc) ->
     Guard = [],
     Cl = make_clause([Conses], Guard, Body, LineNo),
     {NewA, NewLineNo} = {[Cl | Acc], LineNo},
-    make_is_valid_cls(T, NewLineNo, Prefix, NewA).
+    make_is_valid_cls(T, NewLineNo, NewA).
 
+%% the funny shape of this function is because it used to handle maps
+%% which needed recursion - not refactoring because it will be merled
 -spec build_get_type_fn([[#riak_field_v1{}]], pos_integer(), ast()) ->
                                {expr(), pos_integer()}.
 build_get_type_fn([], LineNo, Acc) ->
