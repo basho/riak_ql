@@ -27,7 +27,7 @@
          make_module_name/1, make_module_name/2
         ]).
 
--type simple_field_type()         :: varchar | sint64 | double | timestamp | boolean | set.
+-type simple_field_type()         :: varchar | sint64 | double | timestamp | boolean.
 
 %% Relational operators allowed in a where clause.
 -type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.

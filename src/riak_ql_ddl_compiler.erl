@@ -197,14 +197,16 @@ make_plain_text(#ddl_v1{fields        = F,
 
 canonical_fields(Fields) ->
     F2 = lists:keysort(#riak_field_v1.position, Fields),
-    [cncl_field_fmt(binary_to_list(X#riak_field_v1.name),
-                    X#riak_field_v1.type,
-                    X#riak_field_v1.optional) || X <- F2].
+    [canonical_field_format(binary_to_list(X#riak_field_v1.name),
+                         X#riak_field_v1.type,
+                         X#riak_field_v1.optional) || X <- F2].
 
-cncl_field_fmt(Nm, Ty, true)  -> Msg = io_lib:format("~s ~s", [Nm, Ty]),
-                                 lists:flatten(Msg);
-cncl_field_fmt(Nm, Ty, false) -> Msg = io_lib:format("~s ~s not null", [Nm, Ty]),
-                                 lists:flatten(Msg).
+canonical_field_format(Nm, Ty, true)  -> 
+    Msg = io_lib:format("~s ~s", [Nm, Ty]),
+    lists:flatten(Msg);
+canonical_field_format(Nm, Ty, false) -> 
+    Msg = io_lib:format("~s ~s not null", [Nm, Ty]),
+    lists:flatten(Msg).
 
 canonical_key(#key_v1{ast = AST}) ->
     [canonical_ast_fmt(X) || X <- AST].
@@ -234,12 +236,12 @@ build_extract_fn([], LineNo, Acc) ->
     Fn = make_fun(extract, 2, Clauses, LineNo),
     {Fn, LineNo};
 build_extract_fn([Fields | T], LineNo, Acc) ->
-    {Fns, LineNo2} = make_extract_cls(Fields, LineNo, ?NOPREFIX, []),
+    {Fns, LineNo2} = make_extract_clauses(Fields, LineNo, ?NOPREFIX, []),
     build_extract_fn(T, LineNo2, [Fns | Acc]).
 
-make_extract_cls([], LineNo, _Prefix, Acc) ->
+make_extract_clauses([], LineNo, _Prefix, Acc) ->
     {lists:reverse(Acc), LineNo + 1};
-make_extract_cls([#riak_field_v1{} = H | T], LineNo, Prefix, Acc) ->
+make_extract_clauses([#riak_field_v1{} = H | T], LineNo, Prefix, Acc) ->
     NPref  = [H | Prefix],
     Args   = [make_string(binary_to_list(Nm), LineNo)
               || #riak_field_v1{name = Nm} <- NPref],
@@ -252,7 +254,7 @@ make_extract_cls([#riak_field_v1{} = H | T], LineNo, Prefix, Acc) ->
     Guard = make_call(make_atom(is_tuple, LineNo), [Var], LineNo),
     Cl = make_clause([Var, Conses], [[Guard]], Body, LineNo),
     {NewA, NewLineNo} = {[Cl | Acc], LineNo},
-    make_extract_cls(T, NewLineNo, Prefix, NewA).
+    make_extract_clauses(T, NewLineNo, Prefix, NewA).
 
 -spec build_get_ddl_compiler_version_fn(LineNo :: pos_integer()) ->
                                                {expr(), pos_integer()}.
@@ -483,20 +485,11 @@ escape(Binary) ->
     List = atom_to_list(Binary),
     lists:filter(fun is_alphanumeric/1, List).
 
-%% ASCII Chars
--define(ZERO,       48).
--define(NINE,       57).
--define(LITTLEA,    97).
--define(LITTLEZ,    122).
--define(BIGA,       65).
--define(BIGZ,       90).
--define(UNDERSCORE, 95).
-
-is_alphanumeric(N) when (N >= ?ZERO    andalso N =< ?NINE)    orelse
-                        (N >= ?LITTLEA andalso N =< ?LITTLEZ) orelse
-                        (N >= ?BIGA    andalso N =< ?BIGZ)    orelse
-                        N =:= ?UNDERSCORE -> true;
-is_alphanumeric(_N)                       -> false.
+is_alphanumeric(N) when (N >= $0 andalso N =< $9) orelse
+                        (N >= $a andalso N =< $z) orelse
+                        (N >= $A andalso N =< $Z) orelse
+                        N =:= $_ -> true;
+is_alphanumeric(_N)              -> false.
 
 make_guard(Variable, varchar, true) ->
     Variable ++ " =:= [] orelse is_binary(" ++ Variable ++ ")";
