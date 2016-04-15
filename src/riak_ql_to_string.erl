@@ -92,6 +92,7 @@ op_to_string(Op) ->
 flat_format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
 
+-spec ddl_rec_to_sql(#ddl_v1{}) -> string().
 ddl_rec_to_sql(#ddl_v1{table         = Tb,
                        fields        = Fs,
                        partition_key = PK,
@@ -123,7 +124,7 @@ make_q(#hash_fn_v1{mod  = riak_ql_quanta,
                    fn   = quantum,
                    args = Args,
                    type = timestamp}) ->
-              [#param_v1{name = [Nm]}, Unit, No] = Args,
+              [#param_v1{name = [Nm]}, No, Unit] = Args,
     _Q = "quantum(" ++ string:join([binary_to_list(Nm), integer_to_list(No), "'" ++ atom_to_list(Unit) ++ "'"], ", ") ++ ")".
 
 extract([X]) -> X.
@@ -260,5 +261,20 @@ select_col_to_string_negated_parens_test() ->
                    ["-1",
                     "-asdf",
                     "-(3+-4)"]).
+
+ddl_rec_to_string_test() ->
+    SQL = "CREATE TABLE Mesa "
+          "(Uno timestamp not null, "
+          "Dos timestamp not null, "
+          "Tres timestamp not null, "
+          "PRIMARY KEY ((Uno, Dos, "
+          "quantum(Tres, 1, 'd')), "
+          "Uno, Dos, Tres))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = #ddl_v1{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql(DDL)
+    ).
 
 -endif.
