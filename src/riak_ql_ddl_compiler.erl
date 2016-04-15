@@ -85,7 +85,7 @@ get_compiler_capabilities() ->
 
 %% Compile the DDL to its helper module AST.
 -spec compile(?DDL{}) ->
-                     {module, ast()} | {error, tuple()}.
+    {module, ast()} | {error, tuple()}.
 compile({ok, ?DDL{} = DDL}) ->
     %% handle output directly from riak_ql_parser
     compile(DDL);
