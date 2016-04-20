@@ -9,10 +9,19 @@ Link to the official and still private [docs](https://github.com/basho/private_b
 
 ### Compiling and Decompiling
 
+Run erlang shell from riak_ql directory with deps.
+
+```
+erl -pa ebin -pa deps/*/ebin
+```
+
+Now run the following in the shell. The generated erl files are in `/tmp`.
+
 ```
 Table_def = "CREATE TABLE MyTable (myfamily varchar not null, myseries varchar not null, time timestamp not null, weather varchar not null, temperature double, PRIMARY KEY ((myfamily, myseries, quantum(time, 10, 'm')), myfamily, myseries, time))".
 
-{ok, DDL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)).
+{ok, {DDL, With_props}} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)).
+
 {ModName, AST} = riak_ql_ddl_compiler:compile(DDL).
 
 riak_ql_ddl_compiler:write_source_to_files("/tmp", DDL, AST).
@@ -27,79 +36,129 @@ The structure and interfaces of the generated modules is shown as per this `.erl
 
 %%% Validates the DDL
 
-%%% Table         : temperatures
-%%% Fields        : [{riak_field_v1,<<"a">>,1,varchar,false},
-                     {riak_field_v1,<<"b">>,2,varchar,false},
-                     {riak_field_v1,<<"c">>,3,timestamp,false}]
+%%% Table         : MyTable
+%%% Fields        : [{riak_field_v1,<<"myfamily">>,1,varchar,false},
+                     {riak_field_v1,<<"myseries">>,2,varchar,false},
+                     {riak_field_v1,<<"time">>,3,timestamp,false},
+                     {riak_field_v1,<<"weather">>,4,varchar,false},
+                     {riak_field_v1,<<"temperature">>,5,double,true}]
 %%% Partition_Key : {key_v1,
-                        [{param_v1,[<<"a">>],undefined},
-                         {param_v1,[<<"b">>],undefined},
+                        [{param_v1,[<<"myfamily">>],undefined},
+                         {param_v1,[<<"myseries">>],undefined},
                          {hash_fn_v1,riak_ql_quanta,quantum,
-                             [{param_v1,[<<"c">>],undefined},15,s],
+                             [{param_v1,[<<"time">>],undefined},10,m],
                              timestamp}]}
-%%% Local_Key     : {key_v1,[{param_v1,[<<"a">>],ascending},
-                             {param_v1,[<<"b">>],descending},
-                             {param_v1,[<<"c">>],ascending}]}
+%%% Local_Key     : {key_v1,[{param_v1,[<<"myfamily">>],undefined},
+                             {param_v1,[<<"myseries">>],undefined},
+                             {param_v1,[<<"time">>],undefined}]}
 
 
--module('riak_ql_table_temperatures$1').
+-module('riak_ql_table_MyTable$1').
 
--export([validate_obj/1, add_column_info/1,
-     get_field_type/1, get_field_position/1,
-     get_field_positions/0, is_field_valid/1, extract/2,
-     get_ddl/0, field_orders/0]).
+-export([add_column_info/1, extract/2, field_orders/0,
+   get_ddl/0, get_ddl_compiler_version/0,
+   get_field_position/1, get_field_positions/0,
+   get_field_type/1, get_identity_hashes/0,
+   get_identity_plaintext_DEBUG/0, is_field_valid/1,
+   revert_ordering_on_local_key/1, validate_obj/1]).
 
-validate_obj({Var1_a, Var2_b, Var3_c})
-    when is_integer(Var3_c) andalso Var3_c > 0,
-     is_binary(Var2_b), is_binary(Var1_a) ->
+validate_obj({Var1_myfamily, Var2_myseries, Var3_time,
+        Var4_weather, Var5_temperature})
+    when is_binary(Var1_myfamily), is_binary(Var2_myseries),
+   is_integer(Var3_time) andalso Var3_time > 0,
+   is_binary(Var4_weather),
+   Var5_temperature =:= [] orelse
+     is_float(Var5_temperature) ->
     true;
 validate_obj(_) -> false.
 
-add_column_info({Var1_a, Var2_b, Var3_c}) ->
-    [{<<"a">>, Var1_a}, {<<"b">>, Var2_b},
-     {<<"c">>, Var3_c}].
+add_column_info({Var1_myfamily, Var2_myseries,
+     Var3_time, Var4_weather, Var5_temperature}) ->
+    [{<<"myfamily">>, Var1_myfamily},
+     {<<"myseries">>, Var2_myseries},
+     {<<"time">>, Var3_time}, {<<"weather">>, Var4_weather},
+     {<<"temperature">>, Var5_temperature}].
 
-extract(Obj, [<<"a">>]) when is_tuple(Obj) ->
+extract(Obj, [<<"myfamily">>]) when is_tuple(Obj) ->
     element(1, Obj);
-extract(Obj, [<<"b">>]) when is_tuple(Obj) ->
+extract(Obj, [<<"myseries">>]) when is_tuple(Obj) ->
     element(2, Obj);
-extract(Obj, [<<"c">>]) when is_tuple(Obj) ->
-    element(3, Obj).
+extract(Obj, [<<"time">>]) when is_tuple(Obj) ->
+    element(3, Obj);
+extract(Obj, [<<"weather">>]) when is_tuple(Obj) ->
+    element(4, Obj);
+extract(Obj, [<<"temperature">>]) when is_tuple(Obj) ->
+    element(5, Obj).
 
-get_field_type([<<"a">>]) -> varchar;
-get_field_type([<<"b">>]) -> varchar;
-get_field_type([<<"c">>]) -> timestamp.
+get_field_type([<<"myfamily">>]) -> varchar;
+get_field_type([<<"myseries">>]) -> varchar;
+get_field_type([<<"time">>]) -> timestamp;
+get_field_type([<<"weather">>]) -> varchar;
+get_field_type([<<"temperature">>]) -> double.
 
-get_field_position([<<"a">>]) -> 1;
-get_field_position([<<"b">>]) -> 2;
-get_field_position([<<"c">>]) -> 3;
+get_field_position([<<"myfamily">>]) -> 1;
+get_field_position([<<"myseries">>]) -> 2;
+get_field_position([<<"time">>]) -> 3;
+get_field_position([<<"weather">>]) -> 4;
+get_field_position([<<"temperature">>]) -> 5;
 get_field_position(_Other) -> undefined.
 
 get_field_positions() ->
-    [{[<<"a">>], 1}, {[<<"b">>], 2}, {[<<"c">>], 3}].
+    [{[<<"myfamily">>], 1}, {[<<"myseries">>], 2},
+     {[<<"time">>], 3}, {[<<"weather">>], 4},
+     {[<<"temperature">>], 5}].
 
-is_field_valid([<<"a">>]) -> true;
-is_field_valid([<<"b">>]) -> true;
-is_field_valid([<<"c">>]) -> true;
 is_field_valid([<<"*">>]) -> true;
+is_field_valid([<<"temperature">>]) -> true;
+is_field_valid([<<"weather">>]) -> true;
+is_field_valid([<<"time">>]) -> true;
+is_field_valid([<<"myseries">>]) -> true;
+is_field_valid([<<"myfamily">>]) -> true;
 is_field_valid(_) -> false.
 
-get_ddl() ->
-    {ddl_v1, <<"temperatures">>,
-     [{riak_field_v1, <<"a">>, 1, varchar, false},
-      {riak_field_v1, <<"b">>, 2, varchar, false},
-      {riak_field_v1, <<"c">>, 3, timestamp, false}],
-     {key_v1,
-      [{param_v1, [<<97>>], undefined},
-       {param_v1, [<<98>>], undefined},
-       {hash_fn_v1, riak_ql_quanta, quantum,
-    [{param_v1, [<<99>>], undefined}, 15, s], timestamp}]},
-     {key_v1,
-      [{param_v1, [<<97>>], ascending},
-       {param_v1, [<<98>>], descending},
-       {param_v1, [<<99>>], ascending}]}}.
+get_ddl_compiler_version() -> 2.
 
-field_orders() -> [ascending, descending, ascending].
+get_ddl() ->
+    {ddl_v1, <<"MyTable">>,
+     [{riak_field_v1, <<"myfamily">>, 1, varchar, false},
+      {riak_field_v1, <<"myseries">>, 2, varchar, false},
+      {riak_field_v1, <<"time">>, 3, timestamp, false},
+      {riak_field_v1, <<"weather">>, 4, varchar, false},
+      {riak_field_v1, <<"temperature">>, 5, double, true}],
+     {key_v1,
+      [{param_v1, [<<109, 121, 102, 97, 109, 105, 108, 121>>],
+  undefined},
+       {param_v1, [<<109, 121, 115, 101, 114, 105, 101, 115>>],
+  undefined},
+       {hash_fn_v1, riak_ql_quanta, quantum,
+  [{param_v1, [<<116, 105, 109, 101>>], undefined}, 10,
+   m],
+  timestamp}]},
+     {key_v1,
+      [{param_v1, [<<109, 121, 102, 97, 109, 105, 108, 121>>],
+  undefined},
+       {param_v1, [<<109, 121, 115, 101, 114, 105, 101, 115>>],
+  undefined},
+       {param_v1, [<<116, 105, 109, 101>>], undefined}]}}.
+
+field_orders() -> [ascending, ascending, ascending].
+
+revert_ordering_on_local_key({Myfamily, Myseries,
+            Time}) ->
+    [Myfamily, Myseries, Time].
+
+get_identity_hashes() ->
+    [<<145, 158, 82, 87, 116, 200, 171, 61, 66, 95, 210,
+       148, 159, 19, 210, 22>>].
+
+get_identity_plaintext_DEBUG() ->
+    "TABLE: MyTable: FIELDS: myfamily varchar "
+    "not null: myseries varchar not null: "
+    "time timestamp not null: weather varchar "
+    "not null: temperature double: PRIMARY "
+    "KEY: myfamily: myseries: riak_ql_quanta "
+    "quantum time 10 m timestamp: LOCAL KEY: "
+    "myfamily: myseries: time".
 ```
 
 ### Keywords in the Lexer

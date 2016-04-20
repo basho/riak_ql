@@ -31,13 +31,13 @@
 -record(riak_field_v1, {
           name     = <<>>  :: binary(),
           position         :: undefined | pos_integer(),
-          type             :: undefined | riak_ql_ddl:field_type(),
+          type             :: undefined | riak_ql_ddl:simple_field_type(),
           optional = false :: boolean()
          }).
 
 
 -record(param_v1, {
-          name :: [binary()],
+          name = [<<>>] :: [binary()],
           ordering = undefined :: undefined | ascending | descending
          }).
 
@@ -45,7 +45,7 @@
           mod       :: atom(),
           fn        :: atom(),
           args = [] :: [#param_v1{} | any()],
-          type      :: riak_ql_ddl:field_type()
+          type      :: riak_ql_ddl:simple_field_type()
          }).
 
 -record(key_v1, {
