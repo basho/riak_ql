@@ -25,7 +25,6 @@
 
 -export([
          flip_binary/1,
-         get_version/0,
          make_module_name/1, make_module_name/2
         ]).
 
@@ -108,19 +107,16 @@
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
 
--spec get_version() -> binary().
-get_version() ->
-    ?RIAK_QL_DDL_VERSION.
-
 -spec make_module_name(Table::binary()) ->
                               module().
 %% @doc Generate a unique module name for Table at version 1. @see
 %%      make_module_name/2.
 make_module_name(Table) ->
-    make_module_name(Table, 1).
+    make_module_name(Table, ?DDL_RECORD_VERSION).
 
--spec make_module_name(Table::binary(), Version::integer()) ->
-                              module().
+-spec make_module_name(Table   :: binary(),
+                       Version :: riak_ql_component:component_version()) ->
+                       module().
 %% @doc Generate a unique, but readable and recognizable, module name
 %%      for Table at a certain Version, by 'escaping' non-ascii chars
 %%      in Table a la C++.

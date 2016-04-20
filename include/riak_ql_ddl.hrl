@@ -23,7 +23,11 @@
 -ifndef(RIAK_QL_DDL_HRL).
 -define(RIAK_QL_DDL_HRL, included).
 
--define(RIAK_QL_DDL_VERSION, <<"1.3">>).
+%% NOTE: Every time there is a change to the DDL helper
+%% or anything related to DDL changes, this number must be
+%% incremented.  It is independent of the DDL record version (below).
+-define(RIAK_QL_DDL_COMPILER_VERSION, 2).
+
 -record(riak_field_v1, {
           name     = <<>>  :: binary(),
           position         :: undefined | pos_integer(),
@@ -57,5 +61,6 @@
 
 -define(DDL, #ddl_v1).
 -define(DDL_RECORD_NAME, ddl_v1).
+-define(DDL_RECORD_VERSION, 1).
 
 -endif.
