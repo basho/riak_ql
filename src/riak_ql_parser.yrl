@@ -850,6 +850,7 @@ validate_ddl(DDL) ->
     ok = assert_primary_key_fields_non_null(DDL),
     ok = assert_not_more_than_one_quantum(DDL),
     ok = assert_quantum_fn_args(DDL),
+    ok = assert_quantum_is_last_in_partition_key(DDL),
     DDL.
 
 %% @doc Ensure DDL has keys
@@ -953,6 +954,20 @@ assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST }
             return_error_flat(
                 "More than one quantum function in the partition key.", [])
     end.
+
+assert_quantum_is_last_in_partition_key(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+    assert_quantum_is_last_in_partition_key2(PKAST).
+
+%%
+assert_quantum_is_last_in_partition_key2([]) ->
+    ok;
+assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }]) ->
+    ok;
+assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }|_]) ->
+    return_error_flat(
+        "The quantum function can must be the last element of the partition key.", []);
+assert_quantum_is_last_in_partition_key2([_|Tail]) ->
+    assert_quantum_is_last_in_partition_key2(Tail).
 
 %% Check that the field name exists in the list of fields.
 is_field(Field, Fields) ->
