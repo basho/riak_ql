@@ -551,7 +551,7 @@ default_insert_columns(Mod) when is_atom(Mod) ->
 %%
 %% NOTE: If a compiled helper module is a available then use
 %% `Mod:get_field_type/1'.
--spec get_field_type(#ddl_v1{}, binary()) -> {ok, field_type()} | notfound.
+-spec get_field_type(#ddl_v1{}, binary()) -> {ok, simple_field_type()} | notfound.
 get_field_type(#ddl_v1{ fields = Fields }, FieldName) when is_binary(FieldName) ->
     case lists:keyfind(FieldName, #riak_field_v1.name, Fields) of
       #riak_field_v1{ type = Type } ->
