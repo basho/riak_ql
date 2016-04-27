@@ -924,12 +924,20 @@ assert_partition_key_fields_exist(?DDL{ fields = Fields,
                               [string:join(MissingFields, ", ")])
     end.
 
-assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
-    [assert_quantum_fn_args2(Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
+assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } } = DDL) ->
+    [assert_quantum_fn_args2(DDL, Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
     ok.
 
 %% The param argument is validated by assert_partition_key_fields_exist/1.
-assert_quantum_fn_args2([_Param, Unit, Measure]) ->
+assert_quantum_fn_args2(DDL, [Param, Unit, Measure]) ->
+    FieldName = name_of(Param),
+    case riak_ql_ddl:get_field_type(DDL, FieldName) of
+        {ok, timestamp} ->
+            ok;
+        {ok, InvalidType} ->
+            return_error_flat("Quantum field '~s' must be type of timestamp but was ~p.",
+                              [FieldName, InvalidType])
+    end,
     case lists:member(Measure, [d,h,m,s]) of
         true ->
             ok;
