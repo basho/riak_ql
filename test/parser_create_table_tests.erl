@@ -463,6 +463,30 @@ quantum_fn_last_arg_no_quotes_required_test() ->
         PKAST
       ).
 
+quantum_must_be_last_in_the_partition_key_1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's'),a,b), c,a,b))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"The quantum function can must be the last element of the partition key.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_must_be_last_in_the_partition_key_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,quantum(c, 15, 's'),b), a,c,b))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"The quantum function can must be the last element of the partition key.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
 create_with_1_test() ->
     Table_def =
         "CREATE TABLE temperatures ("

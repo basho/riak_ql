@@ -252,3 +252,26 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
 ?invalid_query_test(varchar_6_test,
                     ?STANDARDTABLE,
                     ?SQL ++ "myvarchar >= 3.4").
+
+%% identity hash tests
+
+identity_hash_test() ->
+    CreateTable = ?STANDARDTABLE,
+    Lexed = riak_ql_lexer:get_tokens(CreateTable),
+    {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
+    {module, Module} =  riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
+    Result = Module:get_identity_plaintext_DEBUG(),
+    Expected = "TABLE: "
+        "GeoCheckin: "
+        "FIELDS: "
+        "geohash varchar not null: "
+        "user varchar not null: "
+        "time timestamp not null: "
+        "mytimestamp timestamp not null: "
+        "myboolean boolean not null: "
+        "mydouble double not null: "
+        "mysint64 sint64 not null: "
+        "myvarchar varchar not null: "
+        "PRIMARY KEY: geohash: user: riak_ql_quanta quantum time 15 m timestamp: "
+        "LOCAL KEY: geohash: user: time",
+    ?assertEqual(Expected, Result).
