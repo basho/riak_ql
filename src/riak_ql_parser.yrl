@@ -973,7 +973,7 @@ assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }]) ->
     ok;
 assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }|_]) ->
     return_error_flat(
-        "The quantum function can must be the last element of the partition key.", []);
+        "The quantum function must be the last element of the partition key.", []);
 assert_quantum_is_last_in_partition_key2([_|Tail]) ->
     assert_quantum_is_last_in_partition_key2(Tail).
 
