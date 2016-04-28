@@ -24,6 +24,7 @@
 -include("riak_ql_ddl.hrl").
 
 -export([
+         apply_ordering/2,
          flip_binary/1,
          get_field_type/2,
          make_module_name/1, make_module_name/2

@@ -538,3 +538,29 @@ partition_key_quantum_with_duplicate_fields_is_not_allowed_test() ->
         {error,{0,riak_ql_parser,<<"Primary key has duplicate fields (c)">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
     ).
+
+boolean_cannot_be_desc_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b BOOLEAN NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,
+          <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was boolean.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+float_cannot_be_desc_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b DOUBLE NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,
+          <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was double.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).

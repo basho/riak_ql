@@ -848,6 +848,7 @@ validate_ddl(DDL) ->
     ok = assert_not_more_than_one_quantum(DDL),
     ok = assert_quantum_fn_args(DDL),
     ok = assert_quantum_is_last_in_partition_key(DDL),
+    ok = assert_desc_key_types(DDL),
     DDL.
 
 %% @doc Ensure DDL has keys
@@ -985,6 +986,28 @@ assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }|_]) ->
         "The quantum function must be the last element of the partition key.", []);
 assert_quantum_is_last_in_partition_key2([_|Tail]) ->
     assert_quantum_is_last_in_partition_key2(Tail).
+
+%% Assert that any paramerts in the local key that use the desc keyword are
+%% types that support it.
+assert_desc_key_types(#ddl_v1{ local_key = #key_v1{ ast = LKAST } } = DDL) ->
+    [assert_desc_key_field_type(DDL, P) || #param_v1{ ordering = descending } = P <- LKAST],
+    ok.
+
+%%
+assert_desc_key_field_type(DDL, #param_v1{ name = [Name] }) ->
+    {ok, Type} = riak_ql_ddl:get_field_type(DDL, Name),
+    case Type of
+        sint64 ->
+            ok;
+        varchar ->
+            ok;
+        timestamp ->
+            ok;
+        _ ->
+            return_error_flat(
+                "Elements in the local key marked descending (DESC) must be of "
+                "type sint64 or varchar, but was ~p.", [Type])
+    end.
 
 %% Check that the field name exists in the list of fields.
 is_field(Field, Fields) ->
