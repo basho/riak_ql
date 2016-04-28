@@ -25,6 +25,7 @@
 
 -export([
          flip_binary/1,
+         get_field_type/2,
          make_module_name/1, make_module_name/2
         ]).
 
@@ -563,6 +564,19 @@ default_insert_columns(Mod) when is_atom(Mod) ->
                     {identifier, Col}
                end,
     lists:map(FormatFn, ColPos).
+
+%% Get the type of a field from the DDL datastructure.
+%%
+%% NOTE: If a compiled helper module is a available then use
+%% `Mod:get_field_type/1'.
+-spec get_field_type(#ddl_v1{}, binary()) -> {ok, simple_field_type()} | notfound.
+get_field_type(#ddl_v1{ fields = Fields }, FieldName) when is_binary(FieldName) ->
+    case lists:keyfind(FieldName, #riak_field_v1.name, Fields) of
+      #riak_field_v1{ type = Type } ->
+          {ok, Type};
+      false ->
+            notfound
+    end.
 
 -ifdef(TEST).
 -compile(export_all).

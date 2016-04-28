@@ -847,6 +847,7 @@ validate_ddl(DDL) ->
     ok = assert_partition_key_fields_not_descending(DDL),
     ok = assert_not_more_than_one_quantum(DDL),
     ok = assert_quantum_fn_args(DDL),
+    ok = assert_quantum_is_last_in_partition_key(DDL),
     DDL.
 
 %% @doc Ensure DDL has keys
@@ -932,12 +933,20 @@ assert_partition_key_fields_exist(?DDL{ fields = Fields,
                               [string:join(MissingFields, ", ")])
     end.
 
-assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
-    [assert_quantum_fn_args2(Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
+assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } } = DDL) ->
+    [assert_quantum_fn_args2(DDL, Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
     ok.
 
 %% The param argument is validated by assert_partition_key_fields_exist/1.
-assert_quantum_fn_args2([_Param, Unit, Measure]) ->
+assert_quantum_fn_args2(DDL, [Param, Unit, Measure]) ->
+    FieldName = name_of(Param),
+    case riak_ql_ddl:get_field_type(DDL, FieldName) of
+        {ok, timestamp} ->
+            ok;
+        {ok, InvalidType} ->
+            return_error_flat("Quantum field '~s' must be type of timestamp but was ~p.",
+                              [FieldName, InvalidType])
+    end,
     case lists:member(Measure, [d,h,m,s]) of
         true ->
             ok;
@@ -962,6 +971,20 @@ assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST }
             return_error_flat(
                 "More than one quantum function in the partition key.", [])
     end.
+
+assert_quantum_is_last_in_partition_key(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+    assert_quantum_is_last_in_partition_key2(PKAST).
+
+%%
+assert_quantum_is_last_in_partition_key2([]) ->
+    ok;
+assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }]) ->
+    ok;
+assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }|_]) ->
+    return_error_flat(
+        "The quantum function must be the last element of the partition key.", []);
+assert_quantum_is_last_in_partition_key2([_|Tail]) ->
+    assert_quantum_is_last_in_partition_key2(Tail).
 
 %% Check that the field name exists in the list of fields.
 is_field(Field, Fields) ->
