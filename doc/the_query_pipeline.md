@@ -415,7 +415,7 @@ This process is trivially recursive. For operational reasons these operations mu
 +-------+-------+       |          +-------+-------+-------+
 | Val1X | Val1Y |       |          | Val1a | Val1b | Val1c |
 +---------------+       | Chunk1   +-----------------------+
-| Val2X | Val2Y |       +----------+ Val2a | Val2b | Val2c |
+| Val4X | Val4Y |       +----------+ Val2a | Val2b | Val2c |
 +-------+-------+       |          +-----------------------+
                         |          | Val3a | Val3b | Val3c |
                         |          +-------+-------+-------+
