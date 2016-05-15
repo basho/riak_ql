@@ -42,6 +42,7 @@ KeyField
 KeyFieldArgList
 KeyFieldArg
 NotNull
+GroupBy
 
 %% ValueExpression
 %% CommonValueExpression
@@ -76,6 +77,7 @@ Terminals
 or_
 and_
 boolean
+by
 character_literal
 comma
 create
@@ -91,6 +93,7 @@ identifier
 insert
 integer
 into
+group
 key
 limit
 left_paren
@@ -125,6 +128,8 @@ Endsymbol '$end'.
 Statement -> StatementWithoutSemicolon : '$1'.
 Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
+GroupBy -> group by Fields: {group_by, '$3'}.
+
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
@@ -133,6 +138,8 @@ StatementWithoutSemicolon -> Insert : '$1'.
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
+Select -> select Fields from Buckets Where GroupBy 
+                                           : make_select('$1', '$2', '$3', '$4', '$5', '$6').
 Select -> select Fields from Buckets Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4').
 
@@ -374,7 +381,8 @@ Erlang code.
           fields  = [],
           limit   = [],
           where   = [],
-          ops     = []
+          ops     = [],
+          group_by
          }).
 
 -include("riak_ql_ddl.hrl").
@@ -413,27 +421,29 @@ convert(#outputs{type    = select,
                  buckets = B,
                  fields  = F,
                  limit   = L,
-                 where   = W}) ->
+                 where   = W,
+                 group_by = G}) ->
     [
      {type, select},
      {tables, B},
      {fields, F},
      {limit, L},
-     {where, W}
+     {where, W},
+     {group_by, G}
     ];
 convert(#outputs{type = create} = O) ->
     O.
 
-%% make_atom({binary, SomeWord}) ->
-%%     {atom, binary_to_atom(SomeWord, utf8)}.
-
 make_select(A, B, C, D) -> make_select(A, B, C, D, {where, []}).
+
+make_select(A, B, C, D, E) -> make_select(A, B, C, D, E, {group_by, []}).
 
 make_select({select, _SelectBytes},
             Select,
             {from, _FromBytes},
             {Type, D},
-            {_WhereType, E}) ->
+            {_Where, E},
+            {group_by, GroupFields}) ->
     Bucket = case Type of
                  identifier -> D;
                  list   -> {list, [X || X <- D]};
@@ -445,11 +455,12 @@ make_select({select, _SelectBytes},
                    end,
     FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
     FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
-    _O = #outputs{type    = select,
-                  fields  = FieldsWrappedIdentifiers,
-                  buckets = Bucket,
-                  where   = E
-                 }.
+    #outputs{type    = select,
+             fields  = FieldsWrappedIdentifiers,
+             buckets = Bucket,
+             where   = E,
+             group_by = lists:flatten([GroupFields])
+            }.
 
 
 wrap_identifier({identifier, IdentifierName})
