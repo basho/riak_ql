@@ -340,6 +340,7 @@ RowValue -> FieldValue : ['$1'].
 
 FieldValue -> integer : '$1'.
 FieldValue -> float : '$1'.
+FieldValue -> TruthValue : '$1'.
 FieldValue -> CharacterLiteral : '$1'.
 FieldValue -> Identifier : '$1'.
 
