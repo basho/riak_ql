@@ -103,8 +103,6 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
     {FieldOrdersFn, LineNo10} = build_field_orders_fn(DDL, LineNo9),
     {RevertOrderingFn, LineNo11} = build_revert_ordering_on_local_key_fn(DDL, LineNo10),
-    {FieldOrdersFn, LineNo10} = build_field_orders_fn(DDL, LineNo9),
-    {RevertOrderingFn, LineNo11} = build_revert_ordering_on_local_key_fn(DDL, LineNo10),
     AST = Attrs
         ++ VFns
         ++ ACFns
