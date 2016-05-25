@@ -29,12 +29,12 @@
 -module(riak_ql_quanta).
 
 -export([
-	 quantum/3,
-	 quanta/4,
+   quantum/3,
+   quanta/4,
          timestamp_to_ms/1,
          ms_to_timestamp/1,
          unit_to_millis/2
-	]).
+  ]).
 
 -type time_ms() :: non_neg_integer().
 %% A timestamp in millisconds representing number of millisconds from Unix epoch
@@ -69,13 +69,13 @@
 quanta(StartTime, EndTime, QuantaSize, Unit) ->
     Start = quantum(StartTime, QuantaSize, Unit),
     case Start of
-	{error, _} = E -> E;
-	_Other         -> End = EndTime,
-			  Diff = End - Start,
-			  Slice = unit_to_ms(Unit) * QuantaSize,
-			  NSlices = accommodate(Diff, Slice),
-			  Quanta = gen_quanta(NSlices, Start, Slice, []),
-			  {NSlices, Quanta}
+  {error, _} = E -> E;
+  _Other         -> End = EndTime,
+        Diff = End - Start,
+        Slice = unit_to_ms(Unit) * QuantaSize,
+        NSlices = accommodate(Diff, Slice),
+        Quanta = gen_quanta(NSlices, Start, Slice, []),
+        {NSlices, Quanta}
     end.
 
 %% compute ceil(Length / Unit)
