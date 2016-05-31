@@ -30,8 +30,7 @@
 
 -export([
          make_create_table/2,
-         make_create_table/3,
-         get_version/0
+         make_create_table/3
         ]).
 
 -include("riak_ql_ddl.hrl").
@@ -39,8 +38,6 @@
 %%
 %% API
 %%
-get_version() -> "1.3".
-
 make_create_table(TableName, Contents) ->
     make_create_table(TableName, Contents, []).
 
