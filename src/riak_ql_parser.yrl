@@ -133,6 +133,9 @@ StatementWithoutSemicolon -> Insert : '$1'.
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
+%% No joins for you!
+Select -> select Fields from Buckets : return_error(0, <<"Must provide exactly one table name">>).
+
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
 
@@ -153,8 +156,8 @@ Field -> NumericValueExpression : '$1'.
 %Field -> Identifier    : canonicalise_col('$1').
 Field -> asterisk : make_wildcard('$1').
 
-Buckets -> Buckets comma Bucket : make_list('$1', '$3').
-Buckets -> Bucket               : '$1'.
+%% Support early error on multi-table select
+Buckets -> Bucket comma Bucket : make_list('$1', '$3').
 
 Bucket -> Identifier   : '$1'.
 
