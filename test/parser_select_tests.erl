@@ -93,14 +93,7 @@ select_nested_quotes_sql_test() ->
        ]).
 
 select_from_lists_sql_test() ->
-    ?sql_comp_assert_match(
-       "select * from events, errors", select,
-       [{fields, [
-                  {identifier, [<<"*">>]}
-                 ]},
-        {tables, {list, [<<"events">>, <<"errors">>]}},
-        {where, []}
-       ]).
+    ?sql_comp_fail("select * from events, errors").
 
 select_fields_from_lists_sql_test() ->
     ?sql_comp_assert_match(

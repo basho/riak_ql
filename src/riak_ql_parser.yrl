@@ -133,8 +133,8 @@ StatementWithoutSemicolon -> Insert : '$1'.
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
-Select -> select Fields from Buckets Where : make_select('$1', '$2', '$3', '$4', '$5').
-Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4').
+Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
+Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
 
 %% 20.9 DESCRIBE STATEMENT
 Describe -> describe Bucket : make_describe('$2').
