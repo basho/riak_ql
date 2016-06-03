@@ -134,7 +134,7 @@ Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
 %% No joins for you!
-Select -> select Fields from Buckets : return_error(0, <<"Must provide exactly one table name">>).
+Select -> select Fields from Buckets : make_select({select, multi_table_error}, '$2', '$3', '$4').
 
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
@@ -430,7 +430,10 @@ convert(#outputs{type = create} = O) ->
 %% make_atom({binary, SomeWord}) ->
 %%     {atom, binary_to_atom(SomeWord, utf8)}.
 
-make_select(A, B, C, D) -> make_select(A, B, C, D, {where, []}).
+make_select({select, multi_table_error}, _B, _C, _D) ->
+    return_error(0, <<"Must provide exactly one table name">>);
+make_select(A, B, C, D) ->
+    make_select(A, B, C, D, {where, []}).
 
 make_select({select, _SelectBytes},
             Select,
