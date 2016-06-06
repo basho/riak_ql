@@ -310,8 +310,8 @@ build_field_orders_fn_string(?DDL{ local_key = #key_v1{ ast = AST } }) ->
 order_from_key_field(Param) ->
     order_from_key_field2(riak_ql_ddl:param_ordering(Param)).
 
-order_from_key_field2(undefined) ->
-    ascending;
+% order_from_key_field2(undefined) ->
+%     ascending;
 order_from_key_field2(Ordering) ->
     Ordering.
 
@@ -331,26 +331,26 @@ build_revert_ordering_on_local_key_fn_string(?DDL{ local_key = #key_v1{ ast = AS
         "revert_ordering_on_local_key({~s}) -> [~s].",[FieldNameArgs, Results])).
 
 %%
-maybe_revert_ordering_on_local_key_element(DDL, #param_v1{ name = N1 } = Param) ->
+maybe_revert_ordering_on_local_key_element(_DDL, #param_v1{ name = N1 } = Param) ->
     N2 = to_var_name_string(N1),
     case riak_ql_ddl:param_ordering(Param) of
-        descending ->
-            revert_ordering_on_local_key_element(DDL, N2);
+        % descending ->
+        %     revert_ordering_on_local_key_element(DDL, N2);
         _ ->
             N2
     end.
 
 %%
-revert_ordering_on_local_key_element(DDL, VarName) ->
-    case field_type(DDL, hd(VarName)) of
-        varchar ->
-            "riak_ql_ddl:flip_binary(" ++ VarName ++ ")";
-        Type when Type == timestamp; Type == sint64 ->
-            %% in the case of integers we just negate the original negation
-            VarName ++ "*-1";
-        _ ->
-            VarName
-    end.
+% revert_ordering_on_local_key_element(DDL, VarName) ->
+%     case field_type(DDL, hd(VarName)) of
+%         varchar ->
+%             "riak_ql_ddl:flip_binary(" ++ VarName ++ ")";
+%         Type when Type == timestamp; Type == sint64 ->
+%             %% in the case of integers we just negate the original negation
+%             VarName ++ "*-1";
+%         _ ->
+%             VarName
+%     end.
 
 %%
 to_var_name_string([FieldName]) ->
@@ -360,10 +360,10 @@ to_var_name_string(FieldName) when is_binary(FieldName) ->
     [string:to_upper([H]) | Tail].
 
 %%
-field_type(#ddl_v1{ fields = Fields }, FieldName) ->
-    #riak_field_v1{ type = Type } =
-        lists:keyfind(FieldName, #riak_field_v1.name, Fields),
-    Type.
+% field_type(#ddl_v1{ fields = Fields }, FieldName) ->
+%     #riak_field_v1{ type = Type } =
+%         lists:keyfind(FieldName, #riak_field_v1.name, Fields),
+%     Type.
 
 % revert_ordering_on_local_key({A,B,C,D}) ->
 %     [A,B,apply_ordering(C, descending)].
