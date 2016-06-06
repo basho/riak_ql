@@ -539,41 +539,41 @@ partition_key_quantum_with_duplicate_fields_is_not_allowed_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
     ).
 
-boolean_cannot_be_desc_test() ->
-    Table_def =
-        "CREATE TABLE temperatures ("
-        "a VARCHAR NOT NULL, "
-        "b BOOLEAN NOT NULL, "
-        "c TIMESTAMP NOT NULL, "
-        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
-    ?assertEqual(
-        {error,{0,riak_ql_parser,
-          <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was boolean.">>}},
-        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-    ).
+% boolean_cannot_be_desc_test() ->
+%     Table_def =
+%         "CREATE TABLE temperatures ("
+%         "a VARCHAR NOT NULL, "
+%         "b BOOLEAN NOT NULL, "
+%         "c TIMESTAMP NOT NULL, "
+%         "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
+%     ?assertEqual(
+%         {error,{0,riak_ql_parser,
+%           <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was boolean.">>}},
+%         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+%     ).
 
-float_cannot_be_desc_test() ->
-    Table_def =
-        "CREATE TABLE temperatures ("
-        "a VARCHAR NOT NULL, "
-        "b DOUBLE NOT NULL, "
-        "c TIMESTAMP NOT NULL, "
-        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
-    ?assertEqual(
-        {error,{0,riak_ql_parser,
-          <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was double.">>}},
-        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-    ).
+% float_cannot_be_desc_test() ->
+%     Table_def =
+%         "CREATE TABLE temperatures ("
+%         "a VARCHAR NOT NULL, "
+%         "b DOUBLE NOT NULL, "
+%         "c TIMESTAMP NOT NULL, "
+%         "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
+%     ?assertEqual(
+%         {error,{0,riak_ql_parser,
+%           <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was double.">>}},
+%         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+%     ).
 
-desc_cannot_be_defined_on_the_partition_key_test() ->
-    Table_def =
-        "CREATE TABLE tab ("
-        "a VARCHAR NOT NULL, "
-        "b VARCHAR NOT NULL, "
-        "c TIMESTAMP NOT NULL, "
-        "PRIMARY KEY ((a,b DESC,quantum(c, 15, s)), a,b,c))",
-    ?assertEqual(
-        {error,{0,riak_ql_parser,
-          <<"Order can only be used in the local key, 'b' set to descending">>}},
-        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
-    ).
+% desc_cannot_be_defined_on_the_partition_key_test() ->
+%     Table_def =
+%         "CREATE TABLE tab ("
+%         "a VARCHAR NOT NULL, "
+%         "b VARCHAR NOT NULL, "
+%         "c TIMESTAMP NOT NULL, "
+%         "PRIMARY KEY ((a,b DESC,quantum(c, 15, s)), a,b,c))",
+%     ?assertEqual(
+%         {error,{0,riak_ql_parser,
+%           <<"Order can only be used in the local key, 'b' set to descending">>}},
+%         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+%     ).

@@ -27,7 +27,8 @@
          apply_ordering/2,
          flip_binary/1,
          get_field_type/2,
-         make_module_name/1, make_module_name/2
+         make_module_name/1, make_module_name/2,
+         param_ordering/1
         ]).
 
 -type simple_field_type()         :: varchar | sint64 | double | timestamp | boolean.
@@ -175,7 +176,8 @@ mk_k([#hash_fn_v1{mod = Md,
     A2 = extract(Args, Vals, []),
     V  = erlang:apply(Md, Fn, A2),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
-mk_k([#param_v1{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
+mk_k([#param_v1{name = [Nm]} = Param | T1], Vals, Mod, Acc) ->
+    Ordering = param_ordering(Param),
     case lists:keyfind(Nm, 1, Vals) of
         {Nm, V} ->
             Ty = Mod:get_field_type([Nm]),
@@ -187,7 +189,8 @@ mk_k([#param_v1{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
 -spec extract(list(), [{any(), any()}], [any()]) -> any().
 extract([], _Vals, Acc) ->
     lists:reverse(Acc);
-extract([#param_v1{name = [Nm], ordering = Ordering} | T], Vals, Acc) ->
+extract([#param_v1{name = [Nm]} = Param | T], Vals, Acc) ->
+    Ordering = param_ordering(Param),
     {Nm, Val} = lists:keyfind(Nm, 1, Vals),
     extract(T, Vals, [apply_ordering(Val, Ordering) | Acc]);
 extract([Constant | T], Vals, Acc) ->
@@ -196,7 +199,8 @@ extract([Constant | T], Vals, Acc) ->
 -spec build([#param_v1{}], tuple(), atom(), any()) -> list().
 build([], _Obj, _Mod, A) ->
     lists:reverse(A);
-build([#param_v1{name = Nm, ordering = Ordering} | T], Obj, Mod, A) ->
+build([#param_v1{name = Nm} = Param | T], Obj, Mod, A) ->
+    Ordering = param_ordering(Param),
     Val = Mod:extract(Obj, Nm),
     Type = Mod:get_field_type(Nm),
     build(T, Obj, Mod, [{Type, apply_ordering(Val, Ordering)} | A]);
@@ -578,6 +582,9 @@ get_field_type(#ddl_v1{ fields = Fields }, FieldName) when is_binary(FieldName) 
       false ->
             notfound
     end.
+
+%% A getter for the ordering field in the param_v1 record.
+param_ordering(#param_v1{}) -> ascending.
 
 -ifdef(TEST).
 -compile(export_all).

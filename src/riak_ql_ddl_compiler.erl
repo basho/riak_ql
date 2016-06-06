@@ -307,12 +307,13 @@ build_field_orders_fn_string(?DDL{ local_key = #key_v1{ ast = AST } }) ->
     lists:flatten(io_lib:format("field_orders() -> ~p.",[Orders])).
 
 %%
-order_from_key_field(#param_v1{ ordering = undefined }) ->
+order_from_key_field(Param) ->
+    order_from_key_field2(riak_ql_ddl:param_ordering(Param)).
+
+order_from_key_field2(undefined) ->
     ascending;
-order_from_key_field(#param_v1{ ordering = Ordering }) ->
-    Ordering;
-order_from_key_field(_) ->
-    ascending.
+order_from_key_field2(Ordering) ->
+    Ordering.
 
 %% Convert a local key that has had the descending logic run on it to it's
 %% original value. Used to convert streamed list keys back to their original
@@ -325,24 +326,31 @@ build_revert_ordering_on_local_key_fn_string(?DDL{ local_key = #key_v1{ ast = AS
     FieldNameArgs =
         string:join([to_var_name_string(N) || #param_v1{ name = N } <- AST], ","),
     Results =
-        string:join([revert_ordering_on_local_key_element(DDL, P) || P <- AST], ","),
+        string:join([maybe_revert_ordering_on_local_key_element(DDL, P) || P <- AST], ","),
     lists:flatten(io_lib:format(
         "revert_ordering_on_local_key({~s}) -> [~s].",[FieldNameArgs, Results])).
 
 %%
-revert_ordering_on_local_key_element(DDL, #param_v1{ name = N1, ordering = descending }) ->
+maybe_revert_ordering_on_local_key_element(DDL, #param_v1{ name = N1 } = Param) ->
     N2 = to_var_name_string(N1),
-    case field_type(DDL, hd(N1)) of
-        varchar ->
-            "riak_ql_ddl:flip_binary(" ++ N2 ++ ")";
-        Type when Type == timestamp; Type == sint64 ->
-            %% in the case of integers we just negate the original negation
-            N2 ++ "*-1";
+    case riak_ql_ddl:param_ordering(Param) of
+        descending ->
+            revert_ordering_on_local_key_element(DDL, N2);
         _ ->
             N2
-    end;
-revert_ordering_on_local_key_element(_, #param_v1{ name = N }) ->
-    to_var_name_string(N).
+    end.
+
+%%
+revert_ordering_on_local_key_element(DDL, VarName) ->
+    case field_type(DDL, hd(VarName)) of
+        varchar ->
+            "riak_ql_ddl:flip_binary(" ++ VarName ++ ")";
+        Type when Type == timestamp; Type == sint64 ->
+            %% in the case of integers we just negate the original negation
+            VarName ++ "*-1";
+        _ ->
+            VarName
+    end.
 
 %%
 to_var_name_string([FieldName]) ->
@@ -393,7 +401,7 @@ expand_ast(AST, LineNo) when is_list(AST) ->
     Fields = [expand_a2(X, LineNo) || X <- AST],
     make_conses(lists:reverse(Fields), LineNo, {nil, LineNo}).
 
-expand_a2(#param_v1{name = _Nm, ordering = _Ordering} = Param, _LineNo) ->
+expand_a2(#param_v1{name = _Nm} = Param, _LineNo) ->
     %% Bins = [make_binary(X, LineNo) || X <- Nm],
     %% Conses = make_conses(Bins, LineNo, {nil, LineNo}),
     %% make_tuple([make_atom(param_v1, LineNo),
@@ -1296,29 +1304,29 @@ build_field_orders_fn_string_test() ->
         build_field_orders_fn_string(DDL )
     ).
 
-build_field_orders_fn_string_asc_desc_test() ->
-    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
-        "CREATE TABLE temperatures ("
-        "a VARCHAR NOT NULL, "
-        "b VARCHAR NOT NULL, "
-        "c TIMESTAMP NOT NULL, "
-        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
-    ?assertEqual(
-        "field_orders() -> [ascending,descending,ascending].",
-        build_field_orders_fn_string(DDL)
-    ).
+% build_field_orders_fn_string_asc_desc_test() ->
+%     {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+%         "CREATE TABLE temperatures ("
+%         "a VARCHAR NOT NULL, "
+%         "b VARCHAR NOT NULL, "
+%         "c TIMESTAMP NOT NULL, "
+%         "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
+%     ?assertEqual(
+%         "field_orders() -> [ascending,descending,ascending].",
+%         build_field_orders_fn_string(DDL)
+%     ).
 
-build_revert_ordering_on_local_key_fn_string_test() ->
-    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
-        "CREATE TABLE temperatures ("
-        "a VARCHAR NOT NULL, "
-        "b VARCHAR NOT NULL, "
-        "c TIMESTAMP NOT NULL, "
-        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
-    ?assertEqual(
-        "revert_ordering_on_local_key({A,B,C}) -> [A,riak_ql_ddl:flip_binary(B),C].",
-        build_revert_ordering_on_local_key_fn_string(DDL)
-    ).
+% build_revert_ordering_on_local_key_fn_string_test() ->
+%     {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+%         "CREATE TABLE temperatures ("
+%         "a VARCHAR NOT NULL, "
+%         "b VARCHAR NOT NULL, "
+%         "c TIMESTAMP NOT NULL, "
+%         "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
+%     ?assertEqual(
+%         "revert_ordering_on_local_key({A,B,C}) -> [A,riak_ql_ddl:flip_binary(B),C].",
+%         build_revert_ordering_on_local_key_fn_string(DDL)
+%     ).
 
 
 -endif.
