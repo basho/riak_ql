@@ -135,8 +135,11 @@ StatementWithoutSemicolon -> Insert : '$1'.
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
-Select -> select Fields from Buckets Where : make_select('$1', '$2', '$3', '$4', '$5').
-Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4').
+%% No joins for you!
+Select -> select Fields from Buckets : make_select({select, multi_table_error}, '$2', '$3', '$4').
+
+Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
+Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
 
 %% 20.9 DESCRIBE STATEMENT
 Describe -> describe Bucket : make_describe('$2').
@@ -155,8 +158,8 @@ Field -> NumericValueExpression : '$1'.
 %Field -> Identifier    : canonicalise_col('$1').
 Field -> asterisk : make_wildcard('$1').
 
-Buckets -> Buckets comma Bucket : make_list('$1', '$3').
-Buckets -> Bucket               : '$1'.
+%% Support early error on multi-table select
+Buckets -> Bucket comma Bucket : make_list('$1', '$3').
 
 Bucket -> Identifier   : '$1'.
 
@@ -348,6 +351,7 @@ RowValue -> FieldValue : ['$1'].
 
 FieldValue -> integer : '$1'.
 FieldValue -> float : '$1'.
+FieldValue -> TruthValue : '$1'.
 FieldValue -> CharacterLiteral : '$1'.
 FieldValue -> Identifier : '$1'.
 
@@ -434,7 +438,10 @@ convert(#outputs{type = create} = O) ->
 %% make_atom({binary, SomeWord}) ->
 %%     {atom, binary_to_atom(SomeWord, utf8)}.
 
-make_select(A, B, C, D) -> make_select(A, B, C, D, {where, []}).
+make_select({select, multi_table_error}, _B, _C, _D) ->
+    return_error(0, <<"Must provide exactly one table name">>);
+make_select(A, B, C, D) ->
+    make_select(A, B, C, D, {where, []}).
 
 make_select({select, _SelectBytes},
             Select,
