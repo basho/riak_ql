@@ -90,7 +90,7 @@ Time quantisation is done by the module:
 
 Please read the inline documentation for this module.
 
-### 4.iv DDL Compiler
+###  DDL Compiler
 
 The DDL compiler is implemented by:
 
