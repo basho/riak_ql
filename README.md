@@ -16,9 +16,8 @@ This README is an overview of the repo individual sub-systems have their own doc
 
 This document contains the following sections (marked as to their completeness)
 
-Repository Contents
-Summary
-
+1 Repository Contents
+2 Summary
 * Runtime Tools
 * SQL Lexer/Parser
 * Time Quantiser Fn
@@ -101,7 +100,6 @@ When a `CREATE TABLE...` statement if fed into the lexer/parser it generates a `
 The module `riak_ql_ddl_compiler.erl` performs the compilation and the module `riak_ql_ddl.erl` provides a set of wrappers around the compiled module to add utility functions to the API.
 
 For more details see the [DDL Compiler](./doc/ddl_compiler.md)
-
 
 ###  Runtime Query Fns
 
