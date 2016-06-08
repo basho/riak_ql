@@ -111,5 +111,5 @@ The runtime query system performs operations on data in the query pipeline by ca
 
 ### Testing Strategy
 
-Details of the testing strategy are written up in [`riak_test` And Test Strategy](./doc/riak_test_and_test_strategy)
+Details of the testing strategy are written up in [`riak_test` And Test Strategy](./doc/riak_test_and_test_strategy.md)
 
