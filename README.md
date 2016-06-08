@@ -1,6 +1,6 @@
 # Riak QL
 
-## 1 Introduction
+## Introduction
 
 riak_ql provides a number of different functions to Riak
 
@@ -12,21 +12,21 @@ Link to the official and still private [docs](https://github.com/basho/private_b
 
 This README is an overview of the repo individual sub-systems have their own documentation which will be linked to as appropriate.
 
-## 2 Table Of Contents
+## Table Of Contents
 
 This document contains the following sections (marked as to their completeness)
 
-1 Introduction
-2 Table Of Contents
-3 Repository Contents
-4 Summary
-4.i Runtime Tools
-4.ii SQL Lexer/Parser
-4.iii Time Quantiser Fn
-4.iv DDL Compiler
-4.v Runtime Query Fns
+Repository Contents
+Summary
 
-## 3 Repository Contents
+* Runtime Tools
+* SQL Lexer/Parser
+* Time Quantiser Fn
+* DDL Compiler
+* Runtime Query Fns
+* Testing Strategy
+
+## Repository Contents
 
 This application contains the following files:
 
@@ -41,9 +41,9 @@ This application contains the following files:
 
 ----
 
-## 4 Summary
+## Summary
 
-### 4.i Runtime Tools
+### Runtime Tools
 
 There is an escript that lets you run the lexer/parser from the command line - it is designed to help developers/operators check their syntax, etc, etc
 
@@ -51,7 +51,7 @@ There is an escript that lets you run the lexer/parser from the command line - i
 
 Please read the inline documentation for this module.
 
-### 4.ii SQL Lexer/Parser
+### SQL Lexer/Parser
 
 The SQL Lexer/Parser is takes a string representation of a SQL query and then compiles. The modules that perform this are:
 
@@ -81,7 +81,7 @@ This code generates one of 2 output records:
 
 **NOTE:** the output of the lexer is a proplist of record field names and values - the actual record is constructed *over the fence* from `riak_ql` in `riak_kv` for the purposes of simplifying inter-repo dependency management.
 
-### 4.iii Time Quantiser
+### Time Quantiser
 
 Time quantisation is done by the module:
 
@@ -103,10 +103,13 @@ The module `riak_ql_ddl_compiler.erl` performs the compilation and the module `r
 For more details see the [DDL Compiler](./doc/ddl_compiler.md)
 
 
-### 4.v Runtime Query Fns
+###  Runtime Query Fns
 
 The runtime query system performs operations on data in the query pipeline by calling a set of library functions. These are defined in:
 
 * `riak_ql_window_agg_fns.erl`
 
+### Testing Strategy
+
+Details of the testing strategy are written up in [`riak_test` And Test Strategy](./doc/riak_test_and_test_strategy)
 
