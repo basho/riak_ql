@@ -17,7 +17,9 @@ This README is an overview of the repo individual sub-systems have their own doc
 This document contains the following sections (marked as to their completeness)
 
 1 Repository Contents
+
 2 Summary
+
 * Runtime Tools
 * SQL Lexer/Parser
 * Time Quantiser Fn
