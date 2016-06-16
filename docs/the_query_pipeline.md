@@ -1,19 +1,20 @@
 # The Query Pipeline
 
-## 1	Introduction
+## Introduction
 
 This documenation describes:
 
-* Section 2 - client-to-query processing
-* Section 3 - query validation before execution
-* Section 4 - query rewriting for execution
+* Client-to-query processing
+* Query validation before execution
+* Query rewriting for execution
 
+---
 
-## 2 Client-to-Query Processing
+## Client-to-Query Processing
 
 This section shows the lifecyle of an SQL `SELECT` request
 
-### 2.a Process Overview
+### Client-to-Query Processing - Process Overview
 
 ```
 Client-side   +--+
@@ -26,7 +27,7 @@ parameterised +--+
 query
 ```
 
-### 2.b Conformance with the SQL Foundation Document
+### Client-to-Query Processing - Conformance with the SQL Foundation Document
 
 It is worthing making the point about conformance with the spec at this stage. Below is an extract from the `riak_ql_parser.yrl` language definition of a Numeric Value Expression:
 
@@ -66,7 +67,7 @@ ASTERISK = (\*)
 SOLIDUS  = (/)
 ```
 
-### 2.c The Role Of Canonicalisation
+### Client-to-Query Processing - The Role Of Canonicalisation
 
 The lexer/parser output is canonicalised in a number of ways - this is to ensure that SQL statements that are logically *equivalent* have an *identical* (not merely *equivalent*) output.
 
@@ -112,13 +113,15 @@ The `WHERE` clause is canonicalised here - with a particular eye on simplifying 
 
 **TODO:** break the canconicaliser out into its own module
 
-### 2.d Proplist Output
+### Client-to-Query Processing - Proplist Output
 
 By emitting a proplist (or set of nested proplists) whose key equate to record fields. This is to decouple dependencies on `.hrl` files between `riak_kv` and `riak_ql` and make multi-repo releases less of a pain in the neck to wrestle out of the door.
 
-## 3 Query Validation Before Execution
+---
 
-### 3.a Overview
+## Query Validation Before Execution
+
+### Query Validation Before Execution - Overview
 
 The output of the lexer/parser is a valid SQL statement - but that doesn't not correspond to a valid query. There are three different types of validation that the query must pass before it is executable:
 
@@ -161,15 +164,15 @@ In future the restriction on *key covering* queries will be relaxed but other va
 
 The DDL helper functions emitted by the DDL Compiler are key here - see the [DDL Compiler](./ddl_compiler.md)
 
-### 3.b Valid Fields
+### Query Validation Before Execution - Valid Fields
 
 This stage of the validation is straightforward, iterate over the Lisp outputs that corrspond to the `SELECT` and `WHERE` clauses and for every leaf that is a field reference check that its name corresponds to a declared field.
 
-### 3.c Time Series Key Restrictions
+### Query Validation Before Execution - Time Series Key Restrictions
 
 The key restrictions are enforced with the BFL methodology - *brute force and ignorance*. `WHERE` clauses that completley cover the key space are accepted, the rest are errored.
 
-### 3.d Typesafe Arithmetic
+### Query Validation Before Execution - Typesafe Arithmetic
 
 This is similar to the first validation - the Lisp of the `SELECT` clause needs to be iterated over - and two checks performed:
 
@@ -182,13 +185,15 @@ The validator requires information from the DDL helper module as well as the typ
 
 **NOTE:** wherever possible functions that validate queries should be generated directly into the helper modules - they are fast, efficient, testable and behave predicatably with different underlying data schemas
 
-### 3.e Output
+### Query Validation Before Execution - Output
 
 The SQL query is not changed by the validation process. A given query is either valid - in which case it passed on to the query sub-system for execution - or it is invalid - in which case an appropriate error message is sent back to the user who submitted it.
 
-## 4 Query Rewriting For Execution
+---
 
-### 4.a Theory
+## Query Rewriting For Execution
+
+### Query Rewriting For Execution - Theory
 
 The query rewriter can be thought of the in the following terms:
 
@@ -202,7 +207,7 @@ The query rewriter can be thought of the in the following terms:
   * the query compiler may, based on heuristics, put two queries with the same **declarative** form through different **executable** query plans that have different execution costs
 * the data structure that describes a query can be made recursive by hoisting `SELECT`, `WHERE`, (not-yet-implemented) `GROUP BY` or (not-yet-implemented) `ORDER` clauses into the `FROM` clause and rewriting them
 
-### 4.b The `riak_sql_select_v1{}` Record
+### Query Rewriting For Execution - The `riak_sql_select_v1{}` Record
 
 ```erlang
 -record(riak_select_v1,
@@ -241,7 +246,7 @@ Notice that the fields in the record fall into 2 disctinct categories:
   * `cover_context`
   * `local_key`
 
-### 4.c Notes On Terminology
+### Query Rewriting For Execution - Notes On Terminology
 
 At the heart of thinking about query pipelines is the notion of **tables** which have **column descriptors** and **rows of data**. These are make visible by the riak-shell:
 
@@ -281,7 +286,7 @@ table returned to user <-----------+ table fragements created in pipeline
                          Operation
 ```
 
-### 4.d Understanding The Query Pipeline
+### Query Rewriting For Execution - Understanding The Query Pipeline
 
 We can conceptualise the **declarative** statements as being logically related. Consider the following transforms (operating right to left, of course):
 
@@ -586,8 +591,12 @@ Strategically we wish to implement all operators in the pipeline (`FROM`, `SELEC
 ```
 
 
-### 4.e Notes Of The Datastructure
+### Query Rewriting For Execution - Notes Of The Datastructure
 
 The important thing about the  `riak_sql_select_v1{}` record is that it takes many forms. It contains a number of fields which are semantically consistent but which have implementation differences. SQL is a declarative language and the SQL clause structure is preservered, so fields like `SELECT`, `FROM`, `WHERE`, `ORDER BY` and `LIMIT` may contain different data structures for the purposes of execution but which carry the same sematic burden.
 
 It would have been possible to have each stage of the pipeline have its own record - and this seems sensible in Time Series when there are basically 2 major types (`sql` and `timeseries`) but already there are several unimplemented ones shadowly emerging on the road map (eg `TS full table scan`, `composite key read`). The Spark connector integration could easily be constructed as a new record. This approach would lead to a lot of different records with very similar names and structures.
+
+----
+
+# FIN

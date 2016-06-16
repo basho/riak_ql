@@ -14,12 +14,9 @@ This README is an overview of the repo individual sub-systems have their own doc
 
 ## Table Of Contents
 
-This document contains the following sections (marked as to their completeness)
+This document contains the following sections:
 
-1 Repository Contents
-
-2 Summary
-
+* Repository Contents
 * Runtime Tools
 * SQL Lexer/Parser
 * Time Quantiser Fn
@@ -42,9 +39,7 @@ This application contains the following files:
 
 ----
 
-## Summary
-
-### Runtime Tools
+## Runtime Tools
 
 There is an escript that lets you run the lexer/parser from the command line - it is designed to help developers/operators check their syntax, etc, etc
 
@@ -52,7 +47,7 @@ There is an escript that lets you run the lexer/parser from the command line - i
 
 Please read the inline documentation for this module.
 
-### SQL Lexer/Parser
+## SQL Lexer/Parser
 
 The SQL Lexer/Parser is takes a string representation of a SQL query and then compiles. The modules that perform this are:
 
@@ -82,7 +77,7 @@ This code generates one of 2 output records:
 
 **NOTE:** the output of the lexer is a proplist of record field names and values - the actual record is constructed *over the fence* from `riak_ql` in `riak_kv` for the purposes of simplifying inter-repo dependency management.
 
-### Time Quantiser
+## Time Quantiser
 
 Time quantisation is done by the module:
 
@@ -90,7 +85,7 @@ Time quantisation is done by the module:
 
 Please read the inline documentation for this module.
 
-###  DDL Compiler
+## DDL Compiler
 
 The DDL compiler is implemented by:
 
@@ -103,13 +98,12 @@ The module `riak_ql_ddl_compiler.erl` performs the compilation and the module `r
 
 For more details see the [DDL Compiler](./doc/ddl_compiler.md)
 
-###  Runtime Query Fns
+## Runtime Query Fns
 
 The runtime query system performs operations on data in the query pipeline by calling a set of library functions. These are defined in:
 
 * `riak_ql_window_agg_fns.erl`
 
-### Testing Strategy
+## Testing Strategy
 
 Details of the testing strategy are written up in [`riak_test` And Test Strategy](./doc/riak_test_and_test_strategy.md)
-

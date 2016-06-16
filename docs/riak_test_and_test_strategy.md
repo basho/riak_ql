@@ -51,6 +51,8 @@ The `ts_degraded_*` tests run against a cluster with at least 1 member taken dow
 
 The theory is that bugs that a test suite checks for cast shadows down the suite - so if there is a unit test failing in 1 - then it should appear as failures in some or all of 2, 3, 4, 5 and 6.
 
+The main Quick Check tests are the backstop.
+
 ---
 
 ## Self Triaging Test Suite
