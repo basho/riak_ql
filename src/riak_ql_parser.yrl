@@ -425,7 +425,8 @@ convert(#outputs{type    = select,
                  fields  = F,
                  limit   = L,
                  where   = W,
-                 group_by = G}) ->
+                 group_by = G} = Outputs) ->
+    ok = validate_select_query(Outputs),
     [
      {type, select},
      {tables, B},
@@ -436,6 +437,23 @@ convert(#outputs{type    = select,
     ];
 convert(#outputs{type = create} = O) ->
     O.
+
+validate_select_query(Outputs) ->
+    ok = assert_group_by_select(Outputs).
+
+%% If the query uses GROUP BY then check that the identifiers in the select
+%% all exist in the GROUP BY.
+assert_group_by_select(#outputs{ group_by = [] }) ->
+    ok;
+assert_group_by_select(#outputs{ fields = Fields, group_by = GroupBy }) ->
+    IllegalFields =
+        [binary_to_list(F)|| {identifier, [F]} <- Fields, not lists:member({identifier, F}, GroupBy)],
+    case IllegalFields of
+        [] ->
+            ok;
+        _ ->
+            return_error(0, "Field(s) " ++ string:join(IllegalFields,", ") ++ " are specified in the select statement but not the GROUP BY.")
+    end.
 
 make_select({select, multi_table_error}, _B, _C, _D) ->
     return_error(0, <<"Must provide exactly one table name">>);
