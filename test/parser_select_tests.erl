@@ -138,7 +138,6 @@ select_quoted_escape_sql_test() ->
                 ]}
        ]).
 
-
 group_by_one_field_test() ->
     Query_sql =
         "SELECT b FROM mytab "
@@ -198,5 +197,15 @@ selection_fields_must_be_in_group_by_3_test() ->
         "GROUP BY a, b",
     ?assertEqual(
         {error, {0, riak_ql_parser, "Field(s) d are specified in the select statement but not the GROUP BY."}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+field_in_aggregate_function_does_not_have_to_be_in_group_by_test() ->
+    Query_sql =
+        "SELECT AVG(x) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertMatch(
+        {select, [_|_]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
