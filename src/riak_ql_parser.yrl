@@ -446,14 +446,44 @@ validate_select_query(Outputs) ->
 assert_group_by_select(#outputs{ group_by = [] }) ->
     ok;
 assert_group_by_select(#outputs{ fields = Fields, group_by = GroupBy }) ->
-    IllegalFields =
-        [binary_to_list(F)|| {identifier, [F]} <- Fields, not lists:member({identifier, F}, GroupBy)],
-    case IllegalFields of
+    Identifiers = lists:flatten(
+        [lists:reverse(find_group_identifiers(ColumnSelect, [])) || ColumnSelect <- Fields]),
+    IllegalIdentifiers =
+        [to_identifier_name(Identifier)|| Identifier <- Identifiers, not is_identifier_in_groups(Identifier, GroupBy)],
+    case IllegalIdentifiers of
         [] ->
             ok;
         _ ->
-            return_error(0, "Field(s) " ++ string:join(IllegalFields,", ") ++ " are specified in the select statement but not the GROUP BY.")
+            return_error_flat("Field(s) " ++ string:join(IllegalIdentifiers,", ") ++ " are specified in the select statement but not the GROUP BY.")
     end.
+
+%%
+is_identifier_in_groups({identifier, [F]}, GroupBy) ->
+    lists:member({identifier, F}, GroupBy);
+is_identifier_in_groups(Identifier, GroupBy) ->
+    lists:member(Identifier, GroupBy).
+
+%% Identifier field name as a string.
+to_identifier_name({identifier, [F]}) ->
+    binary_to_list(F);
+to_identifier_name({identifier, F}) ->
+    binary_to_list(F).
+
+%% Recurse through a column in the select clause to find identifiers that must
+%% be specified in the GROUP BY.
+find_group_identifiers({identifier, [<<"*">>]} = Identifier, Acc) ->
+    [Identifier|Acc];
+find_group_identifiers({identifier, _} = Identifier, Acc) ->
+    [Identifier|Acc];
+find_group_identifiers({negate, Expr}, Acc) ->
+    find_group_identifiers(Expr, Acc);
+find_group_identifiers({Op, Left, Right}, Acc) when is_atom(Op) ->
+    find_group_identifiers(Right, find_group_identifiers(Left, Acc));
+find_group_identifiers({{window_agg_fn, _}, _}, Acc) ->
+    %% identifiers in aggregate functions are ok
+    Acc;
+find_group_identifiers({_, _}, Acc) ->
+    Acc.
 
 make_select({select, multi_table_error}, _B, _C, _D) ->
     return_error(0, <<"Must provide exactly one table name">>);

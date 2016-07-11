@@ -176,7 +176,7 @@ selection_fields_must_be_in_group_by_1_test() ->
         "WHERE a = 1 "
         "GROUP BY a, b",
     ?assertEqual(
-        {error, {0, riak_ql_parser, "Field(s) c are specified in the select statement but not the GROUP BY."}},
+        {error, {0, riak_ql_parser, <<"Field(s) c are specified in the select statement but not the GROUP BY.">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
@@ -186,7 +186,7 @@ selection_fields_must_be_in_group_by_2_test() ->
         "WHERE a = 1 "
         "GROUP BY a, b",
     ?assertEqual(
-        {error, {0, riak_ql_parser, "Field(s) c, d are specified in the select statement but not the GROUP BY."}},
+        {error, {0, riak_ql_parser, <<"Field(s) c, d are specified in the select statement but not the GROUP BY.">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
@@ -196,7 +196,47 @@ selection_fields_must_be_in_group_by_3_test() ->
         "WHERE a = 1 "
         "GROUP BY a, b",
     ?assertEqual(
-        {error, {0, riak_ql_parser, "Field(s) d are specified in the select statement but not the GROUP BY."}},
+        {error, {0, riak_ql_parser, <<"Field(s) d are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+selection_fields_must_be_in_group_by_arithmetic_left_test() ->
+    Query_sql =
+        "SELECT d + 1 FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) d are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+selection_fields_must_be_in_group_by_arithmetic_left_right_test() ->
+    Query_sql =
+        "SELECT d + e FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) d, e are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+selection_fields_must_be_in_group_by_arithmetic_right_test() ->
+    Query_sql =
+        "SELECT 2 + d FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) d are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+select_all_not_allowed_as_column_with_group_by_test() ->
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) * are specified in the select statement but not the GROUP BY.">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
