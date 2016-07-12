@@ -33,7 +33,7 @@ There are six layers of tests, which should be fixed in descending order:
 
 5 `ts_*_eqc` QuickCheck tests running under `riak_test` (these are still under development)
 * 'good' input tests based on generating valid inputs
-* 'bad' input tests based on generaing invalid inputs
+* 'bad' input tests based on generating invalid inputs
 
 6 `ts_updgrade_downgrade_*_eqc` upgrade/downgrade QuickCheck tests running under `riak_test` (these are still under development)
 

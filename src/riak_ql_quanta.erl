@@ -13,7 +13,7 @@
 %% The function <em>quanta/4</em> takes 2 times in milliseconds and size of the quantum
 %% and the of units of said quantum and returns a list of quantum boundaries that span the time
 %%
-%% Copyright (c) 2007-2016 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2015-2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file

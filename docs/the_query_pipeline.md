@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This documenation describes:
+This documentation describes:
 
 * Client-to-query processing
 * Query validation before execution
@@ -12,7 +12,7 @@ This documenation describes:
 
 ## Client-to-Query Processing
 
-This section shows the lifecyle of an SQL `SELECT` request
+This section shows the life-cycle of an SQL `SELECT` request
 
 ### Client-to-Query Processing - Process Overview
 
@@ -29,7 +29,7 @@ query
 
 ### Client-to-Query Processing - Conformance with the SQL Foundation Document
 
-It is worthing making the point about conformance with the spec at this stage. Below is an extract from the `riak_ql_parser.yrl` language definition of a Numeric Value Expression:
+It is worth making the point about conformance with the spec at this stage. Below is an extract from the `riak_ql_parser.yrl` language definition of a Numeric Value Expression:
 
 ```erlang
 %% 6.27 NUMERIC VALUE EXPRESSION
@@ -54,7 +54,7 @@ Term ->
      (...)
 ```
 
-This is the corresponsing section of the SQL Foundation Document:
+This is the corresponding section of the SQL Foundation Document:
 
 ![SQL Foundation Document](./img/SQL_Foundation_Doc.png)
 
@@ -115,7 +115,7 @@ The `WHERE` clause is canonicalised here - with a particular eye on simplifying 
 
 ### Client-to-Query Processing - Proplist Output
 
-By emitting a proplist (or set of nested proplists) whose key equate to record fields. This is to decouple dependencies on `.hrl` files between `riak_kv` and `riak_ql` and make multi-repo releases less of a pain in the neck to wrestle out of the door.
+By emitting a proplist (or set of nested proplists) whose keys equate to record fields. This is to decouple dependencies on `.hrl` files between `riak_kv` and `riak_ql` and make multi-repo releases less of a pain in the neck to wrestle out of the door.
 
 ---
 
@@ -123,7 +123,7 @@ By emitting a proplist (or set of nested proplists) whose key equate to record f
 
 ### Query Validation Before Execution - Overview
 
-The output of the lexer/parser is a valid SQL statement - but that doesn't not correspond to a valid query. There are three different types of validation that the query must pass before it is executable:
+The output of the lexer/parser is a valid SQL statement - but one that does not correspond to a valid query. There are three different types of validation that the query must pass before it is executable:
 
 * do the fields in various query clauses correspond to fields in the underlying declared table defined by a `CREATE TABLE` statement? The clauses that must be checked are:
 
@@ -134,7 +134,7 @@ The output of the lexer/parser is a valid SQL statement - but that doesn't not c
 * TS can only run a subset of queries at the moment
   * 'the `WHERE` clause of the query must cover the partition and local keys'
 * are any arithmetic operations in the `SELECT` (or the other as-yet-unimplemented clauses) type safe?
-  * for instance you can't divide `varchars` by `integers`
+  * for instance you can't divide a `varchar` by an `integer`
 
 ```
                                     |
@@ -166,13 +166,13 @@ The DDL helper functions emitted by the DDL Compiler are key here - see the [DDL
 
 ### Query Validation Before Execution - Valid Fields
 
-This stage of the validation is straightforward, iterate over the Lisp outputs that corrspond to the `SELECT` and `WHERE` clauses and for every leaf that is a field reference check that its name corresponds to a declared field.
+This stage of the validation is straightforward: iterate over the Lisp outputs that correspond to the `SELECT` and `WHERE` clauses and for every leaf that is a field reference check that its name corresponds to a declared field.
 
 ### Query Validation Before Execution - Time Series Key Restrictions
 
-The key restrictions are enforced with the BFL methodology - *brute force and ignorance*. `WHERE` clauses that completley cover the key space are accepted, the rest are errored.
+The key restrictions are enforced with the BFL methodology - *brute force and ignorance*. `WHERE` clauses that completely cover the key space are accepted, the rest are errored.
 
-### Query Validation Before Execution - Typesafe Arithmetic
+### Query Validation Before Execution - Typesafe Arithmetic Expressions
 
 This is similar to the first validation - the Lisp of the `SELECT` clause needs to be iterated over - and two checks performed:
 
@@ -183,7 +183,7 @@ This is similar to the first validation - the Lisp of the `SELECT` clause needs 
 
 The validator requires information from the DDL helper module as well as the type specs from modules that implement the functions (eg `COUNT`, `AVG`, `SUM`) as well as arithmetic operators (`+`, `-`, `/` or `*`) to perform this validation.
 
-**NOTE:** wherever possible functions that validate queries should be generated directly into the helper modules - they are fast, efficient, testable and behave predicatably with different underlying data schemas
+**NOTE:** wherever possible functions that validate queries should be generated directly into the helper modules - they are fast, efficient, testable and behave predictably with different underlying data schemas
 
 ### Query Validation Before Execution - Output
 
@@ -203,7 +203,7 @@ The query rewriter can be thought of the in the following terms:
   * this is a statement of the results the users would like to see
 * the output is **executable**
   * this is how Riak will return results that match the users declaration
-* there is **NOT** a one-to-one correspondence between the **declerative** input and the **executable** output
+* there is **NOT** a one-to-one correspondence between the **declarative** input and the **executable** output
   * the query compiler may, based on heuristics, put two queries with the same **declarative** form through different **executable** query plans that have different execution costs
 * the data structure that describes a query can be made recursive by hoisting `SELECT`, `WHERE`, (not-yet-implemented) `GROUP BY` or (not-yet-implemented) `ORDER` clauses into the `FROM` clause and rewriting them
 
@@ -231,7 +231,7 @@ The query rewriter can be thought of the in the following terms:
         }).
 ```
 
-Notice that the fields in the record fall into 2 disctinct categories:
+Notice that the fields in the record fall into 2 distinct categories:
 
 * **declarative** fields which contain the users intention
   * `SELECT`
@@ -282,7 +282,7 @@ single SQL statement written by user +----------------> many SQL fragments execu
 Consequently the query pipeline operates right to left:
 
 ```
-table returned to user <-----------+ table fragements created in pipeline
+table returned to user <-----------+ table fragments created in pipeline
                          Operation
 ```
 
@@ -387,7 +387,7 @@ In this context `FROM` can be considered to be the identity operator:
 
 Using this knowledge we can trivially rewrite an SQL statement as a series of nested SQL statements - with the nesting being implemented as a logical pipeline.
 
-Let us see this happening for a simple SQL statement:
+Let us see this happening for a simple SQL statement (**Note** this is not a valid timeseries query - it is for expository purposes only):
 
 ```sql
 SELECT, height, weight FROM mytable WHERE height > 10;
@@ -409,7 +409,7 @@ This can be rewritten into queries - the results of the right hand of which is o
 + WHERE    []                      + WHERE    height > 10
 ```
 
-This process is trivially recursive. For operational reasons these operations must be chunked (to prevent memory overflow, unchuncked queries would simply load all the data in to memory, which kinda obviates the very existance of databases as a technology).
+This process is trivially recursive. For operational reasons these operations must be chunked (to prevent memory overflow, unchuncked queries would simply load all the data in to memory, which kinda obviates the very existence of databases as a technology).
 
 ```
 +-------+-------+                  +-------+-------+-------+
@@ -492,8 +492,8 @@ This becomes (again executing right-to-left):
 Note 3 things:
 
 * the `FROM` clauses are now no longer logical `FROM`s they are physical `FROM`s - a coverage plan has been constructed and these SQL statements have been dispatched to vnodes to run
-* the `WHERE` clause has now be reweritten from a **declarative** one to a **executable** one - it has a leveldb start and end key to scan and then a clause to run on all values between those end points
-* this diagram includes the physical locations the various pipeline functions run at - on the right hand side the C++ vnodes, on the left the Erlang co-ordinator (inside the query sub-system)
+* the `WHERE` clause has now be rewritten from a **declarative** one to a **executable** one - it has a leveldb start and end key to scan and then a clause to run on all values between those end points
+* this diagram includes the physical locations the various pipeline functions run at - on the right hand side the C++ vnodes, on the left the Erlang coordinator (inside the query sub-system)
 
 This is an accurate view of how Riak TS 1.2 would rewrite that statement. But there is an another obvious, semantically equivalent form that it could be rewritten to, and which would be more efficient (which will be implemented from Riak TS 1.3 onwards):
 
@@ -528,11 +528,11 @@ This is an accurate view of how Riak TS 1.2 would rewrite that statement. But th
                                              + temp      > 18
 ```
 
-Performing the selection (which is a column reduction) at the vnode (the right hand side) means that less data is shipped around the cluster than in the case where the selection is performed at the left hand side (in the query co-ordinator). Imagine if the table `mytable` had 100 columns.
+Performing the selection (which is a column reduction) at the vnode (the right hand side) means that less data is shipped around the cluster than in the case where the selection is performed at the left hand side (in the query coordinator). Imagine if the table `mytable` had 100 columns.
 
-This the last essential operation of a query system, building a query plan. This is the most effecient way to rewrite this query to execute with this table which is loaded with data of this *shape* on a riak cluster with this many nodes and ring of this size.
+This the last essential operation of a query system, building a query plan. This is the most efficient way to rewrite this query to execute with this table which is loaded with data of this *shape* on a riak cluster with this many nodes and ring of this size.
 
-Strategically the operations are undifferentiated between the Erlang co-ordinator and the leveldb C++ code. We can see why this is the general case if we rewrite the following SQL function:
+Strategically the operations are undifferentiated between the Erlang coordinator and the leveldb C++ code. We can see why this is the general case if we rewrite the following SQL function:
 
 ```sql
 SELECT AVG(temp) FROM mytimeseries WHERE family = 'myfamily', series = 'myseries', timestamp > 1233
@@ -574,7 +574,7 @@ This becomes (again executing right-to-left):
 
 Notice that the `AVG` function has been broken into a `SUM` and a `COUNT` to be run in the C++ code and another pair of `SUM`s to be run in the Erlang Node.
 
-Strategically we wish to implement all operators in the pipeline (`FROM`, `SELECT`, `WHERE`, `GROUP BY`, `ORDER BY`) as an Erlang behaviour (or a behaviour-like construct in C++, a set of function callbacks with defined specs) and this behaviour MUST be identically callable from both the Erlang co-ordinator and within the C++ leveldb code:
+Strategically we wish to implement all operators in the pipeline (`FROM`, `SELECT`, `WHERE`, `GROUP BY`, `ORDER BY`) as an Erlang behaviour (or a behaviour-like construct in C++, a set of function callbacks with defined specs) and this behaviour MUST be identically callable from both the Erlang coordinator and within the C++ leveldb code:
 ```
 +-------+-------+                  +-------+-------+-------+
 | ColX  | ColY  |                  | Col1  | Col2  | Col3  |
@@ -590,10 +590,21 @@ Strategically we wish to implement all operators in the pipeline (`FROM`, `SELEC
                                    +-------+-------+-------+
 ```
 
+### TS Queries Vs other riak Coverage Plans
 
-### Query Rewriting For Execution - Notes Of The Datastructure
+There are multiple different strategies for querying data in Riak. It is important to understand how TS is different.
 
-The important thing about the  `riak_sql_select_v1{}` record is that it takes many forms. It contains a number of fields which are semantically consistent but which have implementation differences. SQL is a declarative language and the SQL clause structure is preservered, so fields like `SELECT`, `FROM`, `WHERE`, `ORDER BY` and `LIMIT` may contain different data structures for the purposes of execution but which carry the same sematic burden.
+There is a blanket query mechanism that requires the query to access the entire keyspace. An example of this would be the 'list buckets' operation - every underlying key in the database is iterated over and a list of unique buckets is returned. To work correctly for all buckets and bucket types (including those created with an `n_val` of 1) such a query needs to iterate over each vnode's keyspace.
+
+Other operations, like list the keys in a bucket operate on a more narrow basis. By examining the n_val for a bucket a sub-set of vnodes can be queried. For instance in normal operations `ring-size/n_val + 1` vnodes contain all the relevant information. A coverage plan that visits those vnodes with multiple key ranges will find all the keys.
+
+2i behaves similary with respect to a sub-set of the ring - except it visits the index space of the ring - not the key-value part.
+
+Time Series is much more like a single key read. The query comes in and is compiled into up to 5 sub-queries. Each of these sub-queries is like a normal KV single-key read for coverage purposes: go to one of the primaries of this vnode and get me the data (in this case a sub-range, not a value).
+
+### Query Rewriting For Execution - Notes Of The Data-structure
+
+The important thing about the  `riak_sql_select_v1{}` record is that it takes many forms. It contains a number of fields which are semantically consistent but which have implementation differences. SQL is a declarative language and the SQL clause structure is preserved, so fields like `SELECT`, `FROM`, `WHERE`, `ORDER BY` and `LIMIT` may contain different data structures for the purposes of execution but which carry the same semantic burden.
 
 It would have been possible to have each stage of the pipeline have its own record - and this seems sensible in Time Series when there are basically 2 major types (`sql` and `timeseries`) but already there are several unimplemented ones shadowly emerging on the road map (eg `TS full table scan`, `composite key read`). The Spark connector integration could easily be constructed as a new record. This approach would lead to a lot of different records with very similar names and structures.
 
