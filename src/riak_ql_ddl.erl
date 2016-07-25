@@ -72,6 +72,7 @@
 -export([
          get_local_key/2, get_local_key/3,
          get_partition_key/2, get_partition_key/3,
+         get_table/1,
          insert_sql_columns/2,
          is_insert_valid/3,
          is_query_valid/3,
@@ -130,6 +131,9 @@ maybe_mangle_char(C) when (C >= $a andalso C =< $z);
 maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
+-spec get_table(?DDL{}) -> term().
+get_table(?DDL{table = T}) ->
+    T.
 
 -spec get_partition_key(?DDL{}, tuple(), module()) -> term().
 get_partition_key(?DDL{partition_key = PK}, Obj, Mod)
