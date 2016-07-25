@@ -10,6 +10,7 @@ StatementWithoutSemicolon
 Query
 Select
 Describe
+ShowTables
 Bucket
 Buckets
 Field
@@ -108,9 +109,11 @@ regex
 right_paren
 select
 semicolon
+show
 sint64
 solidus
 table
+tables
 timestamp
 true
 values
@@ -129,6 +132,7 @@ StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
 StatementWithoutSemicolon -> Insert : '$1'.
+StatementWithoutSemicolon -> ShowTables : '$1'.
 
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
@@ -198,6 +202,8 @@ Comp -> nomatch                : '$1'.
 %% Comp -> notapprox           : '$1'.
 
 CreateTable -> create table : create_table.
+
+ShowTables -> show tables : [{type, show_tables}].
 
 NotNull -> not_ null : '$1'.
 
