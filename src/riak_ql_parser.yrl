@@ -9,6 +9,7 @@ Statement
 StatementWithoutSemicolon
 Query
 Select
+Explain
 Describe
 ShowTables
 Bucket
@@ -83,6 +84,7 @@ create
 describe
 double
 equals_operator
+explain
 false
 float
 from
@@ -131,6 +133,7 @@ Statement -> StatementWithoutSemicolon semicolon : '$1'.
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
+StatementWithoutSemicolon -> Explain : '$1'.
 StatementWithoutSemicolon -> Insert : '$1'.
 StatementWithoutSemicolon -> ShowTables : '$1'.
 
@@ -142,6 +145,9 @@ Select -> select Fields from Buckets : make_select({select, multi_table_error}, 
 
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
+
+%% EXPLAIN STATEMENT
+Explain -> explain Query : make_explain('$2').
 
 %% 20.9 DESCRIBE STATEMENT
 Describe -> describe Bucket : make_describe('$2').
@@ -378,7 +384,7 @@ Erlang code.
 
 -record(outputs,
         {
-          type :: create | describe | insert | select,
+          type :: create | describe | explain | insert | select,
           buckets = [],
           fields  = [],
           limit   = [],
@@ -474,6 +480,11 @@ make_describe({identifier, D}) ->
      {type, describe},
      {identifier, D}
     ].
+
+%% For explain just change the output type
+make_explain(#outputs{type = select} = S) ->
+    Props = convert(S),
+    lists:keyreplace(type, 1, Props, {type, explain}).
 
 make_insert({identifier, Table}, Fields, Values) ->
     FieldsAsList = case is_list(Fields) of
