@@ -78,20 +78,20 @@ create_timeseries_sql_test() ->
                            ],
                   partition_key = #key_v1{
                                      ast = [
-                                            #param_v1{name = [<<"geohash">>]},
-                                            #param_v1{name = [<<"user">>]},
+                                            ?PARAM{name = [<<"geohash">>]},
+                                            ?PARAM{name = [<<"user">>]},
                                             #hash_fn_v1{mod  = riak_ql_quanta,
                                                         fn   = quantum,
                                                         args = [
-                                                                #param_v1{name = [<<"time">>]}, 15, m
+                                                                ?PARAM{name = [<<"time">>]}, 15, m
                                                                ],
                                                         type = timestamp}
                                            ]},
                   local_key = #key_v1{
                                  ast = [
-                                        #param_v1{name = [<<"geohash">>]},
-                                        #param_v1{name = [<<"user">>]},
-                                        #param_v1{name = [<<"time">>]}
+                                        ?PARAM{name = [<<"geohash">>]},
+                                        ?PARAM{name = [<<"user">>]},
+                                        ?PARAM{name = [<<"time">>]}
                                        ]}
                  },
     ?assertEqual(Expected, Got).
@@ -182,21 +182,21 @@ create_all_types_sql_test() ->
                   partition_key =
                       #key_v1{
                          ast = [
-                                #param_v1{name = [<<"user">>]},
-                                #param_v1{name = [<<"geohash">>]},
+                                ?PARAM{name = [<<"user">>]},
+                                ?PARAM{name = [<<"geohash">>]},
                                 #hash_fn_v1{mod  = riak_ql_quanta,
                                             fn   = quantum,
                                             args = [
-                                                    #param_v1{name = [<<"time">>]}, 15, m
+                                                    ?PARAM{name = [<<"time">>]}, 15, m
                                                    ],
                                             type = timestamp}
                                ]},
                   local_key =
                       #key_v1{
                          ast = [
-                                #param_v1{name = [<<"user">>]},
-                                #param_v1{name = [<<"geohash">>]},
-                                #param_v1{name = [<<"time">>]}
+                                ?PARAM{name = [<<"user">>]},
+                                ?PARAM{name = [<<"geohash">>]},
+                                ?PARAM{name = [<<"time">>]}
                                ]}
                  },
     ?assertEqual(Expected, Got).
@@ -340,15 +340,15 @@ no_quanta_in_primary_key_is_ok_test() ->
            partition_key =
                #key_v1{
                   ast = [
-                         #param_v1{name = [<<"a">>]},
-                         #param_v1{name = [<<"b">>]}
+                         ?PARAM{name = [<<"a">>]},
+                         ?PARAM{name = [<<"b">>]}
                         ]},
            local_key =
                #key_v1{
                   ast = [
-                         #param_v1{name = [<<"a">>]},
-                         #param_v1{name = [<<"b">>]},
-                         #param_v1{name = [<<"c">>]}
+                         ?PARAM{name = [<<"a">>]},
+                         ?PARAM{name = [<<"b">>]},
+                         ?PARAM{name = [<<"c">>]}
                         ]}},
         []},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
@@ -454,11 +454,11 @@ quantum_fn_last_arg_no_quotes_required_test() ->
     {ok, {?DDL{ partition_key = #key_v1{ ast = PKAST } }, _}} =
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)),
     ?assertEqual(
-        [#param_v1{name = [<<"a">>]},
-         #param_v1{name = [<<"b">>]},
+        [?PARAM{name = [<<"a">>]},
+         ?PARAM{name = [<<"b">>]},
          #hash_fn_v1{mod = riak_ql_quanta,
                      fn = quantum,
-                     args = [#param_v1{name = [<<"c">>]}, 15, s],
+                     args = [?PARAM{name = [<<"c">>]}, 15, s],
                      type = timestamp}],
         PKAST
       ).

@@ -118,19 +118,19 @@ make_f2([#riak_field_v1{name    = Nm,
     make_f2(T, [NewAcc | Acc]).
 
 pk_to_sql(#key_v1{ast = [Fam, Series, TS]}) ->
-    string:join([binary_to_list(extract(X#param_v1.name)) || X <- [Fam, Series]] ++ [make_q(TS)], ", ").
+    string:join([binary_to_list(extract(X?PARAM.name)) || X <- [Fam, Series]] ++ [make_q(TS)], ", ").
 
 make_q(#hash_fn_v1{mod  = riak_ql_quanta,
                    fn   = quantum,
                    args = Args,
                    type = timestamp}) ->
-              [#param_v1{name = [Nm]}, No, Unit] = Args,
+              [?PARAM{name = [Nm]}, No, Unit] = Args,
     _Q = "quantum(" ++ string:join([binary_to_list(Nm), integer_to_list(No), "'" ++ atom_to_list(Unit) ++ "'"], ", ") ++ ")".
 
 extract([X]) -> X.
 
 lk_to_sql(LK) ->
-    string:join([binary_to_list(extract(X#param_v1.name)) || X <- LK#key_v1.ast], ", ").
+    string:join([binary_to_list(extract(X?PARAM.name)) || X <- LK#key_v1.ast], ", ").
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
