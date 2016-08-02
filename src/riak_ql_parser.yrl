@@ -1,7 +1,7 @@
 %% -*- erlang -*-
 %%% @doc       Parser for the riak Time Series Query Language.
 %%% @author    gguthrie@basho.com
-%%% @copyright (C) 2015 Basho
+%%% @copyright (C) 2016 Basho
 
 Nonterminals
 
@@ -10,12 +10,14 @@ StatementWithoutSemicolon
 Query
 Select
 Describe
+ShowTables
 Bucket
 Buckets
 Field
 FieldElem
 Fields
 Identifier
+Insert
 CharacterLiteral
 Where
 Cond
@@ -28,6 +30,10 @@ TableContentsSource
 TableElementList
 TableElements
 TableElement
+TableProperties
+TablePropertyList
+TableProperty
+TablePropertyValue
 ColumnDefinition
 ColumnConstraint
 KeyDefinition
@@ -58,6 +64,12 @@ CreateTable
 PrimaryKey
 FunArg
 FunArgN
+
+OptFieldList
+IdentifierList
+RowValueList
+RowValue
+FieldValue
 .
 
 Terminals
@@ -77,7 +89,9 @@ from
 greater_than_operator
 gte
 identifier
+insert
 integer
+into
 key
 limit
 left_paren
@@ -95,13 +109,17 @@ regex
 right_paren
 select
 semicolon
+show
 sint64
 solidus
 table
+tables
 timestamp
 true
+values
 varchar
 where
+with
 .
 
 Rootsymbol Statement.
@@ -113,15 +131,22 @@ Statement -> StatementWithoutSemicolon semicolon : '$1'.
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
+StatementWithoutSemicolon -> Insert : '$1'.
+StatementWithoutSemicolon -> ShowTables : '$1'.
 
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
-Select -> select Fields from Buckets Where : make_select('$1', '$2', '$3', '$4', '$5').
-Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4').
+%% No joins for you!
+Select -> select Fields from Buckets : make_select({select, multi_table_error}, '$2', '$3', '$4').
+
+Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
+Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
 
 %% 20.9 DESCRIBE STATEMENT
 Describe -> describe Bucket : make_describe('$2').
+
+Insert -> insert into Identifier OptFieldList values RowValueList : make_insert('$3', '$4', '$6').
 
 Where -> where BooleanValueExpression : make_where('$1', '$2').
 
@@ -135,8 +160,8 @@ Field -> NumericValueExpression : '$1'.
 %Field -> Identifier    : canonicalise_col('$1').
 Field -> asterisk : make_wildcard('$1').
 
-Buckets -> Buckets comma Bucket : make_list('$1', '$3').
-Buckets -> Bucket               : '$1'.
+%% Support early error on multi-table select
+Buckets -> Bucket comma Bucket : make_list('$1', '$3').
 
 Bucket -> Identifier   : '$1'.
 
@@ -177,6 +202,8 @@ Comp -> nomatch                : '$1'.
 %% Comp -> notapprox           : '$1'.
 
 CreateTable -> create table : create_table.
+
+ShowTables -> show tables : [{type, show_tables}].
 
 NotNull -> not_ null : '$1'.
 
@@ -256,6 +283,9 @@ BooleanPredicand ->
 TableDefinition ->
     CreateTable Bucket TableContentsSource :
         make_table_definition('$2', '$3').
+TableDefinition ->
+    CreateTable Bucket TableContentsSource with TableProperties :
+        make_table_definition('$2', '$3', '$5').
 
 TableContentsSource -> TableElementList : '$1'.
 TableElementList -> left_paren TableElements right_paren : '$2'.
@@ -304,11 +334,51 @@ KeyFieldArg -> CharacterLiteral    : '$1'.
 KeyFieldArg -> Identifier : '$1'.
 %% KeyFieldArg -> atom left_paren Word right_paren : make_atom('$3').
 
+OptFieldList -> left_paren IdentifierList right_paren : '$2'.
+OptFieldList -> '$empty' : undefined.
+
+IdentifierList -> IdentifierList comma Identifier : '$1' ++ ['$3'].
+IdentifierList -> Identifier : ['$1'].
+
+RowValueList -> left_paren right_paren : [[]].
+RowValueList -> left_paren RowValue right_paren : ['$2'].
+RowValueList -> RowValueList comma left_paren RowValue right_paren : '$1' ++ ['$4'].
+
+RowValue -> RowValue comma FieldValue : '$1' ++ ['$3'].
+RowValue -> FieldValue : ['$1'].
+
+FieldValue -> integer : '$1'.
+FieldValue -> float : '$1'.
+FieldValue -> TruthValue : '$1'.
+FieldValue -> CharacterLiteral : '$1'.
+FieldValue -> Identifier : '$1'.
+
+TableProperties ->
+    left_paren TablePropertyList right_paren : '$2'.
+
+TablePropertyList ->
+    '$empty' : [].
+TablePropertyList ->
+    TableProperty : prepend_table_proplist([], '$1').
+TablePropertyList ->
+    TableProperty comma TablePropertyList : prepend_table_proplist('$3', '$1').
+
+TableProperty ->
+    identifier equals_operator TablePropertyValue :
+        make_table_property('$1', '$3').
+
+TablePropertyValue -> identifier : '$1'.   %% this is not valid
+%% the above rule is just to produce a specific error message
+TablePropertyValue -> TruthValue : '$1'.
+TablePropertyValue -> integer : '$1'.
+TablePropertyValue -> float : '$1'.
+TablePropertyValue -> character_literal : '$1'.
+
 Erlang code.
 
 -record(outputs,
         {
-          type :: select | create | describe,
+          type :: create | describe | insert | select,
           buckets = [],
           fields  = [],
           limit   = [],
@@ -324,12 +394,27 @@ Erlang code.
 %% no way to stop rebar borking on it AFAIK
 -export([
          return_error/2,
+         ql_parse/1,
          canonicalise_where/1
          ]).
 
+%% Provide more useful success tuples
+ql_parse(Tokens) ->
+    interpret_parse_result(parse(Tokens)).
+
+interpret_parse_result({error, _}=Err) ->
+    Err;
+interpret_parse_result({ok, {?DDL{}=DDL, Props}}) ->
+    {ddl, DDL, Props};
+interpret_parse_result({ok, Proplist}) ->
+    extract_type(proplists:get_value(type, Proplist), Proplist).
+
+extract_type(Type, Proplist) ->
+    {Type, Proplist -- [{type, Type}]}.
+
 %% if no partition key is specified hash on the local key
-fix_up_keys(#ddl_v1{partition_key = none, local_key = LK} = DDL) ->
-    DDL#ddl_v1{partition_key = LK, local_key = LK};
+fix_up_keys(?DDL{partition_key = none, local_key = LK} = DDL) ->
+    DDL?DDL{partition_key = LK, local_key = LK};
 fix_up_keys(A) ->
     A.
 
@@ -338,27 +423,23 @@ convert(#outputs{type    = select,
                  fields  = F,
                  limit   = L,
                  where   = W}) ->
-    Q = case B of
-            {Type, _} when Type =:= list orelse Type =:= regex ->
-                ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = F},
-                            'FROM'   = B,
-                            'WHERE'  = W,
-                            'LIMIT'  = L};
-            _ ->
-                ?SQL_SELECT{'SELECT'   = #riak_sel_clause_v1{clause = F},
-                            'FROM'     = B,
-                            'WHERE'    = W,
-                            'LIMIT'    = L,
-                            helper_mod = riak_ql_ddl:make_module_name(B)}
-        end,
-    Q;
+    [
+     {type, select},
+     {tables, B},
+     {fields, F},
+     {limit, L},
+     {where, W}
+    ];
 convert(#outputs{type = create} = O) ->
     O.
 
 %% make_atom({binary, SomeWord}) ->
 %%     {atom, binary_to_atom(SomeWord, utf8)}.
 
-make_select(A, B, C, D) -> make_select(A, B, C, D, {where, []}).
+make_select({select, multi_table_error}, _B, _C, _D) ->
+    return_error(0, <<"Must provide exactly one table name">>);
+make_select(A, B, C, D) ->
+    make_select(A, B, C, D, {where, []}).
 
 make_select({select, _SelectBytes},
             Select,
@@ -389,7 +470,23 @@ wrap_identifier({identifier, IdentifierName})
 wrap_identifier(Default) -> Default.
 
 make_describe({identifier, D}) ->
-    #riak_sql_describe_v1{'DESCRIBE' = D}.
+    [
+     {type, describe},
+     {identifier, D}
+    ].
+
+make_insert({identifier, Table}, Fields, Values) ->
+    FieldsAsList = case is_list(Fields) of
+                       true  -> Fields;
+                       false -> []
+                   end,
+    FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsAsList],
+    [
+     {type, insert},
+     {table, Table},
+     {fields, FieldsWrappedIdentifiers},
+     {values, Values}
+    ].
 
 add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
@@ -556,6 +653,7 @@ make_funcall({identifier, FuncName}, Args) ->
     Fn = canonicalise_window_aggregate_fn(FuncName),
     case get_func_type(Fn) of
         window_aggregate_fn ->
+            %% FIXME this should be in the type checker in riak_kv_qry_compiler
             {Fn2, Args2} = case {Fn, Args} of
                                {'COUNT', [{asterisk, _Asterisk}]} ->
                                    {'COUNT', [{identifier, <<"*">>}]};
@@ -579,6 +677,8 @@ make_funcall(_, _) ->
 canonicalise_expr({identifier, X}) ->
     {identifier, [X]};
 canonicalise_expr({expr, X}) ->
+    X;
+canonicalise_expr(X) ->
     X.
 
 get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
@@ -587,8 +687,12 @@ get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
                              FuncName =:= 'COUNT'  orelse
                              FuncName =:= 'MIN'    orelse
                              FuncName =:= 'MAX'    orelse
-                             FuncName =:= 'STDDEV' -> window_aggregate_fn;
-get_func_type(FuncName) when is_atom(FuncName)     -> not_supported.
+                             FuncName =:= 'STDDEV' orelse
+                             FuncName =:= 'STDDEV_SAMP' orelse
+                             FuncName =:= 'STDDEV_POP' ->
+    window_aggregate_fn;
+get_func_type(FuncName) when is_atom(FuncName) ->
+    not_supported.
 
 %% TODO
 %% this list to atom needs to change to list to existing atom
@@ -675,16 +779,18 @@ extract_key_field_list({list,
                        Extracted) ->
     [Modfun | extract_key_field_list({list, Rest}, Extracted)];
 extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [#param_v1{name = [Field]} |
+    [?SQL_PARAM{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
-make_table_definition({identifier, Table}, Contents) ->
-    validate_ddl(
-      #ddl_v1{
-         table = Table,
-         partition_key = find_partition_key(Contents),
-         local_key = find_local_key(Contents),
-         fields = find_fields(Contents)}).
+make_table_definition(TableName, Contents) ->
+    make_table_definition(TableName, Contents, []).
+make_table_definition({identifier, Table}, Contents, Properties) ->
+    {validate_ddl(
+       ?DDL{table = Table,
+            partition_key = find_partition_key(Contents),
+            local_key = find_local_key(Contents),
+            fields = find_fields(Contents)}),
+     validate_table_properties(Properties)}.
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
@@ -709,7 +815,7 @@ make_modfun(quantum, {list, Args}) ->
     {modfun, #hash_fn_v1{
                 mod  = riak_ql_quanta,
                 fn   = quantum,
-                args = [#param_v1{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
+                args = [?SQL_PARAM{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
                 type = timestamp
                }}.
 
@@ -724,6 +830,27 @@ find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
 find_fields(Count, [_Head | Rest], Elements) ->
     find_fields(Count, Rest, Elements).
 
+prepend_table_proplist(L, P) ->
+    [P | L].
+
+make_table_property({identifier, K}, {Type, _V})
+  when Type == identifier ->
+    return_error(
+      0, iolist_to_binary(
+           io_lib:format("Expecting a numeric, boolean or string value for WITH property \"~s\""
+                         " (did you forget to quote a string?)", [K])));
+make_table_property({identifier, K}, {Type, V})
+  when Type == boolean;
+       Type == integer;
+       Type == float;
+       Type == character_literal ->
+    {K, V}.
+
+validate_table_properties(Properties) ->
+    %% We let all k=v in: there's more substantial validation and
+    %% enrichment happening in riak_kv_wm_utils:erlify_bucket_prop
+    Properties.
+
 
 %% DDL validation
 
@@ -734,11 +861,13 @@ validate_ddl(DDL) ->
     ok = assert_primary_and_local_keys_match(DDL),
     ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
-    ok = assert_field_order_matches_key_order(DDL),
+    ok = assert_not_more_than_one_quantum(DDL),
+    ok = assert_quantum_fn_args(DDL),
+    ok = assert_quantum_is_last_in_partition_key(DDL),
     DDL.
 
-%% @doc Ensure DDL can haz keys
-assert_keys_present(#ddl_v1{local_key = LK, partition_key = PK})
+%% @doc Ensure DDL has keys
+assert_keys_present(?DDL{local_key = LK, partition_key = PK})
   when LK == none;
        PK == none ->
     return_error_flat("Missing primary key");
@@ -746,9 +875,9 @@ assert_keys_present(_GoodDDL) ->
     ok.
 
 %% @doc Ensure all fields appearing in PRIMARY KEY are not null.
-assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
-                                           fields = Fields}) ->
-    PKFieldNames = [N || #param_v1{name = [N]} <- LK],
+assert_primary_key_fields_non_null(?DDL{local_key = #key_v1{ast = LK},
+                                        fields = Fields}) ->
+    PKFieldNames = [N || ?SQL_PARAM{name = [N]} <- LK],
     OnlyPKFields = [F || #riak_field_v1{name = N} = F <- Fields,
                          lists:member(N, PKFieldNames)],
     NonNullFields =
@@ -762,24 +891,17 @@ assert_primary_key_fields_non_null(#ddl_v1{local_key = #key_v1{ast = LK},
                               [string:join(NonNullFields, ", ")])
     end.
 
-%% @doc Verify that the primary key has three components
-%%      and the third element is a quantum
-assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) when length(Key) == 3 ->
-    assert_param_is_quantum(lists:nth(3, Key));
-assert_partition_key_length(#ddl_v1{partition_key = {key_v1, Key}}) ->
-    return_error_flat("Primary key must consist of exactly 3 fields (has ~b)", [length(Key)]).
-
-%% @doc Verify that the key element is a quantum
-assert_param_is_quantum(#hash_fn_v1{mod = riak_ql_quanta, fn = quantum}) ->
+%% @doc Assert that the partition key has at least one field.
+assert_partition_key_length(?DDL{partition_key = {key_v1, [_|_]}}) ->
     ok;
-assert_param_is_quantum(_KeyComponent) ->
-    return_error_flat("Third element of primary key must be a quantum").
+assert_partition_key_length(?DDL{partition_key = {key_v1, Key}}) ->
+    return_error_flat("Primary key must have one or more fields ~p", [Key]).
 
 %% @doc Verify primary key and local partition have the same elements
-assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primary},
-                                            local_key = #key_v1{ast = Local}}) ->
+assert_primary_and_local_keys_match(?DDL{partition_key = #key_v1{ast = Primary},
+                                         local_key = #key_v1{ast = Local}}) ->
     PrimaryList = [query_field_name(F) || F <- Primary],
-    LocalList = [query_field_name(F) || F <- Local],
+    LocalList = [query_field_name(F) || F <- lists:sublist(Local, length(PrimaryList))],
     case PrimaryList == LocalList of
         true ->
             ok;
@@ -787,8 +909,8 @@ assert_primary_and_local_keys_match(#ddl_v1{partition_key = #key_v1{ast = Primar
             return_error_flat("Local key does not match primary key")
     end.
 
-assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
-    Fields = [N || #param_v1{name = [N]} <- LK],
+assert_unique_fields_in_pk(?DDL{local_key = #key_v1{ast = LK}}) ->
+    Fields = [N || ?SQL_PARAM{name = [N]} <- LK],
     case length(Fields) == length(lists:usort(Fields)) of
         true ->
             ok;
@@ -803,39 +925,79 @@ assert_unique_fields_in_pk(#ddl_v1{local_key = #key_v1{ast = LK}}) ->
     end.
 
 %% Ensure that all fields in the primary key exist in the table definition.
-assert_partition_key_fields_exist(#ddl_v1{ fields = Fields,
-                                           partition_key =
-                                               #key_v1{ ast = PK } }) ->
+assert_partition_key_fields_exist(?DDL{ fields = Fields,
+                                         partition_key = #key_v1{ ast = PK } }) ->
     MissingFields =
         [binary_to_list(name_of(F)) || F <- PK, not is_field(F, Fields)],
     case MissingFields of
         [] ->
             ok;
         _ ->
-            return_error_flat("Primary key fields do not exist (~s).",
+            return_error_flat("Primary key includes non-existent fields (~s).",
                               [string:join(MissingFields, ", ")])
     end.
 
-%% Ensure the keys appearing in the key follow the order in which they are defined
-assert_field_order_matches_key_order(#ddl_v1{fields = Fields,
-                                             local_key = #key_v1{ast = LK}}) ->
-    KeyFieldsInOrder = [N || #param_v1{name = [N]} <- LK],
-    OnlyKeyFields = [F || #riak_field_v1{name = F} <- Fields, lists:member(F, KeyFieldsInOrder)],
-    case KeyFieldsInOrder == OnlyKeyFields of
+assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } } = DDL) ->
+    [assert_quantum_fn_args2(DDL, Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
+    ok.
+
+%% The param argument is validated by assert_partition_key_fields_exist/1.
+assert_quantum_fn_args2(DDL, [Param, Unit, Measure]) ->
+    FieldName = name_of(Param),
+    case riak_ql_ddl:get_field_type(DDL, FieldName) of
+        {ok, timestamp} ->
+            ok;
+        {ok, InvalidType} ->
+            return_error_flat("Quantum field '~s' must be type of timestamp but was ~p.",
+                              [FieldName, InvalidType])
+    end,
+    case lists:member(Measure, [d,h,m,s]) of
         true ->
             ok;
         false ->
-            return_error_flat("Keys must have fields in the order they appear in the table definition")
+            return_error_flat("Quantum time measure was ~p but must be d, h, m or s.",
+                              [Measure])
+    end,
+    case is_integer(Unit) andalso Unit >= 1 of
+        true ->
+            ok;
+        false ->
+            return_error_flat("Quantum time unit must be a positive integer.", [])
     end.
+
+assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+    QuantumFns =
+        [Fn || #hash_fn_v1{ } = Fn <- PKAST],
+    case length(QuantumFns) =< 1 of
+        true ->
+            ok;
+        false ->
+            return_error_flat(
+                "More than one quantum function in the partition key.", [])
+    end.
+
+assert_quantum_is_last_in_partition_key(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+    assert_quantum_is_last_in_partition_key2(PKAST).
+
+%%
+assert_quantum_is_last_in_partition_key2([]) ->
+    ok;
+assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }]) ->
+    ok;
+assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }|_]) ->
+    return_error_flat(
+        "The quantum function must be the last element of the partition key.", []);
+assert_quantum_is_last_in_partition_key2([_|Tail]) ->
+    assert_quantum_is_last_in_partition_key2(Tail).
 
 %% Check that the field name exists in the list of fields.
 is_field(Field, Fields) ->
     (lists:keyfind(name_of(Field), 2, Fields) /= false).
 
 %%
-name_of(#param_v1{ name = [N] }) ->
+name_of(?SQL_PARAM{ name = [N] }) ->
     N;
-name_of(#hash_fn_v1{ args = [#param_v1{ name = [N] }|_] }) ->
+name_of(#hash_fn_v1{ args = [?SQL_PARAM{ name = [N] }|_] }) ->
     N.
 
 which_duplicate(FF) ->
@@ -851,9 +1013,9 @@ which_duplicate([_|T], Acc) ->
 
 %% Pull the name out of the appropriate record
 query_field_name(#hash_fn_v1{args = Args}) ->
-    Param = lists:keyfind(param_v1, 1, Args),
+    Param = lists:keyfind(?SQL_PARAM_RECORD_NAME, 1, Args),
     query_field_name(Param);
-query_field_name(#param_v1{name = Field}) ->
+query_field_name(?SQL_PARAM{name = Field}) ->
     Field.
 
 -spec return_error_flat(string()) -> no_return().

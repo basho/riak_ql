@@ -3,7 +3,7 @@
 %% query_ddl: a test suite for queries against DDLs
 %%
 %%
-%% Copyright (c) 2007-2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -42,31 +42,31 @@
 
 run_test(Name, CreateTable, SQLQuery, IsValid) ->
     Lexed = riak_ql_lexer:get_tokens(CreateTable),
-    {ok, DDL} = riak_ql_parser:parse(Lexed),
+    {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
     case riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL) of
         {module, Module} ->
             Lexed2 = riak_ql_lexer:get_tokens(SQLQuery),
-            Qry = riak_ql_parser:parse(Lexed2),
+            Qry = riak_ql_parser:ql_parse(Lexed2),
             case Qry of
-                {ok, Q} -> case riak_ql_ddl:is_query_valid(Module, DDL, Q) of
-                               true ->
-                                   case IsValid of
-                                       true ->
-                                           ?assert(true);
-                                       false ->
-                                           ?debugFmt("Query in ~p should not be valid", [Name]),
-                                           ?assert(false)
-                                   end;
-                               {false, E} ->
-                                   case IsValid of
-                                       true ->
-                                           ?debugFmt("Test ~p failed with query syntax error of ~p~n",
-                                                     [Name, E]),
-                                           ?assert(false);
-                                       false ->
-                                           ?assert(true)
-                                   end
-                           end;
+                {select, Q} -> case riak_ql_ddl:is_query_valid(Module, DDL, riak_ql_ddl:parsed_sql_to_query(Q)) of
+                                   true ->
+                                       case IsValid of
+                                           true ->
+                                               ?assert(true);
+                                           false ->
+                                               ?debugFmt("Query in ~p should not be valid", [Name]),
+                                               ?assert(false)
+                                       end;
+                                   {false, E} ->
+                                       case IsValid of
+                                           true ->
+                                               ?debugFmt("Test ~p failed with query syntax error of ~p~n",
+                                                         [Name, E]),
+                                               ?assert(false);
+                                           false ->
+                                               ?assert(true)
+                                       end
+                               end;
                 Err     -> ?debugFmt("Test ~p failed with error ~p~n", [Name, Err]),
                            ?assert(false)
             end;
@@ -77,19 +77,19 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
 
 
 -define(STANDARDTABLE,
-        "CREATE TABLE GeoCheckin "
-        ++ "(geohash varchar not null, "
-        ++ "user varchar not null, "
-        ++ "time timestamp not null, "
-        ++ "mytimestamp timestamp not null, "
-        ++ "myboolean boolean not null, "
-        ++ "mydouble double not null, "
-        ++ "mysint64 sint64 not null, "
-        ++ "myvarchar varchar not null, "
-        ++ "PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
+        "CREATE TABLE GeoCheckin"
+        " (geohash varchar not null,"
+        " user varchar not null,"
+        " time timestamp not null,"
+        " mytimestamp timestamp not null,"
+        " myboolean boolean not null,"
+        " mydouble double not null,"
+        " mysint64 sint64 not null,"
+        " myvarchar varchar not null,"
+        " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))").
 
--define(SQL, "SELECT * FROM GeoCheckin WHERE " ++
-            "geohash = 'erk' and user = 'berk' and time > 1 and time < 1000 and ").
+-define(SQL, "SELECT * FROM GeoCheckin WHERE "
+        "geohash = 'erk' and user = 'berk' and time > 1 and time < 1000 and ").
 
 %% Timestamps
 
@@ -252,3 +252,26 @@ run_test(Name, CreateTable, SQLQuery, IsValid) ->
 ?invalid_query_test(varchar_6_test,
                     ?STANDARDTABLE,
                     ?SQL ++ "myvarchar >= 3.4").
+
+%% identity hash tests
+
+identity_hash_test() ->
+    CreateTable = ?STANDARDTABLE,
+    Lexed = riak_ql_lexer:get_tokens(CreateTable),
+    {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
+    {module, Module} =  riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
+    Result = Module:get_identity_plaintext_DEBUG(),
+    Expected = "TABLE: "
+        "GeoCheckin: "
+        "FIELDS: "
+        "geohash varchar not null: "
+        "user varchar not null: "
+        "time timestamp not null: "
+        "mytimestamp timestamp not null: "
+        "myboolean boolean not null: "
+        "mydouble double not null: "
+        "mysint64 sint64 not null: "
+        "myvarchar varchar not null: "
+        "PRIMARY KEY: geohash: user: riak_ql_quanta quantum time 15 m timestamp: "
+        "LOCAL KEY: geohash: user: time",
+    ?assertEqual(Expected, Result).

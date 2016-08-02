@@ -17,7 +17,7 @@
 %%
 %%     ./riak_ql -ddl "SELECT * FROM my_table"
 %%
-%% Copyright (c) 2007-2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -44,13 +44,15 @@
 main([_|_] = Args) ->
     Query = lists:last(Args),
     Lexed = riak_ql_lexer:get_tokens(Query),
-    case riak_ql_parser:parse(Lexed) of
-        {ok, DDL} ->
-            maybe_print_ddl(Args, DDL);
+    case riak_ql_parser:ql_parse(Lexed) of
+        {ddl, DDL, WithProperties} ->
+            maybe_print_ddl(Args, {DDL, WithProperties});
         {error, {Token,_,_}} ->
             io:format("Error: syntax error before ~s~n", [Token]),
             % return an error code for the proc if an error has occurred
-            erlang:halt(1)
+            erlang:halt(1);
+        {_, SQL} ->
+            maybe_print_ddl(Args, SQL)
     end;
 main([]) ->
     io:format(

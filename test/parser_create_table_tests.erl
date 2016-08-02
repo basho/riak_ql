@@ -1,3 +1,26 @@
+%% -------------------------------------------------------------------
+%%
+%% Table creation tests for the Parser
+%%
+%%
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
+
 -module(parser_create_table_tests).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -7,12 +30,6 @@ create_no_key_sql_test() ->
     ?sql_comp_fail("create table temps ("
                    " time timestamp not null, "
                    " temp_k double)").
-
-create_wrong_field_order_sql_test() ->
-    ?sql_comp_fail("create table consufed ("
-                   " a varchar not null, b varchar not null, c timestamp not null,"
-                   " PRIMARY KEY ((a, c, quantum(b, 15, 'm')), a, c, b))").
-
 
 create_timeseries_sql_test() ->
     String =
@@ -24,11 +41,13 @@ create_timeseries_sql_test() ->
         " temp varchar,"
         " PRIMARY KEY ((geohash, user, quantum(time, 15, 'm')), geohash, user, time))",
     Toks = riak_ql_lexer:get_tokens(String),
-    Got = case riak_ql_parser:parse(Toks) of
-              {ok, G} -> G;
-              _WC     -> wont_compile
+    Got = case riak_ql_parser:ql_parse(Toks) of
+              {ddl, D, _Props} ->
+                  D;
+              _WC ->
+                  wont_compile
           end,
-    Expected = #ddl_v1{
+    Expected = ?DDL{
                   table = <<"GeoCheckin">>,
                   fields = [
                             #riak_field_v1{
@@ -59,20 +78,20 @@ create_timeseries_sql_test() ->
                            ],
                   partition_key = #key_v1{
                                      ast = [
-                                            #param_v1{name = [<<"geohash">>]},
-                                            #param_v1{name = [<<"user">>]},
+                                            ?SQL_PARAM{name = [<<"geohash">>]},
+                                            ?SQL_PARAM{name = [<<"user">>]},
                                             #hash_fn_v1{mod  = riak_ql_quanta,
                                                         fn   = quantum,
                                                         args = [
-                                                                #param_v1{name = [<<"time">>]}, 15, m
+                                                                ?SQL_PARAM{name = [<<"time">>]}, 15, m
                                                                ],
                                                         type = timestamp}
                                            ]},
                   local_key = #key_v1{
                                  ast = [
-                                        #param_v1{name = [<<"geohash">>]},
-                                        #param_v1{name = [<<"user">>]},
-                                        #param_v1{name = [<<"time">>]}
+                                        ?SQL_PARAM{name = [<<"geohash">>]},
+                                        ?SQL_PARAM{name = [<<"user">>]},
+                                        ?SQL_PARAM{name = [<<"time">>]}
                                        ]}
                  },
     ?assertEqual(Expected, Got).
@@ -95,11 +114,13 @@ create_all_types_sql_test() ->
         " PRIMARY KEY ((user, geohash, quantum(time, 15, 'm')),"
         " user, geohash, time))",
     Toks = riak_ql_lexer:get_tokens(String),
-    Got = case riak_ql_parser:parse(Toks) of
-              {ok, G} -> G;
-              WC     -> WC
+    Got = case riak_ql_parser:ql_parse(Toks) of
+              {ddl, D, _Props} ->
+                  D;
+              WC ->
+                  WC
           end,
-    Expected = #ddl_v1{
+    Expected = ?DDL{
                   table = <<"GeoCheckin">>,
                   fields = [
                             #riak_field_v1{
@@ -161,21 +182,21 @@ create_all_types_sql_test() ->
                   partition_key =
                       #key_v1{
                          ast = [
-                                #param_v1{name = [<<"user">>]},
-                                #param_v1{name = [<<"geohash">>]},
+                                ?SQL_PARAM{name = [<<"user">>]},
+                                ?SQL_PARAM{name = [<<"geohash">>]},
                                 #hash_fn_v1{mod  = riak_ql_quanta,
                                             fn   = quantum,
                                             args = [
-                                                    #param_v1{name = [<<"time">>]}, 15, m
+                                                    ?SQL_PARAM{name = [<<"time">>]}, 15, m
                                                    ],
                                             type = timestamp}
                                ]},
                   local_key =
                       #key_v1{
                          ast = [
-                                #param_v1{name = [<<"user">>]},
-                                #param_v1{name = [<<"geohash">>]},
-                                #param_v1{name = [<<"time">>]}
+                                ?SQL_PARAM{name = [<<"user">>]},
+                                ?SQL_PARAM{name = [<<"geohash">>]},
+                                ?SQL_PARAM{name = [<<"time">>]}
                                ]}
                  },
     ?assertEqual(Expected, Got).
@@ -215,8 +236,8 @@ key_fields_must_exist_1_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertEqual(
-       {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family).">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       {error, {0, riak_ql_parser, <<"Primary key includes non-existent fields (family).">>}},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 key_fields_must_exist_2_test() ->
@@ -226,8 +247,8 @@ key_fields_must_exist_2_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertEqual(
-       {error, {0, riak_ql_parser, <<"Primary key fields do not exist (family, series).">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       {error, {0, riak_ql_parser, <<"Primary key includes non-existent fields (family, series).">>}},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 key_fields_must_exist_3_test() ->
@@ -238,8 +259,8 @@ key_fields_must_exist_3_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {error, {0, riak_ql_parser, <<"Primary key fields do not exist (time).">>}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       {error, {0, riak_ql_parser, <<"Primary key includes non-existent fields (time).">>}},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 create_table_white_space_test() ->
@@ -251,8 +272,8 @@ create_table_white_space_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       {ddl, ?DDL{}, []},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 primary_key_white_space_test() ->
@@ -264,8 +285,8 @@ primary_key_white_space_test() ->
         "PRIMARY               \t  KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       {ddl, ?DDL{}, []},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
 not_null_white_space_test() ->
@@ -277,6 +298,243 @@ not_null_white_space_test() ->
         "PRIMARY KEY "
         " ((family, series, quantum(time, 15, 's')), family, series, time))",
     ?assertMatch(
-       {ok, #ddl_v1{}},
-       riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+       {ddl, ?DDL{}, []},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
       ).
+
+short_key_1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "family VARCHAR NOT NULL, "
+        "series VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT                NULL, "
+        "PRIMARY KEY "
+        " ((quantum(time, 15, 's')), time))",
+    ?assertMatch(
+       {ddl, ?DDL{}, []},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+short_key_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c))",
+    ?assertMatch(
+       {ddl, ?DDL{}, []},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+no_quanta_in_primary_key_is_ok_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c SINT64 NOT NULL, "
+        "PRIMARY KEY ((a,b), a,b,c))",
+    ?assertMatch(
+       {ddl,
+        ?DDL{
+           partition_key =
+               #key_v1{
+                  ast = [
+                         ?SQL_PARAM{name = [<<"a">>]},
+                         ?SQL_PARAM{name = [<<"b">>]}
+                        ]},
+           local_key =
+               #key_v1{
+                  ast = [
+                         ?SQL_PARAM{name = [<<"a">>]},
+                         ?SQL_PARAM{name = [<<"b">>]},
+                         ?SQL_PARAM{name = [<<"c">>]}
+                        ]}},
+        []},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+multiple_quantum_functions_not_allowed_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(a, 15, 'm'),b,quantum(c, 15, 'm')), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"More than one quantum function in the partition key.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_field_must_exist_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(eh, 15, s)), a,b,eh))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Primary key includes non-existent fields (eh).">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_field_must_be_timestamp_test() ->
+  Types = [boolean, double, sint64, varchar],
+  [quantum_fn_field_must_be_timestamp_test_helper(T) || T <- Types].
+
+quantum_fn_field_must_be_timestamp_test_helper(FieldType) ->
+    FieldTypeString = atom_to_list(FieldType),
+    FieldTypeBinary = atom_to_binary(FieldType, latin1),
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a SINT64 NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c " ++ FieldTypeString ++ " NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum field 'c' must be type of timestamp but was ", FieldTypeBinary/binary, ".">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_second_arg_must_be_positive_integer_1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, s, s)), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum time unit must be a positive integer.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_second_arg_must_be_positive_integer_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, -15, s)), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum time unit must be a positive integer.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_second_arg_must_be_positive_integer_3_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15.5, s)), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum time unit must be a positive integer.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_last_arg_must_be_supported_quanta_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 'y')), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum time measure was y but must be d, h, m or s.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_last_arg_no_quotes_required_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b,c))",
+    {ok, {?DDL{ partition_key = #key_v1{ ast = PKAST } }, _}} =
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+        [?SQL_PARAM{name = [<<"a">>]},
+         ?SQL_PARAM{name = [<<"b">>]},
+         #hash_fn_v1{mod = riak_ql_quanta,
+                     fn = quantum,
+                     args = [?SQL_PARAM{name = [<<"c">>]}, 15, s],
+                     type = timestamp}],
+        PKAST
+      ).
+
+quantum_must_be_last_in_the_partition_key_1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's'),a,b), c,a,b))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"The quantum function must be the last element of the partition key.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_must_be_last_in_the_partition_key_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,quantum(c, 15, 's'),b), a,c,b))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"The quantum function must be the last element of the partition key.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+create_with_1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c))"
+        " with ()",
+    {ddl, _DDL, WithProps} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+      [],
+      WithProps).
+
+create_with_2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c))"
+        " with (a ='2a', c= 3, d=0.5, e=true, f='')",
+    {ddl, _DDL, WithProps} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+      [{<<"a">>, <<"2a">>}, {<<"c">>, 3}, {<<"d">>, 0.5}, {<<"e">>, true}, {<<"f">>, <<>>}],
+      WithProps).
+
+partition_key_with_duplicate_fields_is_not_allowed_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,a,quantum(c, 15, s)), a,a,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Primary key has duplicate fields (a)">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+partition_key_quantum_with_duplicate_fields_is_not_allowed_test() ->
+    %% the quantum function uses the same field as another field in the
+    %% partition key
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,c,quantum(c, 15, s)), a,c,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Primary key has duplicate fields (c)">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).

@@ -1,7 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Parser tests for the DESCRIBE command
-%%
+%% riak_ql_component: Common Components Code (CCC)
 %%
 %% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
@@ -20,16 +19,9 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+-module(riak_ql_component).
 
--module(parser_describe_tests).
+%% API
+-type component_version() :: pos_integer().
+-export_type([component_version/0]).
 
--include_lib("eunit/include/eunit.hrl").
--include("parser_test_utils.hrl").
-
-simple_describe_test() ->
-    ?sql_comp_assert("describe GeoCheckins", describe,
-                     [{identifier, <<"GeoCheckins">>}]).
-
-uppercase_quoted_describe_test() ->
-    ?sql_comp_assert("DESCRIBE \"GeoCheckins\"", describe,
-                     [{identifier, <<"GeoCheckins">>}]).

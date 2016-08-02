@@ -21,15 +21,13 @@
 %%
 %% -------------------------------------------------------------------
 
--module(parser_describe_tests).
+-module(parser_show_tables_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 -include("parser_test_utils.hrl").
 
-simple_describe_test() ->
-    ?sql_comp_assert("describe GeoCheckins", describe,
-                     [{identifier, <<"GeoCheckins">>}]).
+simple_show_tables_test() ->
+    ?sql_comp_assert("show tables", show_tables, []).
 
-uppercase_quoted_describe_test() ->
-    ?sql_comp_assert("DESCRIBE \"GeoCheckins\"", describe,
-                     [{identifier, <<"GeoCheckins">>}]).
+uppercase_show_tables_describe_test() ->
+    ?sql_comp_assert("SHOW TABLES", show_tables, []).

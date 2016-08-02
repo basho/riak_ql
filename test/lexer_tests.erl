@@ -1,3 +1,25 @@
+%% -------------------------------------------------------------------
+%%
+%% Tests for the Lexer
+%%
+%%
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
 -module(lexer_tests).
 
 -compile([export_all]).
@@ -228,11 +250,13 @@ not_a_date_test_() ->
     ?_assertEqual(Expected, Got).
 
 multiple_single_quotes_test_() ->
-    Got = riak_ql_lexer:get_tokens("'user_1' 'San Fierro' 'klingon''name'"),
+    Got = riak_ql_lexer:get_tokens("'user_1' 'San Fierro' 'klingon''name' '''a ' ''''"),
     Expected = [
                 {character_literal, <<"user_1">>},
                 {character_literal, <<"San Fierro">>},
-                {character_literal, <<"klingon'name">>}
+                {character_literal, <<"klingon'name">>},
+                {character_literal, <<"'a ">>},
+                {character_literal, <<"'">>}
                ],
     ?_assertEqual(Expected, Got).
 

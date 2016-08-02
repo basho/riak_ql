@@ -3,7 +3,7 @@
 %% riak_ql_window_agg_fns: implementation of Windows Aggregation Fns
 %%                         for the query runner
 %%
-%% Copyright (c) 2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -23,31 +23,42 @@
 -module(riak_ql_window_agg_fns).
 
 
--export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDDEV'/2]).
+-export(['COUNT'/2, 'SUM'/2, 'AVG'/2, 'MEAN'/2, 'MIN'/2, 'MAX'/2, 'STDDEV'/2, 'STDDEV_POP'/2, 'STDDEV_SAMP'/2]).
+-export([add/2, divide/2, multiply/2, subtract/2]).
 -export([finalise/2]).
 -export([start_state/1]).
--export([get_arity_and_type_sig/1]).
+-export([fn_arity/1]).
+-export([fn_type_signature/2]).
 
 -define(SQL_NULL, []).
 
--type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDDEV'.
+-type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDDEV' | 'STDDEV_POP' | 'STDDEV_SAMP'.
 
 -include("riak_ql_ddl.hrl").
 
--spec get_arity_and_type_sig(aggregate_function()) ->
-                                    {Arity::non_neg_integer(),
-                                     field_type() | [{field_type(), field_type()}]}.
-%% Functions used in expression type validation for each Function, the
-%% returned tuple gives the arity and arg-type to return-type pairs.
-%% For functions accepting '*' (such as COUNT), arguments are the entire row, passed
-%% as a list, and no type checking is done on the elements
-get_arity_and_type_sig('COUNT')  -> {1, sint64};
-get_arity_and_type_sig('AVG')    -> {1, [{sint64, double}, {double, double}]};  %% double promotion
-get_arity_and_type_sig('MEAN')   -> get_arity_and_type_sig('AVG');
-get_arity_and_type_sig('MAX')    -> {1, [{sint64, sint64}, {double, double}]};
-get_arity_and_type_sig('MIN')    -> {1, [{sint64, sint64}, {double, double}]};
-get_arity_and_type_sig('STDDEV') -> {1, [{sint64, double}, {double, double}]};  %% ditto
-get_arity_and_type_sig('SUM')    -> {1, [{sint64, sint64}, {double, double}]}.
+
+-spec fn_type_signature(aggregate_function(), Args::[riak_ql_ddl:simple_field_type()]) ->
+        riak_ql_ddl:simple_field_type().
+fn_type_signature('AVG', [double]) -> double;
+fn_type_signature('AVG', [sint64]) -> double;
+fn_type_signature('COUNT', [_]) -> sint64;
+fn_type_signature('MAX', [double]) -> double;
+fn_type_signature('MAX', [sint64]) -> sint64;
+fn_type_signature('MEAN', Args) -> fn_type_signature('AVG', Args);
+fn_type_signature('MIN', [double]) -> double;
+fn_type_signature('MIN', [sint64]) -> sint64;
+fn_type_signature('STDDEV', Args) -> fn_type_signature('STDDEV_SAMP', Args);
+fn_type_signature('STDDEV_POP', [double]) -> double;
+fn_type_signature('STDDEV_POP', [sint64]) -> double;
+fn_type_signature('STDDEV_SAMP', [double]) -> double;
+fn_type_signature('STDDEV_SAMP', [sint64]) -> double;
+fn_type_signature('SUM', [double]) -> double;
+fn_type_signature('SUM', [sint64]) -> sint64;
+fn_type_signature(Fn, Args) ->
+    {error, {argument_type_mismatch, Fn, Args}}.
+
+%%
+fn_arity(_FnName) -> 1.
 
 %% Get the initial accumulator state for the aggregation.
 -spec start_state(aggregate_function()) ->
@@ -57,9 +68,15 @@ start_state('MEAN')   -> start_state('AVG');
 start_state('COUNT')  -> 0;
 start_state('MAX')    -> ?SQL_NULL;
 start_state('MIN')    -> ?SQL_NULL;
-start_state('STDDEV') -> {0, 0.0, 0.0};
+start_state('STDDEV') -> start_state_stddev();
+start_state('STDDEV_POP') -> start_state_stddev();
+start_state('STDDEV_SAMP') -> start_state_stddev();
 start_state('SUM')    -> ?SQL_NULL;
 start_state(_)        -> stateless.
+
+%%
+start_state_stddev() ->
+    {0, 0.0, 0.0}.
 
 %% Calculate the final results using the accumulated result.
 -spec finalise(aggregate_function(), any()) -> any().
@@ -69,11 +86,15 @@ finalise('MEAN', State) ->
     finalise('AVG', State);
 finalise('AVG', {N, Acc})  ->
     Acc / N;
-finalise('STDDEV', {N, _, _}) when N < 2 ->
-    % STDDEV must have two or more values to or return NULL
+finalise(Stddev, {N, _, _}) when (Stddev == 'STDDEV' orelse Stddev == 'STDDEV_POP' orelse Stddev == 'STDDEV_SAMP')  andalso N < 2 ->
+    % STDDEV_POP must have two or more values to or return NULL
     ?SQL_NULL;
-finalise('STDDEV', {N, _, Q}) ->
+finalise('STDDEV', State) ->
+    finalise('STDDEV_SAMP', State);
+finalise('STDDEV_POP', {N, _, Q}) ->
     math:sqrt(Q / N);
+finalise('STDDEV_SAMP', {N, _, Q}) ->
+    math:sqrt(Q / (N-1));
 finalise(_Fn, Acc) ->
     Acc.
 
@@ -118,20 +139,50 @@ finalise(_Fn, Acc) ->
 'MAX'(Arg, State) when Arg > State -> Arg;
 'MAX'(_, State) -> State.
 
-'STDDEV'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
+'STDDEV'(Arg, State) ->
+    'STDDEV_POP'(Arg, State).
+
+'STDDEV_POP'(Arg, {N_old, A_old, Q_old}) when is_number(Arg) ->
     %% A and Q are those in https://en.wikipedia.org/wiki/Standard_deviation#Rapid_calculation_methods
     N = N_old + 1,
     A = A_old + (Arg - A_old) / N,
     Q = Q_old + (Arg - A_old) * (Arg - A),
     {N, A, Q};
-'STDDEV'(_, State) ->
+'STDDEV_POP'(_, State) ->
     State.
+
+'STDDEV_SAMP'(Arg, State) ->
+    'STDDEV_POP'(Arg, State).
+
+%%
+add(?SQL_NULL, _) -> ?SQL_NULL;
+add(_, ?SQL_NULL) -> ?SQL_NULL;
+add(A, B)         -> A + B.
+
+%%
+divide(?SQL_NULL, _) -> ?SQL_NULL;
+divide(_, ?SQL_NULL) -> ?SQL_NULL;
+divide(_, 0)         -> error(divide_by_zero);
+divide(_, 0.0)       -> error(divide_by_zero);
+divide(A, B) when is_integer(A) andalso is_integer(B)
+                     -> A div B;
+divide(A, B)         -> A / B.
+
+%%
+multiply(?SQL_NULL, _) -> ?SQL_NULL;
+multiply(_, ?SQL_NULL) -> ?SQL_NULL;
+multiply(A, B)         -> A * B.
+
+%%
+subtract(?SQL_NULL, _) -> ?SQL_NULL;
+subtract(_, ?SQL_NULL) -> ?SQL_NULL;
+subtract(A, B)         -> A - B.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-stddev_test() ->
-    State0 = start_state('STDDEV'),
+stddev_pop_test() ->
+    State0 = start_state('STDDEV_POP'),
     Data = [
             1.0, 2.0, 3.0, 4.0, 2.0,
             3.0, 4.0, 4.0, 4.0, 3.0,
@@ -144,24 +195,38 @@ stddev_test() ->
     %% need to run python on that arch to figure out what Expected
     %% value can be then.  Or, introduce an epsilon and check that the
     %% delta is small enough.
-    State9 = lists:foldl(fun 'STDDEV'/2, State0, Data),
-    Got = finalise('STDDEV', State9),
+    State9 = lists:foldl(fun 'STDDEV_POP'/2, State0, Data),
+    Got = finalise('STDDEV_POP', State9),
     ?assertEqual(Expected, Got).
 
-stddev_no_value_test() ->
+stddev_samp_test() ->
+    State0 = start_state('STDDEV_SAMP'),
+    Data = [
+            1.0, 2.0, 3.0, 4.0, 2.0,
+            3.0, 4.0, 4.0, 4.0, 3.0,
+            2.0, 3.0, 2.0, 1.0, 1.0
+           ],
+    State9 = lists:foldl(fun 'STDDEV_SAMP'/2, State0, Data),
+    %% expected value calulated usingpostgres STDDEV_SAMP
+    ?assertEqual(
+        1.1212238211627762,
+        finalise('STDDEV_SAMP', State9)
+    ).
+
+stddev_pop_no_value_test() ->
     ?assertEqual(
         [], 
-        finalise('STDDEV', start_state('STDDEV'))
+        finalise('STDDEV_POP', start_state('STDDEV_POP'))
     ).
-stddev_one_value_test() ->
+stddev_pop_one_value_test() ->
     ?assertEqual(
         ?SQL_NULL, 
-        finalise('STDDEV', 'STDDEV'(3, start_state('STDDEV')))
+        finalise('STDDEV_POP', 'STDDEV_POP'(3, start_state('STDDEV_POP')))
     ).
-stddev_two_value_test() ->
+stddev_pop_two_value_test() ->
     ?assertEqual(
         0.5, 
-        finalise('STDDEV', lists:foldl(fun 'STDDEV'/2, start_state('STDDEV'), [1.0,2.0]))
+        finalise('STDDEV_POP', lists:foldl(fun 'STDDEV_POP'/2, start_state('STDDEV_POP'), [1.0,2.0]))
     ).
 
 

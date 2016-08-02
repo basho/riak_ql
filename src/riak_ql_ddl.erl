@@ -2,8 +2,7 @@
 %%
 %% riak_ql_ddl: API module for the DDL
 %%
-%%
-%% Copyright (c) 2007-2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -24,13 +23,43 @@
 
 -include("riak_ql_ddl.hrl").
 
-%% this function can be used to work out which Module to use
 -export([
+         get_field_type/2,
          make_module_name/1, make_module_name/2
         ]).
 
--type ddl() :: #ddl_v1{}.
--export_type([ddl/0]).
+-type simple_field_type()         :: varchar | sint64 | double | timestamp | boolean.
+
+%% Relational operators allowed in a where clause.
+-type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
+
+-type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
+-type data_value()       :: {integer, integer()}
+                          | {float, float()}
+                          | {boolean, boolean()}
+                          | {binary, binary()}.
+-type field_identifier() :: {identifier, [binary()]}.
+-type selection()  :: field_identifier()
+                    | data_value()
+                    | selection_function()
+                    | {expr, selection()}
+                    | {negate, selection()}
+                    | {relational_op(), selection(), selection()}.
+
+-type insertion()  :: field_identifier().
+-type filter()     :: term().
+
+-type ddl() :: ?DDL{}.
+
+-export_type([
+              data_value/0,
+              ddl/0,
+              field_identifier/0,
+              filter/0,
+              selection/0,
+              selection_function/0,
+              simple_field_type/0
+             ]).
 
 
 %% a helper function for destructuring data objects
@@ -40,20 +69,28 @@
 %% so this function can be called out to to pick
 %% apart the DDL records
 
--export([get_local_key/2, get_local_key/3]).
--export([get_partition_key/2, get_partition_key/3]).
--export([is_query_valid/3]).
+-export([
+         get_local_key/2, get_local_key/3,
+         get_partition_key/2, get_partition_key/3,
+         get_table/1,
+         insert_sql_columns/2,
+         is_insert_valid/3,
+         is_query_valid/3,
+         make_key/3,
+         syntax_error_to_msg/1
+        ]).
 %%-export([get_return_types_and_col_names/2]).
--export([make_key/3]).
--export([syntax_error_to_msg/1]).
 
 -type query_syntax_error() ::
         {bucket_type_mismatch, DDL_bucket::binary(), Query_bucket::binary()} |
         {incompatible_type, Field::binary(), simple_field_type(), atom()} |
         {incompatible_operator, Field::binary(), simple_field_type(), relational_op()}  |
         {unexpected_where_field, Field::binary()} |
+        {unexpected_insert_field, Field::binary()} |
         {unexpected_select_field, Field::binary()} |
-        {selections_cant_be_blank, []}.
+        {unknown_column_type, term()} |
+        {selections_cant_be_blank, []} |
+        {insertions_cant_be_blank, []}.
 
 -export_type([query_syntax_error/0]).
 
@@ -61,6 +98,8 @@
 -include_lib("eunit/include/eunit.hrl").
 %% for debugging only
 -export([make_ddl/2]).
+%% for other testing modules
+-export([parsed_sql_to_query/1]).
 -endif.
 
 -define(CANBEBLANK,  true).
@@ -71,10 +110,11 @@
 %% @doc Generate a unique module name for Table at version 1. @see
 %%      make_module_name/2.
 make_module_name(Table) ->
-    make_module_name(Table, 1).
+    make_module_name(Table, ?DDL_RECORD_VERSION).
 
--spec make_module_name(Table::binary(), Version::integer()) ->
-                              module().
+-spec make_module_name(Table   :: binary(),
+                       Version :: riak_ql_component:component_version()) ->
+                       module().
 %% @doc Generate a unique, but readable and recognizable, module name
 %%      for Table at a certain Version, by 'escaping' non-ascii chars
 %%      in Table a la C++.
@@ -91,27 +131,30 @@ maybe_mangle_char(C) when (C >= $a andalso C =< $z);
 maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
+-spec get_table(?DDL{}) -> term().
+get_table(?DDL{table = T}) ->
+    T.
 
--spec get_partition_key(#ddl_v1{}, tuple(), module()) -> term().
-get_partition_key(#ddl_v1{partition_key = PK}, Obj, Mod)
+-spec get_partition_key(?DDL{}, tuple(), module()) -> term().
+get_partition_key(?DDL{partition_key = PK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = PK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_partition_key(#ddl_v1{}, tuple()) -> term().
-get_partition_key(#ddl_v1{table = T}=DDL, Obj)
+-spec get_partition_key(?DDL{}, tuple()) -> term().
+get_partition_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_partition_key(DDL, Obj, Mod).
 
--spec get_local_key(#ddl_v1{}, tuple(), module()) -> term().
-get_local_key(#ddl_v1{local_key = LK}, Obj, Mod)
+-spec get_local_key(?DDL{}, tuple(), module()) -> term().
+get_local_key(?DDL{local_key = LK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_local_key(#ddl_v1{}, tuple()) -> term().
-get_local_key(#ddl_v1{table = T}=DDL, Obj)
+-spec get_local_key(?DDL{}, tuple()) -> term().
+get_local_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_local_key(DDL, Obj, Mod).
@@ -133,7 +176,7 @@ mk_k([#hash_fn_v1{mod = Md,
     A2 = extract(Args, Vals, []),
     V  = erlang:apply(Md, Fn, A2),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
-mk_k([#param_v1{name = [Nm]} | T1], Vals, Mod, Acc) ->
+mk_k([?SQL_PARAM{name = [Nm]} | T1], Vals, Mod, Acc) ->
     {Nm, V} = lists:keyfind(Nm, 1, Vals),
     Ty = Mod:get_field_type([Nm]),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]).
@@ -141,16 +184,16 @@ mk_k([#param_v1{name = [Nm]} | T1], Vals, Mod, Acc) ->
 -spec extract(list(), [{any(), any()}], [any()]) -> any().
 extract([], _Vals, Acc) ->
     lists:reverse(Acc);
-extract([#param_v1{name = [Nm]} | T], Vals, Acc) ->
+extract([?SQL_PARAM{name = [Nm]} | T], Vals, Acc) ->
     {Nm, Val} = lists:keyfind(Nm, 1, Vals),
     extract(T, Vals, [Val | Acc]);
 extract([Constant | T], Vals, Acc) ->
     extract(T, Vals, [Constant | Acc]).
 
--spec build([#param_v1{}], tuple(), atom(), any()) -> list().
+-spec build([?SQL_PARAM{}], tuple(), atom(), any()) -> list().
 build([], _Obj, _Mod, A) ->
     lists:reverse(A);
-build([#param_v1{name = Nm} | T], Obj, Mod, A) ->
+build([?SQL_PARAM{name = Nm} | T], Obj, Mod, A) ->
     Val = Mod:extract(Obj, Nm),
     Type = Mod:get_field_type(Nm),
     build(T, Obj, Mod, [{Type, Val} | A]);
@@ -162,16 +205,16 @@ build([#hash_fn_v1{mod  = Md,
     Val = erlang:apply(Md, Fn, A2),
     build(T, Obj, Mod, [{Ty, Val} | A]).
 
--spec convert([#param_v1{}], tuple(), atom(), [any()]) -> any().
+-spec convert([?SQL_PARAM{}], tuple(), atom(), [any()]) -> any().
 convert([], _Obj, _Mod, Acc) ->
     lists:reverse(Acc);
-convert([#param_v1{name = Nm} | T], Obj, Mod, Acc) ->
+convert([?SQL_PARAM{name = Nm} | T], Obj, Mod, Acc) ->
     Val = Mod:extract(Obj, Nm),
     convert(T, Obj, Mod, [Val | Acc]);
 convert([Constant | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Constant | Acc]).
 
-%% Convert an error emmitted from the :is_query_valid/3 function
+%% Convert an error emitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
 -spec syntax_error_to_msg(query_syntax_error()) ->
                                  Msg::binary().
@@ -181,15 +224,21 @@ syntax_error_to_msg(E) ->
 
 %%
 syntax_error_to_msg2({type_check_failed, Fn, Arity, ExprTypes}) ->
-    {"Function ~p/~p called with arguments of the wrong type ~p.", [Fn, Arity, ExprTypes]};
-syntax_error_to_msg2({fn_called_with_wrong_arity, Fn, Arity, NoArgs}) ->
-    {"Function ~p/~p called with ~p arguments.", [Fn, Arity, NoArgs]};
+    {"Function ~s/~p called with arguments of the wrong type ~p.",
+      [unquote_fn(Fn), Arity, ExprTypes]};
+syntax_error_to_msg2({fn_called_with_wrong_arity, Fn, Arity, NumArgs}) ->
+    {"Function ~s/~p called with ~p arguments.", [unquote_fn(Fn), Arity, NumArgs]};
 syntax_error_to_msg2({bucket_type_mismatch, B1, B2}) ->
     {"bucket_type_mismatch: DDL bucket type was ~s "
      "but query selected from bucket type ~s.", [B1, B2]};
 syntax_error_to_msg2({incompatible_type, Field, Expected, Actual}) ->
     {"incompatible_type: field ~s with type ~p cannot be compared "
      "to type ~p in where clause.", [Field, Expected, Actual]};
+syntax_error_to_msg2({incompatible_insert_type, Field, Expected, Actual}) ->
+    {"incompatible_insert_type: field ~s with type ~p cannot be inserted "
+    "to type ~p .", [Field, Actual, Expected]};
+syntax_error_to_msg2({incompatible_insert_type}) ->
+    {"incompatible_insert_type: bad type for inserted field"};
 syntax_error_to_msg2({incompatible_operator, Field, ColType, Op}) ->
     {"incompatible_operator: field ~s with type ~p cannot use "
      "operator ~p in where clause.", [Field, ColType, Op]};
@@ -199,25 +248,50 @@ syntax_error_to_msg2({unexpected_where_field, Field}) ->
 syntax_error_to_msg2({unexpected_select_field, Field}) ->
     {"unexpected_select_field: unexpected field ~s in select clause.",
      [Field]};
+syntax_error_to_msg2({unexpected_insert_field, Field}) ->
+    {"unexpected_select_field: unexpected field ~s in insert clause.",
+     [Field]};
 syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
     {"subexpressions_not_supported: expressions in where clause operators"
      " (~s ~s ...) are not supported.",
      [Field, Op]};
 syntax_error_to_msg2({unknown_column_type, Other}) ->
-    {"Unexpected select column type ~p.", [Other]}.
+    {"Unexpected select column type ~p.", [Other]};
+syntax_error_to_msg2({invalid_field_operation}) ->
+    {"Comparing or otherwise operating on two fields is not supported", []};
+syntax_error_to_msg2({argument_type_mismatch, Fn, Args}) ->
+    {"Function '~s' called with arguments of the wrong type ~p.", [Fn, Args]};
+syntax_error_to_msg2({operator_type_mismatch, Fn, Type1, Type2}) ->
+    {"Operator '~s' called with mismatched types [~p vs ~p].", [Fn, Type1, Type2]}.
 
+%% An atom with upper case chars gets printed as 'COUNT' so remove the
+%% quotes to make the error message more reable.
+unquote_fn(Fn) when is_atom(Fn) ->
+    string:strip(atom_to_list(Fn), both, $').
 
--spec is_query_valid(module(), #ddl_v1{}, ?SQL_SELECT{}) ->
+-spec is_query_valid(module(), ?DDL{}, {term(), term(), term()}) ->
                             true | {false, [query_syntax_error()]}.
-is_query_valid(_, #ddl_v1{ table = T1 },
-               ?SQL_SELECT{ 'FROM' = T2 }) when T1 =/= T2 ->
+is_query_valid(_, ?DDL{ table = T1 },
+               {T2, _Select, _Where}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
-is_query_valid(Mod, _,
-               ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = Selection},
-                           'WHERE'  = Where}) ->
+is_query_valid(Mod, _, {_Table, Selection, Where}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
+
+-spec is_insert_valid(module(), #ddl_v1{}, {term(), term(), term()}) ->
+                      true | {false, [query_syntax_error()]}.
+is_insert_valid(_, #ddl_v1{ table = T1 },
+                {T2, _Fields, _Values}) when T1 /= T2 ->
+    {false, [{bucket_type_mismatch, {T1, T2}}]};
+is_insert_valid(Mod, _DDL, {_Table, Fields, Values}) ->
+    ValidColumns = are_insert_columns_valid(Mod, Fields, ?CANTBEBLANK),
+    case ValidColumns of
+        true ->
+            are_insert_types_valid(Mod, Fields, Values);
+        _ ->
+            ValidColumns
+    end.
 
 %%
 is_query_valid_result(true,        true)        -> true;
@@ -252,6 +326,9 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
         false ->
             [{unexpected_where_field, Field} | Acc1]
     end;
+%% the case where two fields are being operated on
+is_filters_field_valid(_Mod, {_Op, _Field1, _Field2}, Acc1) when is_binary(_Field1), is_binary(_Field2) ->
+    [{invalid_field_operation} | Acc1];
 %% the case where RHS is an expression on its own (LHS must still be a valid field)
 is_filters_field_valid(_Mod, {Op, Field, {_RHS_op, _RHS_lhs_bare_value, _RHS_rhs}}, Acc1) ->
     [{subexpressions_not_supported, Field, Op} | Acc1].
@@ -330,35 +407,26 @@ are_selections_valid(Mod, Selections, _) ->
         fun(E, Acc) ->
                 is_selection_column_valid(Mod, E, Acc)
         end,
-    case lists:foldl(CheckFn, {[], true}, Selections) of
-        {[],   true}  -> true;
-        {Msgs, false} -> {false, lists:reverse(Msgs)}
+    case lists:foldl(CheckFn, [], Selections) of
+        []     -> true;
+        Errors -> {false, lists:reverse(Errors)}
     end.
 
 %% Reported error types must be supported by the function syntax_error_to_msg2
-is_selection_column_valid(Mod, {identifier, X}, {Acc, Status}) ->
+is_selection_column_valid(Mod, {identifier, X}, Acc) ->
     case Mod:is_field_valid(X) of
         true  ->
-            {Acc, Status};
+            Acc;
         false ->
-            Msg = {unexpected_select_field, hd(X)},
-            {[Msg | Acc], false}
+            [{unexpected_select_field, hd(X)} | Acc]
     end;
-is_selection_column_valid(Mod, {{window_agg_fn, Fn}, Args}, {Acc, Status}) ->
-    %% if the field is not an identifier, it should already be validated
-    {Arity, FnTypeSig} = riak_ql_window_agg_fns:get_arity_and_type_sig(Fn),
-    case length(Args) of
-        Arity when is_atom(FnTypeSig) ->
-            %% function takes args of any type
-            {Acc, Status};
-        Arity -> ExprTypes = type(Args, Mod, []),
-                 case do_types_match(FnTypeSig, ExprTypes) of
-                     true  -> {Acc, Status};
-                     false -> Msg1 = {type_check_failed, Fn, Arity, ExprTypes},
-                              {[Msg1 | Acc], false}
-                 end;
-        N     -> Msg2 = {fn_called_with_wrong_arity, Fn, Arity, N},
-                 {[Msg2 | Acc], false}
+is_selection_column_valid(_, {{window_agg_fn, Fn}, Args}, Acc) ->
+    ArgLen = length(Args),
+    case riak_ql_window_agg_fns:fn_arity(Fn) == ArgLen of
+        false ->
+            [{fn_called_with_wrong_arity, Fn, 1, length(Args)} | Acc];
+        true ->
+            Acc
     end;
 is_selection_column_valid(_, {Type, _}, Acc) when is_atom(Type) ->
     %% literal types, integer double etc.
@@ -366,23 +434,8 @@ is_selection_column_valid(_, {Type, _}, Acc) when is_atom(Type) ->
 is_selection_column_valid(_, {Op, _, _}, Acc) when is_atom(Op) ->
     %% arithmetic
     Acc;
-is_selection_column_valid(_, Other, {Acc, _}) ->
-    {[{unknown_column_type, Other} | Acc], false}.
-
-do_types_match(FnTypeSig, ExprTypes) ->
-    CheckFn = fun(X, Acc) ->
-                      case lists:keymember(X, 1, FnTypeSig) of
-                          true  -> Acc;
-                          false -> false
-                      end
-              end,
-    lists:foldl(CheckFn, true, ExprTypes).
-
-type([], _Mod, Acc) ->
-    lists:reverse(Acc);
-type([{identifier, I} | T], Mod, Acc) ->
-    NewAcc = Mod:get_field_type(I),
-    type(T, Mod, [NewAcc | Acc]).
+is_selection_column_valid(_, Other, Acc) ->
+    [{unknown_column_type, Other} | Acc].
 
 %% Fold over the syntax tree for a where clause.
 fold_where_tree([], Acc, _) ->
@@ -394,6 +447,122 @@ fold_where_tree({Op, LHS, RHS}, Acc1, Fn) when Op == and_; Op == or_ ->
     fold_where_tree(RHS, Acc2, Fn);
 fold_where_tree(Clause, Acc, Fn) ->
     Fn(Clause, Acc).
+
+-spec are_insert_columns_valid(module(), [insertion()], boolean()) ->
+    true | {false, [query_syntax_error()]}.
+are_insert_columns_valid(_, [], ?CANTBEBLANK) ->
+    {false, [{insertions_cant_be_blank, []}]};
+are_insert_columns_valid(Mod, Columns, _) ->
+    CheckFn =
+        fun(E, Acc) ->
+            is_insert_column_valid(Mod, E, Acc)
+        end,
+    case lists:foldl(CheckFn, [], Columns) of
+        []     -> true;
+        Errors -> {false, lists:reverse(Errors)}
+    end.
+
+%% Reported error types must be supported by the function syntax_error_to_msg2
+-spec is_insert_column_valid(module(), field_identifier(), list()) ->
+                             list(true | query_syntax_error()).
+is_insert_column_valid(Mod, {identifier, X}, Acc) ->
+    case Mod:is_field_valid(X) of
+        true  ->
+            Acc;
+        false ->
+            [{unexpected_insert_field, hd(X)} | Acc]
+    end;
+is_insert_column_valid(_, Other, Acc) ->
+    [{unexpected_insert_field, Other} | Acc].
+
+-spec are_insert_types_valid(module(), [insertion()], [[data_value()]]) ->
+    true | {false, [true | query_syntax_error()]}.
+are_insert_types_valid(Mod, Columns, Values) ->
+    VerifyRowFn =
+        fun(RowValues, Acc) ->
+            [is_insert_row_type_valid(Mod, Columns, RowValues) | Acc]
+        end,
+    InvalidRows = lists:foldl(VerifyRowFn, [], Values),
+    case lists:member(false, InvalidRows) of
+        true  -> incompatible_insert_type;
+        false -> true
+    end.
+
+-spec is_insert_row_type_valid(module(), [insertion()], [data_value()]) ->
+    [] | [false].
+is_insert_row_type_valid(Mod, Columns, RowValues) ->
+    ColPos = build_insert_col_positions(Mod, Columns, RowValues),
+    DataRow = build_insert_validation_obj(Mod, ColPos),
+    Mod:validate_obj(DataRow).
+
+-spec build_insert_col_positions(module(), [insertion()], [data_value()]) ->
+    [{pos_integer(), term()}].
+build_insert_col_positions(Mod, Columns, RowValues) ->
+    BuildListFn =
+        fun({{identifier, Col}, {_Type, Val}}, Acc) ->
+            Pos = Mod:get_field_position(Col),
+            [{Pos, Val} | Acc]
+        end,
+    Unsorted = lists:foldl(BuildListFn, [], match_columns_to_values(Columns, RowValues)),
+    lists:keysort(1, Unsorted).
+
+%% Make the list lengths match to allow construction of validation object
+-spec match_columns_to_values([field_identifier()], [data_value()]) ->
+                           [{field_identifier(), data_value()}].
+match_columns_to_values(Cols, Vals) when length(Cols) == length(Vals) ->
+    lists:zip(Cols, Vals);
+match_columns_to_values(Cols, Vals) when length(Cols) > length(Vals) ->
+    lists:zip(lists:sublist(Cols, 1, length(Vals)), Vals);
+match_columns_to_values(Cols, Vals) when length(Cols) < length(Vals) ->
+    lists:zip(Cols, lists:sublist(Vals, 1, length(Cols))).
+
+-spec build_insert_validation_obj(module(), [{pos_integer(), term()}]) ->
+    tuple().
+build_insert_validation_obj(Mod, ColPos) ->
+    Row = make_empty_insert_row(Mod),
+    ExtractFn = fun({Pos, Val}, Acc) ->
+        case is_integer(Pos) of
+            true -> setelement(Pos, Acc, Val);
+            _ -> Acc
+        end
+    end,
+    lists:foldl(ExtractFn, Row, ColPos).
+
+make_empty_insert_row(Mod) ->
+    Positions = Mod:get_field_positions(),
+    list_to_tuple(lists:duplicate(length(Positions), [])).
+
+%% If the INSERT command does not specify a list of columns
+%% the expected behaviour is that ALL columns are specified
+%% in the VALUES clause, so we insert a list of all columns
+%% for validation purposes
+-spec insert_sql_columns(module(), [field_identifier()]) -> [field_identifier()].
+insert_sql_columns(Mod, []) when is_atom(Mod) ->
+    default_insert_columns(Mod);
+insert_sql_columns(_Mod, Fields) ->
+    Fields.
+
+%% Build the default column list, if none is specified
+-spec default_insert_columns(module()) -> [field_identifier()].
+default_insert_columns(Mod) when is_atom(Mod) ->
+    ColPos = Mod:get_field_positions(),
+    FormatFn = fun({Col, _Pos}) when is_list(Col) ->
+                    {identifier, Col}
+               end,
+    lists:map(FormatFn, ColPos).
+
+%% Get the type of a field from the DDL datastructure.
+%%
+%% NOTE: If a compiled helper module is a available then use
+%% `Mod:get_field_type/1'.
+-spec get_field_type(#ddl_v1{}, binary()) -> {ok, simple_field_type()} | notfound.
+get_field_type(#ddl_v1{ fields = Fields }, FieldName) when is_binary(FieldName) ->
+    case lists:keyfind(FieldName, #riak_field_v1.name, Fields) of
+      #riak_field_v1{ type = Type } ->
+          {ok, Type};
+      false ->
+            notfound
+    end.
 
 -ifdef(TEST).
 -compile(export_all).
@@ -423,10 +592,10 @@ make_ddl(Table, Fields, PK) when is_binary(Table) ->
 
 make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
   when is_binary(Table) ->
-    #ddl_v1{table         = Table,
-            fields        = Fields,
-            partition_key = PK,
-            local_key     = LK}.
+    ?DDL{table         = Table,
+         fields        = Fields,
+         partition_key = PK,
+         local_key     = LK}.
 
 %%
 %% get partition_key tests
@@ -435,7 +604,7 @@ make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
 simplest_partition_key_test() ->
     Name = <<"yando">>,
     PK = #key_v1{ast = [
-                        #param_v1{name = [Name]}
+                        ?SQL_PARAM{name = [Name]}
                        ]},
     DDL = make_ddl(<<"simplest_partition_key_test">>,
                    [
@@ -453,8 +622,8 @@ simple_partition_key_test() ->
     Name1 = <<"yando">>,
     Name2 = <<"buckle">>,
     PK = #key_v1{ast = [
-                        #param_v1{name = [Name1]},
-                        #param_v1{name = [Name2]}
+                        ?SQL_PARAM{name = [Name1]},
+                        ?SQL_PARAM{name = [Name2]}
                        ]},
     DDL = make_ddl(<<"simple_partition_key_test">>,
                    [
@@ -478,11 +647,11 @@ function_partition_key_test() ->
     Name1 = <<"yando">>,
     Name2 = <<"buckle">>,
     PK = #key_v1{ast = [
-                        #param_v1{name = [Name1]},
+                        ?SQL_PARAM{name = [Name1]},
                         #hash_fn_v1{mod  = ?MODULE,
                                     fn   = mock_partition_fn,
                                     args = [
-                                            #param_v1{name = [Name2]},
+                                            ?SQL_PARAM{name = [Name2]},
                                             15,
                                             m
                                            ],
@@ -510,77 +679,6 @@ function_partition_key_test() ->
     Expected = [{varchar, <<"three">>}, {timestamp, mock_result}],
     ?assertEqual(Expected, Result).
 
-complex_partition_key_test() ->
-    Name0 = <<"yerp">>,
-    Name1 = <<"yando">>,
-    Name2 = <<"buckle">>,
-    Name3 = <<"doodle">>,
-    PK = #key_v1{ast = [
-                        #param_v1{name = [Name0, Name1]},
-                        #hash_fn_v1{mod  = ?MODULE,
-                                    fn   = mock_partition_fn,
-                                    args = [
-                                            #param_v1{name = [
-                                                              Name0,
-                                                              Name2,
-                                                              Name3
-                                                             ]},
-                                            "something",
-                                            pong
-                                           ],
-                                    type = poodle
-                                   },
-                        #hash_fn_v1{mod  = ?MODULE,
-                                    fn   = mock_partition_fn,
-                                    args = [
-                                            #param_v1{name = [
-                                                              Name0,
-                                                              Name1
-                                                             ]},
-                                            #param_v1{name = [
-                                                              Name0,
-                                                              Name2,
-                                                              Name3
-                                                             ]},
-                                            pang
-                                           ],
-                                    type = wombat
-                                   }
-                       ]},
-    Map3 = {map, [
-                  #riak_field_v1{name     = <<"in_Map_2">>,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map2 = {map, [
-                  #riak_field_v1{name     = Name3,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map1 = {map, [
-                  #riak_field_v1{name     = Name1,
-                                 position = 1,
-                                 type     = sint64},
-                  #riak_field_v1{name     = Name2,
-                                 position = 2,
-                                 type     = Map2},
-                  #riak_field_v1{name     = <<"Level_1_map2">>,
-                                 position = 3,
-                                 type     = Map3}
-                 ]},
-    DDL = make_ddl(<<"complex_partition_key_test">>,
-                   [
-                    #riak_field_v1{name     = Name0,
-                                   position = 1,
-                                   type     = Map1}
-                   ],
-                   PK),
-    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Obj = {{2, {3}, {4}}},
-    Result = (catch get_partition_key(DDL, Obj)),
-    Expected = [{sint64, 2}, {poodle, mock_result}, {wombat, mock_result}],
-    ?assertEqual(Expected, Result).
-
 %%
 %% get local_key tests
 %%
@@ -588,10 +686,10 @@ complex_partition_key_test() ->
 local_key_test() ->
     Name = <<"yando">>,
     PK = #key_v1{ast = [
-                        #param_v1{name = [Name]}
+                        ?SQL_PARAM{name = [Name]}
                        ]},
     LK = #key_v1{ast = [
-                        #param_v1{name = [Name]}
+                        ?SQL_PARAM{name = [Name]}
                        ]},
     DDL = make_ddl(<<"simplest_key_key_test">>,
                    [
@@ -605,86 +703,6 @@ local_key_test() ->
     Result = (catch get_local_key(DDL, Obj)),
     ?assertEqual([{varchar, Name}], Result).
 
-%%
-%% Maps
-%%
-
-simple_valid_map_get_type_1_test() ->
-    Map = {map, [
-                 #riak_field_v1{name     = <<"yarple">>,
-                                position = 1,
-                                type     = sint64}
-                ]},
-    DDL = make_ddl(<<"simple_valid_map_get_type_1_test">>,
-                   [
-                    #riak_field_v1{name     = <<"yando">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"erko">>,
-                                   position = 2,
-                                   type     = Map},
-                    #riak_field_v1{name     = <<"erkle">>,
-                                   position = 3,
-                                   type     = double}
-                   ]),
-    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Result = (catch Module:get_field_type([<<"erko">>, <<"yarple">>])),
-    ?assertEqual(sint64, Result).
-
-simple_valid_map_get_type_2_test() ->
-    Map = {map, [
-                 #riak_field_v1{name     = <<"yarple">>,
-                                position = 1,
-                                type     = sint64}
-                ]},
-    DDL = make_ddl(<<"simple_valid_map_get_type_2_test">>,
-                   [
-                    #riak_field_v1{name     = <<"yando">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"erko">>,
-                                   position = 2,
-                                   type     = Map},
-                    #riak_field_v1{name     = <<"erkle">>,
-                                   position = 3,
-                                   type     = double}
-                   ]),
-    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Result = (catch Module:get_field_type([<<"erko">>])),
-    ?assertEqual(map, Result).
-
-complex_valid_map_get_type_test() ->
-    Map3 = {map, [
-                  #riak_field_v1{name     = <<"in_Map_2">>,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map2 = {map, [
-                  #riak_field_v1{name     = <<"in_Map_1">>,
-                                 position = 1,
-                                 type     = sint64}
-                 ]},
-    Map1 = {map, [
-                  #riak_field_v1{name     = <<"Level_1_1">>,
-                                 position = 1,
-                                 type     = sint64},
-                  #riak_field_v1{name     = <<"Level_1_map1">>,
-                                 position = 2,
-                                 type     = Map2},
-                  #riak_field_v1{name     = <<"Level_1_map2">>,
-                                 position = 3,
-                                 type     = Map3}
-                 ]},
-    DDL = make_ddl(<<"complex_valid_map_get_type_test">>,
-                   [
-                    #riak_field_v1{name     = <<"Top_Map">>,
-                                   position = 1,
-                                   type     = Map1}
-                   ]),
-    {module, Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Path = [<<"Top_Map">>, <<"Level_1_map1">>, <<"in_Map_1">>],
-    Res = (catch Module:get_field_type(Path)),
-    ?assertEqual(sint64, Res).
 
 %%
 %% make_key tests
@@ -692,8 +710,8 @@ complex_valid_map_get_type_test() ->
 
 make_plain_key_test() ->
     Key = #key_v1{ast = [
-                         #param_v1{name = [<<"user">>]},
-                         #param_v1{name = [<<"time">>]}
+                         ?SQL_PARAM{name = [<<"user">>]},
+                         ?SQL_PARAM{name = [<<"time">>]}
                         ]},
     DDL = make_ddl(<<"make_plain_key_test">>,
                    [
@@ -718,11 +736,11 @@ make_plain_key_test() ->
 
 make_functional_key_test() ->
     Key = #key_v1{ast = [
-                         #param_v1{name = [<<"user">>]},
+                         ?SQL_PARAM{name = [<<"user">>]},
                          #hash_fn_v1{mod  = ?MODULE,
                                      fn   = mock_partition_fn,
                                      args = [
-                                             #param_v1{name = [<<"time">>]},
+                                             ?SQL_PARAM{name = [<<"time">>]},
                                              15,
                                              m
                                             ],
@@ -796,8 +814,7 @@ partial_are_selections_valid_fail_test() ->
 simple_is_query_valid_test() ->
     Bucket = <<"simple_is_query_valid_test">>,
     Selections  = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections}},
+    Query = {Bucket, Selections, []},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -806,63 +823,6 @@ simple_is_query_valid_test() ->
                     #riak_field_v1{name     = <<"geohash">>,
                                    position = 2,
                                    type     = sint64}
-                   ]),
-    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    ?assertEqual(
-       true,
-       riak_ql_ddl:is_query_valid(Mod, DDL, Query)
-      ).
-
-simple_is_query_valid_map_test() ->
-    Bucket = <<"simple_is_query_valid_map_test">>,
-    Name0 = <<"name">>,
-    Name1 = <<"temp">>,
-    Name2 = <<"geo">>,
-    Selections  = [{identifier, [<<"temp">>, <<"geo">>]},
-                   {identifier, [<<"name">>]}],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections}},
-    Map = {map, [
-                 #riak_field_v1{name     = Name2,
-                                position = 1,
-                                type     = sint64}
-                ]},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = Name0,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = Name1,
-                                   position = 2,
-                                   type     = Map}
-                   ]),
-    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    ?assertEqual(
-       true,
-       riak_ql_ddl:is_query_valid(Mod, DDL, Query)
-      ).
-
-simple_is_query_valid_map_wildcard_test() ->
-    Bucket = <<"simple_is_query_valid_map_wildcard_test">>,
-    Name0 = <<"name">>,
-    Name1 = <<"temp">>,
-    Name2 = <<"geo">>,
-    Selections  = [{identifier, [<<"temp">>, <<"*">>]}, {identifier, [<<"name">>]}],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections}},
-    Map = {map, [
-                 #riak_field_v1{name     = Name2,
-                                position = 1,
-                                type     = sint64}
-                ]},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = Name0,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = Name1,
-                                   position = 2,
-                                   type     = Map}
                    ]),
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
@@ -882,9 +842,7 @@ simple_filter_query_test() ->
               {'<', <<"temperature">>, {integer, 15}}
              }
             ],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections},
-                        'WHERE'  = Where},
+    Query = {Bucket, Selections, Where},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -912,9 +870,7 @@ full_filter_query_test() ->
                  {'<=', <<"lte field">>,  {integer, 15}},
                  {'>=', <<"gte field">>,  {integer, 15}}}}}}
             ],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections},
-                        'WHERE'  = Where},
+    Query = {Bucket, Selections, Where},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -948,9 +904,7 @@ timeseries_filter_test() ->
               }
              }
             ],
-    Query = ?SQL_SELECT{'FROM'   = Bucket,
-                        'SELECT' = #riak_sel_clause_v1{clause = Selections},
-                        'WHERE'  = Where},
+    Query = {Bucket, Selections, Where},
     Fields = [
               #riak_field_v1{name     = <<"geohash">>,
                              position = 1,
@@ -977,38 +931,66 @@ timeseries_filter_test() ->
                         #hash_fn_v1{mod  = riak_ql_quanta,
                                     fn   = quantum,
                                     args = [
-                                            #param_v1{name = [<<"time">>]},
+                                            ?SQL_PARAM{name = [<<"time">>]},
                                             15,
                                             s
                                            ]}
                        ]},
     LK = #key_v1{ast = [
-                        #param_v1{name = [<<"time">>]},
-                        #param_v1{name = [<<"user">>]}]
+                        ?SQL_PARAM{name = [<<"time">>]},
+                        ?SQL_PARAM{name = [<<"user">>]}]
                 },
-    DDL = #ddl_v1{table         = <<"timeseries_filter_test">>,
-                  fields        = Fields,
-                  partition_key = PK,
-                  local_key     = LK
-                 },
+    DDL = ?DDL{table         = <<"timeseries_filter_test">>,
+               fields        = Fields,
+               partition_key = PK,
+               local_key     = LK
+              },
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
     Expected = true,
     ?assertEqual(Expected, Res).
 
-test_parse(SQL) ->
-    element(2,
-            riak_ql_parser:parse(
-              riak_ql_lexer:get_tokens(SQL))).
+%% is_query_valid expects a 3-tuple: table name, fields, where clause
+parsed_sql_to_query(Proplist) ->
+    {
+      proplists:get_value(tables, Proplist, <<>>),
+      proplists:get_value(fields, Proplist, []),
+      proplists:get_value(where, Proplist, [])
+    }.
 
-is_query_valid_test_helper(Table_name, Table_def, Query) ->
+%% is_query_valid expects a 3-tuple: table name, fields, values
+parsed_sql_to_insert(Mod, Proplist) ->
+    {
+        proplists:get_value(table, Proplist, <<>>),
+        insert_sql_columns(Mod, proplists:get_value(fields, Proplist, [])),
+        proplists:get_value(values, Proplist, [])
+    }.
+
+test_parse(SQL) ->
+    case riak_ql_parser:ql_parse(
+           riak_ql_lexer:get_tokens(SQL)) of
+        {ddl, Parsed, _Props} ->
+            Parsed;
+        {_Species, Parsed} ->
+            Parsed
+    end.
+
+is_sql_valid_test_helper(Table_name, Table_def) ->
     Mod_name = make_module_name(iolist_to_binary(Table_name)),
     catch code:purge(Mod_name),
     catch code:purge(Mod_name),
     DDL = test_parse(Table_def),
     %% ?debugFmt("QUERY is ~p", [test_parse(Query)]),
-    {module,Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    is_query_valid(Mod, DDL, test_parse(Query)).
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
+    {DDL, Mod}.
+
+is_query_valid_test_helper(Table_name, Table_def, Query) ->
+    {DDL, Mod} = is_sql_valid_test_helper(Table_name, Table_def),
+    is_query_valid(Mod, DDL, parsed_sql_to_query(test_parse(Query))).
+
+is_insert_valid_test_helper(Table_name, Table_def, Insert) ->
+    {DDL, Mod} = is_sql_valid_test_helper(Table_name, Table_def),
+    is_insert_valid(Mod, DDL, parsed_sql_to_insert(Mod, test_parse(Insert))).
 
 -define(LARGE_TABLE_DEF,
         "CREATE TABLE mytab"
@@ -1178,12 +1160,68 @@ is_query_valid_no_subexpressions_1_test() ->
                                   "AND myfamily = 'bob' ")
       ).
 
+is_insert_valid_1_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, time, weather) VALUES"
+            "('hazen', 'world', 15, 'sunny')")).
+
+
+is_insert_valid_2_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 69, 'sunny', 45.0)")).
+
+is_insert_valid_out_of_order_1_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, weather, time) VALUES"
+            "('hazen', 'world', 'sunny', 15)")).
+
+is_insert_valid_wrong_type_1_test() ->
+    ?assertEqual(
+        incompatible_insert_type,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, weather, time) VALUES"
+            "('hazen', 'world', 4.5, 15)")).
+
+is_insert_valid_wrong_type_2_test() ->
+    ?assertEqual(
+        incompatible_insert_type,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 4.5, 15)")).
+
+is_insert_valid_too_many_1_test() ->
+    ?assertEqual(
+        incompatible_insert_type,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 4.5, 15, 'haggis', 'kilt')")).
+
+is_insert_valid_invalid_column_1_test() ->
+    ?assertEqual(
+        {false, [
+                 {unexpected_insert_field,<<"peppermint">>}]},
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, peppermint, time) VALUES"
+            "('hazen', 'world', 'cloudy', 15)")).
+
 fold_where_tree_test() ->
-    ?SQL_SELECT{ 'WHERE' = [Where] } = test_parse(
-                                         "SELECT * FROM mytab "
-                                         "WHERE time > 1 AND time < 10 "
-                                         "AND myfamily = 'family1' "
-                                         "AND myseries = 10 "),
+    Parsed = test_parse(
+               "SELECT * FROM mytab "
+               "WHERE time > 1 AND time < 10 "
+               "AND myfamily = 'family1' "
+               "AND myseries = 10 "),
+    Where = proplists:get_value(where, Parsed),
     ?assertEqual(
        [<<"myseries">>, <<"myfamily">>, <<"time">>, <<"time">>],
        lists:reverse(fold_where_tree(Where, [],
@@ -1214,7 +1252,7 @@ fold_where_tree_test() ->
                DDL = test_parse(CreateTab),
                {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
                Q = test_parse(SQL),
-               ?SQL_SELECT{'SELECT' = #riak_sel_clause_v1{clause = Selections}} = Q,
+               Selections = proplists:get_value(fields, Q),
                Got = are_selections_valid(Mod, Selections, ?CANTBEBLANK),
                ?assertEqual(Expected, Got)).
 
@@ -1241,17 +1279,10 @@ fold_where_tree_test() ->
 
 ?select_test(simple_agg_fn_select_2_test, "count(mysint64), avg(mydouble)", true).
 
-?select_test(simple_agg_fn_select_fail_1_test, "count(mysint64), avg(myvarchar)",
-             {false, [
-                      {type_check_failed, 'AVG', 1, [varchar]}
-                     ]
-             }).
-
 ?select_test(simple_agg_fn_select_fail_2_test, "count(mysint64, myboolean), avg(mysint64)",
              {false, [
                       {fn_called_with_wrong_arity, 'COUNT', 1, 2}
                      ]
              }).
-
 
 -endif.
