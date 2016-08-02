@@ -779,7 +779,7 @@ extract_key_field_list({list,
                        Extracted) ->
     [Modfun | extract_key_field_list({list, Rest}, Extracted)];
 extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [#param_v1{name = [Field]} |
+    [?SQL_PARAM{name = [Field]} |
      extract_key_field_list({list, Rest}, Extracted)].
 
 make_table_definition(TableName, Contents) ->
@@ -815,7 +815,7 @@ make_modfun(quantum, {list, Args}) ->
     {modfun, #hash_fn_v1{
                 mod  = riak_ql_quanta,
                 fn   = quantum,
-                args = [#param_v1{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
+                args = [?SQL_PARAM{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
                 type = timestamp
                }}.
 
@@ -877,7 +877,7 @@ assert_keys_present(_GoodDDL) ->
 %% @doc Ensure all fields appearing in PRIMARY KEY are not null.
 assert_primary_key_fields_non_null(?DDL{local_key = #key_v1{ast = LK},
                                         fields = Fields}) ->
-    PKFieldNames = [N || #param_v1{name = [N]} <- LK],
+    PKFieldNames = [N || ?SQL_PARAM{name = [N]} <- LK],
     OnlyPKFields = [F || #riak_field_v1{name = N} = F <- Fields,
                          lists:member(N, PKFieldNames)],
     NonNullFields =
@@ -910,7 +910,7 @@ assert_primary_and_local_keys_match(?DDL{partition_key = #key_v1{ast = Primary},
     end.
 
 assert_unique_fields_in_pk(?DDL{local_key = #key_v1{ast = LK}}) ->
-    Fields = [N || #param_v1{name = [N]} <- LK],
+    Fields = [N || ?SQL_PARAM{name = [N]} <- LK],
     case length(Fields) == length(lists:usort(Fields)) of
         true ->
             ok;
@@ -995,9 +995,9 @@ is_field(Field, Fields) ->
     (lists:keyfind(name_of(Field), 2, Fields) /= false).
 
 %%
-name_of(#param_v1{ name = [N] }) ->
+name_of(?SQL_PARAM{ name = [N] }) ->
     N;
-name_of(#hash_fn_v1{ args = [#param_v1{ name = [N] }|_] }) ->
+name_of(#hash_fn_v1{ args = [?SQL_PARAM{ name = [N] }|_] }) ->
     N.
 
 which_duplicate(FF) ->
@@ -1013,9 +1013,9 @@ which_duplicate([_|T], Acc) ->
 
 %% Pull the name out of the appropriate record
 query_field_name(#hash_fn_v1{args = Args}) ->
-    Param = lists:keyfind(param_v1, 1, Args),
+    Param = lists:keyfind(?SQL_PARAM_RECORD_NAME, 1, Args),
     query_field_name(Param);
-query_field_name(#param_v1{name = Field}) ->
+query_field_name(?SQL_PARAM{name = Field}) ->
     Field.
 
 -spec return_error_flat(string()) -> no_return().

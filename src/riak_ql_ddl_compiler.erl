@@ -221,14 +221,14 @@ canonical_ast_fmt(#hash_fn_v1{mod  = Mod,
     Args2 = [canonical_arg_fmt_v1(X) || X <- Args],
     string:join([atom_to_list(Mod), atom_to_list(Fn)]
                         ++ Args2 ++ [atom_to_list(Type)], " ");
-canonical_ast_fmt(#param_v1{name = [Nm]}) ->
+canonical_ast_fmt(?SQL_PARAM{name = [Nm]}) ->
     binary_to_list(Nm).
 
 canonical_arg_fmt_v1(B) when is_binary(B)    -> binary_to_list(B);
 canonical_arg_fmt_v1(F) when is_float(F)     -> float_to_list(F);
 canonical_arg_fmt_v1(N) when is_integer(N)   -> integer_to_list(N);
 canonical_arg_fmt_v1(A) when is_atom(A)      -> atom_to_list(A);
-canonical_arg_fmt_v1(#param_v1{name = [Nm]}) -> binary_to_list(Nm).
+canonical_arg_fmt_v1(?SQL_PARAM{name = [Nm]}) -> binary_to_list(Nm).
 
 %% the funny shape of this function is because it used to handle maps
 %% which needed recursion - not refactoring because it will be merled
@@ -326,10 +326,10 @@ expand_ast(AST, LineNo) when is_list(AST) ->
     Fields = [expand_a2(X, LineNo) || X <- AST],
     make_conses(lists:reverse(Fields), LineNo, {nil, LineNo}).
 
-expand_a2(#param_v1{name = Nm}, LineNo) ->
+expand_a2(?SQL_PARAM{name = Nm}, LineNo) ->
     Bins = [make_binary(X, LineNo) || X <- Nm],
     Conses = make_conses(Bins, LineNo, {nil, LineNo}),
-    make_tuple([make_atom(param_v1, LineNo) | [Conses]], LineNo);
+    make_tuple([make_atom(?SQL_PARAM_RECORD_NAME, LineNo) | [Conses]], LineNo);
 expand_a2(#hash_fn_v1{mod  = Mod,
                       fn   = Fn,
                       args = Args,
@@ -353,7 +353,7 @@ expand_args(Args, LineNo) ->
 
 %% this first clause jumps out to a different expansion tree
 %% to expand the parameter in the fuction args
-expand_args2(Arg, LineNo) when is_record(Arg, param_v1) ->
+expand_args2(Arg, LineNo) when is_record(Arg, ?SQL_PARAM_RECORD_NAME) ->
     expand_a2(Arg, LineNo);
 expand_args2(Arg, LineNo) when is_binary(Arg) ->
     make_binary(Arg, LineNo);
@@ -1100,7 +1100,7 @@ make_complex_ddl_ddl() ->
                     optional = false}
                 ],
        partition_key = #key_v1{ast = [
-                                      #param_v1{name = [<<"time">>]},
+                                      ?SQL_PARAM{name = [<<"time">>]},
                                       #hash_fn_v1{mod  = crypto,
                                                   fn   = hash,
                                                   %% list isn't a valid arg
@@ -1118,7 +1118,7 @@ make_complex_ddl_ddl() ->
                                   #hash_fn_v1{mod  = crypto,
                                               fn   = hash,
                                               args = [ripemd]},
-                                  #param_v1{name = [<<"time">>]}
+                                  ?SQL_PARAM{name = [<<"time">>]}
                                  ]}}.
 
 %%
@@ -1194,20 +1194,20 @@ make_timeseries_ddl() ->
                              optional = true}
              ],
     PK = #key_v1{ ast = [
-                        #param_v1{name = [<<"time">>]},
-                        #param_v1{name = [<<"user">>]},
+                        ?SQL_PARAM{name = [<<"time">>]},
+                        ?SQL_PARAM{name = [<<"user">>]},
                         #hash_fn_v1{mod  = riak_ql_quanta,
                                      fn   = quantum,
                                      args = [
-                                             #param_v1{name = [<<"time">>]},
+                                             ?SQL_PARAM{name = [<<"time">>]},
                                              15,
                                              s
                                             ],
                                    type = timestamp}
                         ]},
     LK = #key_v1{ast = [
-                        #param_v1{name = [<<"time">>]},
-                        #param_v1{name = [<<"user">>]}]
+                        ?SQL_PARAM{name = [<<"time">>]},
+                        ?SQL_PARAM{name = [<<"user">>]}]
                 },
     _DDL = ?DDL{table         = <<"timeseries_filter_test">>,
                 fields        = Fields,
