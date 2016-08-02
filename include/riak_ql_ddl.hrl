@@ -36,22 +36,22 @@
          }).
 
 
--define(PARAM, #param_v1).
--define(PARAM_RECORD_NAME, param_v1).
--define(PARAM_RECORD_VERSION, 1).
--record(?PARAM_RECORD_NAME, {
+-define(SQL_PARAM, #param_v1).
+-define(SQL_PARAM_RECORD_NAME, param_v1).
+-define(SQL_PARAM_RECORD_VERSION, 1).
+-record(?SQL_PARAM_RECORD_NAME, {
           name = [<<>>] :: [binary()]
          }).
 
 -record(hash_fn_v1, {
           mod       :: atom(),
           fn        :: atom(),
-          args = [] :: [?PARAM{} | any()],
+          args = [] :: [?SQL_PARAM{} | any()],
           type      :: riak_ql_ddl:simple_field_type()
          }).
 
 -record(key_v1, {
-          ast = [] :: [#hash_fn_v1{} | ?PARAM{}]
+          ast = [] :: [#hash_fn_v1{} | ?SQL_PARAM{}]
          }).
 
 -record(ddl_v1, {
