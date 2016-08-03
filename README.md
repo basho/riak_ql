@@ -1,147 +1,109 @@
 # Riak QL
 
+## Introduction
+
 riak_ql provides a number of different functions to Riak
+
 * a lexer/parser for the SQL sub-set we support
 * a function for calculating time quanta for Time Series
 * a compiler for generating helper modules to validate and manipulate records that correspond to a defined table schema in the DDL
 
 Link to the official and still private [docs](https://github.com/basho/private_basho_docs/tree/timeseries/1.0.0/source/languages/en/riakts).
 
-### Compiling and Decompiling
+This README is an overview of the repo. Individual sub-systems have their own documentation which will be linked to as appropriate.
 
-```
-Table_def = "CREATE TABLE MyTable (myfamily varchar not null, myseries varchar not null, time timestamp not null, weather varchar not null, temperature double, PRIMARY KEY ((myfamily, myseries, quantum(time, 10, 'm')), myfamily, myseries, time))".
+## Table Of Contents
 
-{ok, DDL} = riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def)).
-{ModName, AST} = riak_ql_ddl_compiler:compile(DDL).
+This document contains the following sections:
 
-riak_ql_ddl_compiler:write_source_to_files("/tmp", DDL, AST).
-```
+* Repository Contents
+* Runtime Tools
+* SQL Lexer/Parser
+* Time Quantiser Fn
+* DDL Compiler
+* Runtime Query Fns
+* Testing Strategy
 
-### Generated Modules
+## Repository Contents
 
-The structure and interfaces of the generated modules is shown as per this `.erl` file which has been reverse generated from the AST that riak_kv_ddl_compiler emits. The comments contain details of the fields and keys used in the creation of the DDL.
+This application contains the following files:
 
-```erlang
-%%% Generated Module, DO NOT EDIT
+* `riak_ql_cmd.erl`
+* `riak_ql_ddl_compiler.erl`
+* `riak_ql_ddl.erl`
+* `riak_ql_lexer.xrl`
+* `riak_ql_parser.yrl`
+* `riak_ql_quanta.erl`
+* `riak_ql_to_string.erl`
+* `riak_ql_window_agg_fns.erl`
 
-%%% Validates the DDL
+----
 
-%%% Table         : timeseries_filter_test
-%%% Fields        : [{riak_field_v1,<<"geohash">>,1,varchar,false},
-                     {riak_field_v1,<<"user">>,2,varchar,false},
-                     {riak_field_v1,<<"time">>,3,timestamp,false},
-                     {riak_field_v1,<<"weather">>,4,varchar,false},
-                     {riak_field_v1,<<"temperature">>,5,varchar,true}]
-%%% Partition_Key : {key_v1,
-                        [{param_v1,[<<"time">>]},
-                         {param_v1,[<<"user">>]},
-                         {hash_fn_v1,riak_ql_quanta,quantum,
-                             [{param_v1,[<<"time">>]},15,s],
-                             timestamp}]}
-%%% Local_Key     : {key_v1,[{param_v1,[<<"time">>]},{param_v1,[<<"user">>]}]}
+## Runtime Tools
 
+There is an escript that lets you run the lexer/parser from the command line - it is designed to help developers/operators check their syntax.
 
--module('riak_ql_table_timeseries_filter_test$1').
+* `riak_ql_cmd.erl`
 
--export([validate_obj/1, add_column_info/1,
-   get_ddl_compiler_version/0, get_field_type/1,
-   get_field_position/1, get_field_positions/0,
-   is_field_valid/1, extract/2, get_ddl/0,
-   get_identity_hashes/0, get_identity_plaintext_DEBUG/0]).
+Please read the inline documentation for this module.
 
-validate_obj({Var1_geohash, Var2_user, Var3_time,
-        Var4_weather, Var5_temperature})
-    when is_binary(Var1_geohash), is_binary(Var2_user),
-   is_integer(Var3_time) andalso Var3_time > 0,
-   is_binary(Var4_weather),
-   Var5_temperature =:= [] orelse
-     is_binary(Var5_temperature) ->
-    true;
-validate_obj(_) -> false.
+## SQL Lexer/Parser
 
-add_column_info({Var1_geohash, Var2_user, Var3_time,
-     Var4_weather, Var5_temperature}) ->
-    [{<<"geohash">>, Var1_geohash}, {<<"user">>, Var2_user},
-     {<<"time">>, Var3_time}, {<<"weather">>, Var4_weather},
-     {<<"temperature">>, Var5_temperature}].
+The SQL Lexer/Parser takes a string representation of a SQL query and then compiles it. The modules that perform this are:
 
-extract(Obj, [<<"geohash">>]) when is_tuple(Obj) ->
-    element(1, Obj);
-extract(Obj, [<<"user">>]) when is_tuple(Obj) ->
-    element(2, Obj);
-extract(Obj, [<<"time">>]) when is_tuple(Obj) ->
-    element(3, Obj);
-extract(Obj, [<<"weather">>]) when is_tuple(Obj) ->
-    element(4, Obj);
-extract(Obj, [<<"temperature">>]) when is_tuple(Obj) ->
-    element(5, Obj).
+* `riak_ql_lexer.xrl`
+* `riak_ql_parser.yrl`
 
-get_field_type([<<"geohash">>]) -> varchar;
-get_field_type([<<"user">>]) -> varchar;
-get_field_type([<<"time">>]) -> timestamp;
-get_field_type([<<"weather">>]) -> varchar;
-get_field_type([<<"temperature">>]) -> varchar.
+Running `./rebar compile` transforms this pair of leex and yecc files into the executable Erlang counterparts:
 
-get_field_position([<<"geohash">>]) -> 1;
-get_field_position([<<"user">>]) -> 2;
-get_field_position([<<"time">>]) -> 3;
-get_field_position([<<"weather">>]) -> 4;
-get_field_position([<<"temperature">>]) -> 5;
-get_field_position(_Other) -> undefined.
+* `riak_ql_lexer.erl`
+* `riak_ql_parser.erl`
 
-get_field_positions() ->
-    [{[<<"geohash">>], 1}, {[<<"user">>], 2},
-     {[<<"time">>], 3}, {[<<"weather">>], 4},
-     {[<<"temperature">>], 5}].
+For more details of the lexer and parser see the [Lexer And Parser](./doc/lexer_parser.md)
 
-is_field_valid([<<"*">>]) -> true;
-is_field_valid([<<"temperature">>]) -> true;
-is_field_valid([<<"weather">>]) -> true;
-is_field_valid([<<"time">>]) -> true;
-is_field_valid([<<"user">>]) -> true;
-is_field_valid([<<"geohash">>]) -> true;
-is_field_valid(_) -> false.
+To understand how the lexer/parser fits into the query pipeline see [Query Pipeline](./doc/the_query_pipeline.md)
 
-get_ddl_compiler_version() -> 2.
+There is a ruby script and set of SQL keywords which can be used to generate some of the lexer components of `riak_lexer.xrl`:
 
-get_ddl() ->
-    {ddl_v1, <<"timeseries_filter_test">>,
-     [{riak_field_v1, <<"geohash">>, 1, varchar, false},
-      {riak_field_v1, <<"user">>, 2, varchar, false},
-      {riak_field_v1, <<"time">>, 3, timestamp, false},
-      {riak_field_v1, <<"weather">>, 4, varchar, false},
-      {riak_field_v1, <<"temperature">>, 5, varchar, true}],
-     {key_v1,
-      [{param_v1, [<<"time">>]}, {param_v1, [<<"user">>]},
-       {hash_fn_v1, riak_ql_quanta, quantum,
-  [{param_v1, [<<"time">>]}, 15, s], timestamp}]},
-     {key_v1,
-      [{param_v1, [<<"time">>]}, {param_v1, [<<"user">>]}]}}.
+* `priv/keyword_general.rb`
+* `priv/riak_ql_keywords.csv`
 
-get_identity_hashes() ->
-    [<<40, 248, 114, 113, 162, 156, 172, 55, 204, 167, 25,
-       11, 253, 130, 238, 88>>].
+For more details see the [Lexer Keywords](./doc/lexer_keywords.md)
 
-get_identity_plaintext_DEBUG() ->
-    "FIELDS: geohash varchar not null: user "
-    "varchar not null: time timestamp not "
-    "null: weather varchar not null: temperature "
-    "varchar: PRIMARY KEY: time: user: riak_ql_qua"
-    "nta quantum time 15 s timestamp: LOCAL "
-    "KEY: time: user".
-```
+This code generates one of two output records:
 
-### Keywords in the Lexer
+* `ddl_v1{}` - which captures the `CREATE TABLE...` statement
+* `riak_select_v1{}` - which captures a `SELECT * FROM...` statement
 
-The keyword definitions in the lexer are formulaic and repetitive. They're generated using the `priv/riak_ql_keywords.csv` file and `priv/keyword_generator.rb` script.
+**NOTE:** the output of the lexer is a proplist of record field names and values - the actual record is constructed *over the fence* from `riak_ql` in `riak_kv` for the purposes of simplifying inter-repo dependency management.
 
-To add new keywords to the lexer:
+## Time Quantiser
 
-1. Add them to the `priv/riak_ql_keywords.csv` file, one per line. Keeping this file in alphabetic order simplifies future changes.
-2. Run `ruby priv/keyword_generator.rb` with Ruby 1.9.3 or newer.
-3. Replace the keyword definitions near the top of `src/riak_ql_lexer.xrl` with the regex definitions (first chunk of output) from the message generator.
-4. Replace the keyword rules in the `src/riak_ql_lexer.xrl` file with the second chunk of output from the message generator.
-5. Save and commit the csv and lexer changes.
+Time quantisation is done by the module:
 
-If this is done correctly, the commit diff should simply be a few lines added to the csv and a few lines added to the lexer.
+* `riak_ql_quanta.erl`
+
+Please read the inline documentation for this module.
+
+## DDL Compiler
+
+The DDL compiler is implemented by:
+
+* `riak_ql_ddl_compiler.erl`
+* `riak_ql_ddl.erl`
+
+When a `CREATE TABLE...` statement if fed into the lexer/parser it generates a `#ddl_v1{}` - a data description language. This captures the structure of the table. The DDL compiler then generates a helper module for that table which allows for the programmatic manipulation of data in that particular format via a common and fixed API.
+
+The module `riak_ql_ddl_compiler.erl` performs the compilation and the module `riak_ql_ddl.erl` provides a set of wrappers around the compiled module to add utility functions to the API.
+
+For more details see the [DDL Compiler](./doc/ddl_compiler.md)
+
+## Runtime Query Fns
+
+The runtime query system performs operations on data in the query pipeline by calling a set of library functions. These are defined in:
+
+* `riak_ql_window_agg_fns.erl`
+
+## Testing Strategy
+
+Details of the testing strategy are written up in [`riak_test` And Test Strategy](./doc/riak_test_and_test_strategy.md)
