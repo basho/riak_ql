@@ -36,19 +36,22 @@
          }).
 
 
--record(param_v1, {
+-define(SQL_PARAM, #param_v1).
+-define(SQL_PARAM_RECORD_NAME, param_v1).
+-define(SQL_PARAM_RECORD_VERSION, 1).
+-record(?SQL_PARAM_RECORD_NAME, {
           name = [<<>>] :: [binary()]
          }).
 
 -record(hash_fn_v1, {
           mod       :: atom(),
           fn        :: atom(),
-          args = [] :: [#param_v1{} | any()],
+          args = [] :: [?SQL_PARAM{} | any()],
           type      :: riak_ql_ddl:simple_field_type()
          }).
 
 -record(key_v1, {
-          ast = [] :: [#hash_fn_v1{} | #param_v1{}]
+          ast = [] :: [#hash_fn_v1{} | ?SQL_PARAM{}]
          }).
 
 -record(ddl_v1, {
@@ -57,7 +60,6 @@
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
          }).
-
 -define(DDL, #ddl_v1).
 -define(DDL_RECORD_NAME, ddl_v1).
 -define(DDL_RECORD_VERSION, 1).

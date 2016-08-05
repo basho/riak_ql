@@ -9,7 +9,9 @@ AND = (A|a)(N|n)(D|d)
 BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
 BY = (B|b)(Y|y)
 CREATE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)
+DESCRIBE = (D|d)(E|e)(S|s)(C|c)(R|r)(I|i)(B|b)(E|e)
 DOUBLE = (D|d)(O|o)(U|u)(B|b)(L|l)(E|e)
+EXPLAIN = (E|e)(X|x)(P|p)(L|l)(A|a)(I|i)(N|n)
 FALSE = (F|f)(A|a)(L|l)(S|s)(E|e)
 FROM = (F|f)(R|r)(O|o)(M|m)
 GROUP = (G|g)(R|r)(O|o)(U|u)(P|p)
@@ -23,9 +25,10 @@ OR = (O|o)(R|r)
 PRIMARY = (P|p)(R|r)(I|i)(M|m)(A|a)(R|r)(Y|y)
 QUANTUM = (Q|q)(U|u)(A|a)(N|n)(T|t)(U|u)(M|m)
 SELECT = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
-DESCRIBE = (D|d)(E|e)(S|s)(C|c)(R|r)(I|i)(B|b)(E|e)
+SHOW = (S|s)(H|h)(O|o)(W|w)
 SINT64 = (S|s)(I|i)(N|n)(T|t)64
 TABLE = (T|t)(A|a)(B|b)(L|l)(E|e)
+TABLES = (T|t)(A|a)(B|b)(L|l)(E|e)(S|s)
 TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
 TRUE = (T|t)(R|r)(U|u)(E|e)
 VALUES = (V|v)(A|a)(L|l)(U|u)(E|e)(S|s)
@@ -74,7 +77,9 @@ Rules.
 {BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
 {BY} : {token, {by, list_to_binary(TokenChars)}}.
 {CREATE} : {token, {create, list_to_binary(TokenChars)}}.
+{DESCRIBE} : {token, {describe, list_to_binary(TokenChars)}}.
 {DOUBLE} : {token, {double, list_to_binary(TokenChars)}}.
+{EXPLAIN} : {token, {explain, list_to_binary(TokenChars)}}.
 {FALSE} : {token, {false, list_to_binary(TokenChars)}}.
 {FROM} : {token, {from, list_to_binary(TokenChars)}}.
 {INSERT} : {token, {insert, list_to_binary(TokenChars)}}.
@@ -88,9 +93,10 @@ Rules.
 {PRIMARY} : {token, {primary, list_to_binary(TokenChars)}}.
 {QUANTUM} : {token, {quantum, list_to_binary(TokenChars)}}.
 {SELECT} : {token, {select, list_to_binary(TokenChars)}}.
-{DESCRIBE} : {token, {describe, list_to_binary(TokenChars)}}.
+{SHOW} : {token, {show, list_to_binary(TokenChars)}}.
 {SINT64} : {token, {sint64, list_to_binary(TokenChars)}}.
 {TABLE} : {token, {table, list_to_binary(TokenChars)}}.
+{TABLES} : {token, {tables, list_to_binary(TokenChars)}}.
 {TIMESTAMP} : {token, {timestamp, list_to_binary(TokenChars)}}.
 {TRUE} : {token, {true, list_to_binary(TokenChars)}}.
 {VALUES} : {token, {values, list_to_binary(TokenChars)}}.
