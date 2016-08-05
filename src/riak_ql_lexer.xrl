@@ -10,6 +10,7 @@ BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
 CREATE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)
 DESCRIBE = (D|d)(E|e)(S|s)(C|c)(R|r)(I|i)(B|b)(E|e)
 DOUBLE = (D|d)(O|o)(U|u)(B|b)(L|l)(E|e)
+EXPLAIN = (E|e)(X|x)(P|p)(L|l)(A|a)(I|i)(N|n)
 FALSE = (F|f)(A|a)(L|l)(S|s)(E|e)
 FROM = (F|f)(R|r)(O|o)(M|m)
 KEY = (K|k)(E|e)(Y|y)
@@ -75,6 +76,7 @@ Rules.
 {CREATE} : {token, {create, list_to_binary(TokenChars)}}.
 {DESCRIBE} : {token, {describe, list_to_binary(TokenChars)}}.
 {DOUBLE} : {token, {double, list_to_binary(TokenChars)}}.
+{EXPLAIN} : {token, {explain, list_to_binary(TokenChars)}}.
 {FALSE} : {token, {false, list_to_binary(TokenChars)}}.
 {FROM} : {token, {from, list_to_binary(TokenChars)}}.
 {INSERT} : {token, {insert, list_to_binary(TokenChars)}}.
