@@ -7,12 +7,14 @@ Definitions.
 
 AND = (A|a)(N|n)(D|d)
 BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
+BY = (B|b)(Y|y)
 CREATE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)
 DESCRIBE = (D|d)(E|e)(S|s)(C|c)(R|r)(I|i)(B|b)(E|e)
 DOUBLE = (D|d)(O|o)(U|u)(B|b)(L|l)(E|e)
 EXPLAIN = (E|e)(X|x)(P|p)(L|l)(A|a)(I|i)(N|n)
 FALSE = (F|f)(A|a)(L|l)(S|s)(E|e)
 FROM = (F|f)(R|r)(O|o)(M|m)
+GROUP = (G|g)(R|r)(O|o)(U|u)(P|p)
 KEY = (K|k)(E|e)(Y|y)
 INSERT = (I|i)(N|n)(S|s)(E|e)(R|r)(T|t)
 INTO = (I|i)(N|n)(T|t)(O|o)
@@ -73,6 +75,7 @@ Rules.
 
 {AND} : {token, {and_, list_to_binary(TokenChars)}}.
 {BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
+{BY} : {token, {by, list_to_binary(TokenChars)}}.
 {CREATE} : {token, {create, list_to_binary(TokenChars)}}.
 {DESCRIBE} : {token, {describe, list_to_binary(TokenChars)}}.
 {DOUBLE} : {token, {double, list_to_binary(TokenChars)}}.
@@ -81,6 +84,7 @@ Rules.
 {FROM} : {token, {from, list_to_binary(TokenChars)}}.
 {INSERT} : {token, {insert, list_to_binary(TokenChars)}}.
 {INTO} : {token, {into, list_to_binary(TokenChars)}}.
+{GROUP} : {token, {group, list_to_binary(TokenChars)}}.
 {KEY} : {token, {key, list_to_binary(TokenChars)}}.
 {LIMIT} : {token, {limit, list_to_binary(TokenChars)}}.
 {NOT} : {token, {not_, list_to_binary(TokenChars)}}.

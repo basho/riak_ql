@@ -44,6 +44,7 @@ KeyField
 KeyFieldArgList
 KeyFieldArg
 NotNull
+GroupBy
 
 %% ValueExpression
 %% CommonValueExpression
@@ -78,6 +79,7 @@ Terminals
 or_
 and_
 boolean
+by
 character_literal
 comma
 create
@@ -94,6 +96,7 @@ identifier
 insert
 integer
 into
+group
 key
 limit
 left_paren
@@ -130,6 +133,8 @@ Endsymbol '$end'.
 Statement -> StatementWithoutSemicolon : '$1'.
 Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
+GroupBy -> group by Fields: {group_by, '$3'}.
+
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
@@ -140,9 +145,8 @@ StatementWithoutSemicolon -> ShowTables : '$1'.
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
-%% No joins for you!
-Select -> select Fields from Buckets : make_select({select, multi_table_error}, '$2', '$3', '$4').
-
+Select -> select Fields from Bucket Where GroupBy 
+                                          : make_select('$1', '$2', '$3', '$4', '$5', '$6').
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
 
@@ -389,7 +393,8 @@ Erlang code.
           fields  = [],
           limit   = [],
           where   = [],
-          ops     = []
+          ops     = [],
+          group_by
          }).
 
 -include("riak_ql_ddl.hrl").
@@ -428,30 +433,91 @@ convert(#outputs{type    = select,
                  buckets = B,
                  fields  = F,
                  limit   = L,
-                 where   = W}) ->
+                 where   = W,
+                 group_by = G} = Outputs) ->
+    ok = validate_select_query(Outputs),
     [
      {type, select},
      {tables, B},
      {fields, F},
      {limit, L},
-     {where, W}
+     {where, W},
+     {group_by, G}
     ];
 convert(#outputs{type = create} = O) ->
     O.
 
-%% make_atom({binary, SomeWord}) ->
-%%     {atom, binary_to_atom(SomeWord, utf8)}.
+validate_select_query(Outputs) ->
+    ok = assert_group_by_select(Outputs),
+    ok = assert_group_by_is_valid(Outputs).
+
+%% If the query uses GROUP BY then check that the identifiers in the select
+%% all exist in the GROUP BY.
+assert_group_by_select(#outputs{ group_by = [] }) ->
+    ok;
+assert_group_by_select(#outputs{ fields = Fields, group_by = GroupBy }) ->
+    Identifiers = lists:flatten(
+        [lists:reverse(find_group_identifiers(ColumnSelect, [])) || ColumnSelect <- Fields]),
+    IllegalIdentifiers =
+        [to_identifier_name(Identifier)|| Identifier <- Identifiers, not is_identifier_in_groups(Identifier, GroupBy)],
+    case IllegalIdentifiers of
+        [] ->
+            ok;
+        _ ->
+            return_error_flat("Field(s) " ++ string:join(IllegalIdentifiers,", ") ++ " are specified in the select statement but not the GROUP BY.")
+    end.
+
+
+%%
+assert_group_by_is_valid(#outputs{ group_by = GroupBy }) ->
+    case lists:member({identifier, [<<"*">>]}, GroupBy) of
+        false ->
+            ok;
+        true ->
+            return_error_flat("GROUP BY can only contain table columns but '*' was found.")
+    end.
+
+%%
+is_identifier_in_groups({identifier, [F]}, GroupBy) ->
+    lists:member({identifier, F}, GroupBy);
+is_identifier_in_groups(Identifier, GroupBy) ->
+    lists:member(Identifier, GroupBy).
+
+%% Identifier field name as a string.
+to_identifier_name({identifier, [F]}) ->
+    binary_to_list(F);
+to_identifier_name({identifier, F}) ->
+    binary_to_list(F).
+
+%% Recurse through a column in the select clause to find identifiers that must
+%% be specified in the GROUP BY.
+find_group_identifiers({identifier, [<<"*">>]} = Identifier, Acc) ->
+    [Identifier|Acc];
+find_group_identifiers({identifier, _} = Identifier, Acc) ->
+    [Identifier|Acc];
+find_group_identifiers({negate, Expr}, Acc) ->
+    find_group_identifiers(Expr, Acc);
+find_group_identifiers({Op, Left, Right}, Acc) when is_atom(Op) ->
+    find_group_identifiers(Right, find_group_identifiers(Left, Acc));
+find_group_identifiers({{window_agg_fn, _}, _}, Acc) ->
+    %% identifiers in aggregate functions are ok
+    Acc;
+find_group_identifiers({_, _}, Acc) ->
+    Acc.
 
 make_select({select, multi_table_error}, _B, _C, _D) ->
     return_error(0, <<"Must provide exactly one table name">>);
 make_select(A, B, C, D) ->
     make_select(A, B, C, D, {where, []}).
 
+make_select(A, B, C, D, E) -> make_select(A, B, C, D, E, {group_by, []}).
+
 make_select({select, _SelectBytes},
             Select,
             {from, _FromBytes},
             {Type, D},
-            {_WhereType, E}) ->
+            {_Where, E},
+            {group_by, GroupFields}) ->
     Bucket = case Type of
                  identifier -> D;
                  list   -> {list, [X || X <- D]};
@@ -463,11 +529,12 @@ make_select({select, _SelectBytes},
                    end,
     FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
     FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
-    _O = #outputs{type    = select,
-                  fields  = FieldsWrappedIdentifiers,
-                  buckets = Bucket,
-                  where   = E
-                 }.
+    #outputs{type    = select,
+             fields  = FieldsWrappedIdentifiers,
+             buckets = Bucket,
+             where   = E,
+             group_by = lists:flatten([GroupFields])
+            }.
 
 
 wrap_identifier({identifier, IdentifierName})

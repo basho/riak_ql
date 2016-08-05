@@ -137,3 +137,125 @@ select_quoted_escape_sql_test() ->
                  }
                 ]}
        ]).
+
+group_by_one_field_test() ->
+    Query_sql =
+        "SELECT b FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY b",
+    ?assertEqual(
+        {select, [
+                  {tables, <<"mytab">>},
+                  {fields, [{identifier, [<<"b">>]}]},
+                  {limit,  []},
+                  {where,  [{'=', <<"a">>, {integer, 1}}]},
+                  {group_by, [{identifier, <<"b">>}]}
+                 ]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+group_by_two_fields_test() ->
+    Query_sql =
+        "SELECT a, b FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {select, [
+                  {tables, <<"mytab">>},
+                  {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
+                  {limit,  []},
+                  {where,  [{'=', <<"a">>, {integer, 1}}]},
+                  {group_by, [{identifier, <<"a">>}, {identifier, <<"b">>}]}
+                 ]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+selection_fields_must_be_in_group_by_1_test() ->
+    Query_sql =
+        "SELECT c FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) c are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+selection_fields_must_be_in_group_by_2_test() ->
+    Query_sql =
+        "SELECT c, d FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) c, d are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+selection_fields_must_be_in_group_by_3_test() ->
+    Query_sql =
+        "SELECT a, d FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) d are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+selection_fields_must_be_in_group_by_arithmetic_left_test() ->
+    Query_sql =
+        "SELECT d + 1 FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) d are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+selection_fields_must_be_in_group_by_arithmetic_left_right_test() ->
+    Query_sql =
+        "SELECT d + e FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) d, e are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+selection_fields_must_be_in_group_by_arithmetic_right_test() ->
+    Query_sql =
+        "SELECT 2 + d FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) d are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+select_all_not_allowed_as_column_with_group_by_test() ->
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertEqual(
+        {error, {0, riak_ql_parser, <<"Field(s) * are specified in the select statement but not the GROUP BY.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+select_all_not_allowed_in_group_by_test() ->
+    Query_sql =
+        "SELECT AVG(x) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY *, b",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"GROUP BY can only contain table columns but '*' was found.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+field_in_aggregate_function_does_not_have_to_be_in_group_by_test() ->
+    Query_sql =
+        "SELECT AVG(x) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b",
+    ?assertMatch(
+        {select, [_|_]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
