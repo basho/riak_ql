@@ -240,6 +240,16 @@ select_all_not_allowed_as_column_with_group_by_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
+select_all_not_allowed_in_group_by_test() ->
+    Query_sql =
+        "SELECT AVG(x) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY *, b",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"GROUP BY can only contain table columns but '*' was found.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
 field_in_aggregate_function_does_not_have_to_be_in_group_by_test() ->
     Query_sql =
         "SELECT AVG(x) FROM mytab "

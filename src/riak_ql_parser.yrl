@@ -439,7 +439,8 @@ convert(#outputs{type = create} = O) ->
     O.
 
 validate_select_query(Outputs) ->
-    ok = assert_group_by_select(Outputs).
+    ok = assert_group_by_select(Outputs),
+    ok = assert_group_by_is_valid(Outputs).
 
 %% If the query uses GROUP BY then check that the identifiers in the select
 %% all exist in the GROUP BY.
@@ -455,6 +456,16 @@ assert_group_by_select(#outputs{ fields = Fields, group_by = GroupBy }) ->
             ok;
         _ ->
             return_error_flat("Field(s) " ++ string:join(IllegalIdentifiers,", ") ++ " are specified in the select statement but not the GROUP BY.")
+    end.
+
+
+%%
+assert_group_by_is_valid(#outputs{ group_by = GroupBy }) ->
+    case lists:member({identifier, [<<"*">>]}, GroupBy) of
+        false ->
+            ok;
+        true ->
+            return_error_flat("GROUP BY can only contain table columns but '*' was found.")
     end.
 
 %%
