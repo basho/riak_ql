@@ -74,6 +74,7 @@
 -export([
          get_local_key/2, get_local_key/3,
          get_partition_key/2, get_partition_key/3,
+         get_table/1,
          insert_sql_columns/2,
          is_insert_valid/3,
          is_query_valid/3,
@@ -132,6 +133,9 @@ maybe_mangle_char(C) when (C >= $a andalso C =< $z);
 maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
+-spec get_table(?DDL{}) -> term().
+get_table(?DDL{table = T}) ->
+    T.
 
 -spec get_partition_key(?DDL{}, tuple(), module()) -> term().
 get_partition_key(?DDL{partition_key = PK}, Obj, Mod)
@@ -175,7 +179,7 @@ mk_k([#hash_fn_v1{mod = Md,
     A2 = extract(Args, Vals, []),
     V  = erlang:apply(Md, Fn, A2),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
-mk_k([#param_v1{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
+mk_k([?SQL_PARAM{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
     case lists:keyfind(Nm, 1, Vals) of
         {Nm, V} ->
             Ty = Mod:get_field_type([Nm]),
@@ -187,16 +191,16 @@ mk_k([#param_v1{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
 -spec extract(list(), [{any(), any()}], [any()]) -> any().
 extract([], _Vals, Acc) ->
     lists:reverse(Acc);
-extract([#param_v1{name = [Nm], ordering = Ordering} | T], Vals, Acc) ->
+extract([?SQL_PARAM{name = [Nm], ordering = Ordering} | T], Vals, Acc) ->
     {Nm, Val} = lists:keyfind(Nm, 1, Vals),
     extract(T, Vals, [apply_ordering(Val, Ordering) | Acc]);
 extract([Constant | T], Vals, Acc) ->
     extract(T, Vals, [Constant | Acc]).
 
--spec build([#param_v1{}], tuple(), atom(), any()) -> list().
+-spec build([?SQL_PARAM{}], tuple(), atom(), any()) -> list().
 build([], _Obj, _Mod, A) ->
     lists:reverse(A);
-build([#param_v1{name = Nm, ordering = Ordering} | T], Obj, Mod, A) ->
+build([?SQL_PARAM{name = Nm, ordering = Ordering} | T], Obj, Mod, A) ->
     Val = Mod:extract(Obj, Nm),
     Type = Mod:get_field_type(Nm),
     build(T, Obj, Mod, [{Type, apply_ordering(Val, Ordering)} | A]);
@@ -208,10 +212,10 @@ build([#hash_fn_v1{mod  = Md,
     Val = erlang:apply(Md, Fn, A2),
     build(T, Obj, Mod, [{Ty, Val} | A]).
 
--spec convert([#param_v1{}], tuple(), atom(), [any()]) -> any().
+-spec convert([?SQL_PARAM{}], tuple(), atom(), [any()]) -> any().
 convert([], _Obj, _Mod, Acc) ->
     lists:reverse(Acc);
-convert([#param_v1{name = Nm} | T], Obj, Mod, Acc) ->
+convert([?SQL_PARAM{name = Nm} | T], Obj, Mod, Acc) ->
     Val = Mod:extract(Obj, Nm),
     convert(T, Obj, Mod, [Val | Acc]);
 convert([Constant | T], Obj, Mod, Acc) ->
@@ -294,9 +298,9 @@ is_query_valid(Mod, _, {_Table, Selection, Where}) ->
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
 
--spec is_insert_valid(module(), #ddl_v1{}, {term(), term(), term()}) ->
+-spec is_insert_valid(module(), ?DDL{}, {term(), term(), term()}) ->
                       true | {false, [query_syntax_error()]}.
-is_insert_valid(_, #ddl_v1{ table = T1 },
+is_insert_valid(_, ?DDL{ table = T1 },
                 {T2, _Fields, _Values}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_insert_valid(Mod, _DDL, {_Table, Fields, Values}) ->
@@ -570,8 +574,8 @@ default_insert_columns(Mod) when is_atom(Mod) ->
 %%
 %% NOTE: If a compiled helper module is a available then use
 %% `Mod:get_field_type/1'.
--spec get_field_type(#ddl_v1{}, binary()) -> {ok, simple_field_type()} | notfound.
-get_field_type(#ddl_v1{ fields = Fields }, FieldName) when is_binary(FieldName) ->
+-spec get_field_type(?DDL{}, binary()) -> {ok, simple_field_type()} | notfound.
+get_field_type(?DDL{ fields = Fields }, FieldName) when is_binary(FieldName) ->
     case lists:keyfind(FieldName, #riak_field_v1.name, Fields) of
       #riak_field_v1{ type = Type } ->
           {ok, Type};
@@ -619,7 +623,7 @@ make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
 simplest_partition_key_test() ->
     Name = <<"yando">>,
     PK = #key_v1{ast = [
-                        #param_v1{name = [Name]}
+                        ?SQL_PARAM{name = [Name]}
                        ]},
     DDL = make_ddl(<<"simplest_partition_key_test">>,
                    [
@@ -637,8 +641,8 @@ simple_partition_key_test() ->
     Name1 = <<"yando">>,
     Name2 = <<"buckle">>,
     PK = #key_v1{ast = [
-                        #param_v1{name = [Name1]},
-                        #param_v1{name = [Name2]}
+                        ?SQL_PARAM{name = [Name1]},
+                        ?SQL_PARAM{name = [Name2]}
                        ]},
     DDL = make_ddl(<<"simple_partition_key_test">>,
                    [
@@ -662,11 +666,11 @@ function_partition_key_test() ->
     Name1 = <<"yando">>,
     Name2 = <<"buckle">>,
     PK = #key_v1{ast = [
-                        #param_v1{name = [Name1]},
+                        ?SQL_PARAM{name = [Name1]},
                         #hash_fn_v1{mod  = ?MODULE,
                                     fn   = mock_partition_fn,
                                     args = [
-                                            #param_v1{name = [Name2]},
+                                            ?SQL_PARAM{name = [Name2]},
                                             15,
                                             m
                                            ],
@@ -701,10 +705,10 @@ function_partition_key_test() ->
 local_key_test() ->
     Name = <<"yando">>,
     PK = #key_v1{ast = [
-                        #param_v1{name = [Name]}
+                        ?SQL_PARAM{name = [Name]}
                        ]},
     LK = #key_v1{ast = [
-                        #param_v1{name = [Name]}
+                        ?SQL_PARAM{name = [Name]}
                        ]},
     DDL = make_ddl(<<"simplest_key_key_test">>,
                    [
@@ -725,8 +729,8 @@ local_key_test() ->
 
 make_plain_key_test() ->
     Key = #key_v1{ast = [
-                         #param_v1{name = [<<"user">>]},
-                         #param_v1{name = [<<"time">>]}
+                         ?SQL_PARAM{name = [<<"user">>]},
+                         ?SQL_PARAM{name = [<<"time">>]}
                         ]},
     DDL = make_ddl(<<"make_plain_key_test">>,
                    [
@@ -750,41 +754,20 @@ make_plain_key_test() ->
     ?assertEqual(Expected, Got).
 
 make_functional_key_test() ->
-    PK = #key_v1{ast = [
-                         #param_v1{name = [<<"user">>]},
-                         #hash_fn_v1{mod  = ?MODULE,
-                                     fn   = mock_partition_fn,
-                                     args = [
-                                             #param_v1{name = [<<"time">>]},
-                                             15,
-                                             m
-                                            ],
-                                     type = timestamp
-                                    }
-                        ]},
-
-    LK = #key_v1{ast = [
-                         #param_v1{name = [<<"user">>]},
-                         #param_v1{name = [<<"time">>]} ]},
-    DDL = make_ddl(<<"make_plain_key_test">>,
-                   [
-                    #riak_field_v1{name     = <<"user">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"time">>,
-                                   position = 2,
-                                   type     = timestamp}
-                   ],
-                   PK,
-                   LK),
-    Time = 12345,
+    Table_def =
+        "CREATE TABLE make_plain_key_test ("
+        "user VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((user, quantum(time, 15, 'm')), user, time))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
     Vals = [
             {<<"user">>, <<"user_1">>},
-            {<<"time">>, Time}
+            {<<"time">>, 12345}
            ],
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Got = make_key(Mod, PK, Vals),
-    Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
+    Got = make_key(Mod, DDL?DDL.local_key, Vals),
+    Expected = [{varchar, <<"user_1">>}, {timestamp, 12345}],
     ?assertEqual(Expected, Got).
 
 %%
@@ -950,14 +933,14 @@ timeseries_filter_test() ->
                         #hash_fn_v1{mod  = riak_ql_quanta,
                                     fn   = quantum,
                                     args = [
-                                            #param_v1{name = [<<"time">>]},
+                                            ?SQL_PARAM{name = [<<"time">>]},
                                             15,
                                             s
                                            ]}
                        ]},
     LK = #key_v1{ast = [
-                        #param_v1{name = [<<"time">>]},
-                        #param_v1{name = [<<"user">>]}]
+                        ?SQL_PARAM{name = [<<"time">>]},
+                        ?SQL_PARAM{name = [<<"user">>]}]
                 },
     DDL = ?DDL{table         = <<"timeseries_filter_test">>,
                fields        = Fields,

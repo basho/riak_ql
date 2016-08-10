@@ -186,10 +186,10 @@ build_identity_hash_fns(?DDL{} = DDL, LineNo) ->
     {[?Q(HashFn), ?Q(DebugFn)], LineNo + 1}.
 
 %% not using DDL macro because this will be version specific
-make_plain_text(#ddl_v1{table         = Table,
-                        fields        = Fields,
-                        partition_key = PK,
-                        local_key     = LK}) ->
+make_plain_text(?DDL{table         = Table,
+                     fields        = Fields,
+                     partition_key = PK,
+                     local_key     = LK}) ->
    string:join(["\"TABLE"]
                ++ io_lib:format("~s", [Table])
                ++ ["FIELDS"]
@@ -223,14 +223,14 @@ canonical_ast_fmt(#hash_fn_v1{mod  = Mod,
     Args2 = [canonical_arg_fmt_v1(X) || X <- Args],
     string:join([atom_to_list(Mod), atom_to_list(Fn)]
                         ++ Args2 ++ [atom_to_list(Type)], " ");
-canonical_ast_fmt(#param_v1{name = [Nm]}) ->
+canonical_ast_fmt(?SQL_PARAM{name = [Nm]}) ->
     binary_to_list(Nm).
 
 canonical_arg_fmt_v1(B) when is_binary(B)    -> binary_to_list(B);
 canonical_arg_fmt_v1(F) when is_float(F)     -> float_to_list(F);
 canonical_arg_fmt_v1(N) when is_integer(N)   -> integer_to_list(N);
 canonical_arg_fmt_v1(A) when is_atom(A)      -> atom_to_list(A);
-canonical_arg_fmt_v1(#param_v1{name = [Nm]}) -> binary_to_list(Nm).
+canonical_arg_fmt_v1(?SQL_PARAM{name = [Nm]}) -> binary_to_list(Nm).
 
 %% the funny shape of this function is because it used to handle maps
 %% which needed recursion - not refactoring because it will be merled
@@ -307,9 +307,9 @@ build_field_orders_fn_string(?DDL{ local_key = #key_v1{ ast = AST } }) ->
     lists:flatten(io_lib:format("field_orders() -> ~p.",[Orders])).
 
 %%
-order_from_key_field(#param_v1{ ordering = undefined }) ->
+order_from_key_field(?SQL_PARAM{ ordering = undefined }) ->
     ascending;
-order_from_key_field(#param_v1{ ordering = Ordering }) ->
+order_from_key_field(?SQL_PARAM{ ordering = Ordering }) ->
     Ordering;
 order_from_key_field(_) ->
     ascending.
@@ -323,14 +323,14 @@ build_revert_ordering_on_local_key_fn(DDL, LineNum) ->
 %%
 build_revert_ordering_on_local_key_fn_string(?DDL{ local_key = #key_v1{ ast = AST } } = DDL) ->
     FieldNameArgs =
-        string:join([to_var_name_string(N) || #param_v1{ name = N } <- AST], ","),
+        string:join([to_var_name_string(N) || ?SQL_PARAM{ name = N } <- AST], ","),
     Results =
         string:join([revert_ordering_on_local_key_element(DDL, P) || P <- AST], ","),
     lists:flatten(io_lib:format(
         "revert_ordering_on_local_key({~s}) -> [~s].",[FieldNameArgs, Results])).
 
 %%
-revert_ordering_on_local_key_element(DDL, #param_v1{ name = N1, ordering = descending }) ->
+revert_ordering_on_local_key_element(DDL, ?SQL_PARAM{ name = N1, ordering = descending }) ->
     N2 = to_var_name_string(N1),
     case field_type(DDL, hd(N1)) of
         varchar ->
@@ -341,7 +341,7 @@ revert_ordering_on_local_key_element(DDL, #param_v1{ name = N1, ordering = desce
         _ ->
             N2
     end;
-revert_ordering_on_local_key_element(_, #param_v1{ name = N }) ->
+revert_ordering_on_local_key_element(_, ?SQL_PARAM{ name = N }) ->
     to_var_name_string(N).
 
 %%
@@ -352,7 +352,7 @@ to_var_name_string(FieldName) when is_binary(FieldName) ->
     [string:to_upper([H]) | Tail].
 
 %%
-field_type(#ddl_v1{ fields = Fields }, FieldName) ->
+field_type(?DDL{ fields = Fields }, FieldName) ->
     #riak_field_v1{ type = Type } =
         lists:keyfind(FieldName, #riak_field_v1.name, Fields),
     Type.
@@ -393,13 +393,20 @@ expand_ast(AST, LineNo) when is_list(AST) ->
     Fields = [expand_a2(X, LineNo) || X <- AST],
     make_conses(lists:reverse(Fields), LineNo, {nil, LineNo}).
 
-expand_a2(#param_v1{name = _Nm, ordering = _Ordering} = Param, _LineNo) ->
+% <<<<<<< HEAD
+expand_a2(?SQL_PARAM{name = _Nm, ordering = _Ordering} = Param, _LineNo) ->
     %% Bins = [make_binary(X, LineNo) || X <- Nm],
     %% Conses = make_conses(Bins, LineNo, {nil, LineNo}),
     %% make_tuple([make_atom(param_v1, LineNo),
     %%             [Conses],
     %%             make_atom(Ordering, LineNo)], LineNo);
     erl_parse:abstract(Param);
+% =======
+% expand_a2(?SQL_PARAM{name = Nm}, LineNo) ->
+%     Bins = [make_binary(X, LineNo) || X <- Nm],
+%     Conses = make_conses(Bins, LineNo, {nil, LineNo}),
+%     make_tuple([make_atom(?SQL_PARAM_RECORD_NAME, LineNo) | [Conses]], LineNo);
+% >>>>>>> 3b5de80fddb781bb1aa15c4e42fc8ff907f4a516
 expand_a2(#hash_fn_v1{mod  = Mod,
                       fn   = Fn,
                       args = Args,
@@ -423,7 +430,7 @@ expand_args(Args, LineNo) ->
 
 %% this first clause jumps out to a different expansion tree
 %% to expand the parameter in the fuction args
-expand_args2(Arg, LineNo) when is_record(Arg, param_v1) ->
+expand_args2(Arg, LineNo) when is_record(Arg, ?SQL_PARAM_RECORD_NAME) ->
     expand_a2(Arg, LineNo);
 expand_args2(Arg, LineNo) when is_binary(Arg) ->
     make_binary(Arg, LineNo);
@@ -1157,38 +1164,14 @@ complex_ddl_test() ->
     ?assertEqual(?VALID, Result).
 
 make_complex_ddl_ddl() ->
-    ?DDL{
-       table = <<"temperatures">>,
-       fields = [
-                 #riak_field_v1{
-                    name     = <<"time">>,
-                    position = 1,
-                    type     = timestamp,
-                    optional = false},
-                 #riak_field_v1{
-                    name     = <<"user_id">>,
-                    position = 2,
-                    type     = varchar,
-                    optional = false}
-                ],
-       partition_key = #key_v1{ast = [
-                                      #param_v1{name = [<<"time">>]},
-                                      #hash_fn_v1{mod  = crypto,
-                                                  fn   = hash,
-                                                  %% list isn't a valid arg
-                                                  %% type output from the
-                                                  %% lexer/parser
-                                                  args = [
-                                                          sha512,
-                                                          true,
-                                                          1,
-                                                          1.0,
-                                                          <<"abc">>
-                                                         ]}
-                                     ]},
-       local_key = #key_v1{ast = [
-                                  #param_v1{name = [<<"time">>]}
-                                 ]}}.
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "time    TIMESTAMP NOT NULL, "
+        "user_id VARCHAR NOT NULL, "
+        "PRIMARY KEY ((user_id, quantum(time, 15, 's')), user_id, time))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    DDL.
 
 %%
 %% test the get_ddl function
@@ -1263,20 +1246,20 @@ make_timeseries_ddl() ->
                              optional = true}
              ],
     PK = #key_v1{ ast = [
-                        #param_v1{name = [<<"time">>]},
-                        #param_v1{name = [<<"user">>]},
+                        ?SQL_PARAM{name = [<<"time">>]},
+                        ?SQL_PARAM{name = [<<"user">>]},
                         #hash_fn_v1{mod  = riak_ql_quanta,
                                      fn   = quantum,
                                      args = [
-                                             #param_v1{name = [<<"time">>]},
+                                             ?SQL_PARAM{name = [<<"time">>]},
                                              15,
                                              s
                                             ],
                                    type = timestamp}
                         ]},
     LK = #key_v1{ast = [
-                        #param_v1{name = [<<"time">>]},
-                        #param_v1{name = [<<"user">>]}]
+                        ?SQL_PARAM{name = [<<"time">>]},
+                        ?SQL_PARAM{name = [<<"user">>]}]
                 },
     _DDL = ?DDL{table         = <<"timeseries_filter_test">>,
                 fields        = Fields,

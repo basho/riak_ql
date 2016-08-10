@@ -9,7 +9,9 @@ Statement
 StatementWithoutSemicolon
 Query
 Select
+Explain
 Describe
+ShowTables
 Bucket
 Buckets
 Field
@@ -42,6 +44,7 @@ KeyField
 KeyFieldArgList
 KeyFieldArg
 NotNull
+GroupBy
 
 %% ValueExpression
 %% CommonValueExpression
@@ -77,6 +80,7 @@ or_
 and_
 asc
 boolean
+by
 character_literal
 comma
 create
@@ -84,6 +88,7 @@ desc
 describe
 double
 equals_operator
+explain
 false
 float
 from
@@ -93,6 +98,7 @@ identifier
 insert
 integer
 into
+group
 key
 limit
 left_paren
@@ -110,9 +116,11 @@ regex
 right_paren
 select
 semicolon
+show
 sint64
 solidus
 table
+tables
 timestamp
 true
 values
@@ -127,16 +135,25 @@ Endsymbol '$end'.
 Statement -> StatementWithoutSemicolon : '$1'.
 Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
+GroupBy -> group by Fields: {group_by, '$3'}.
+
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
+StatementWithoutSemicolon -> Explain : '$1'.
 StatementWithoutSemicolon -> Insert : '$1'.
+StatementWithoutSemicolon -> ShowTables : '$1'.
 
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
-Select -> select Fields from Buckets Where : make_select('$1', '$2', '$3', '$4', '$5').
-Select -> select Fields from Buckets       : make_select('$1', '$2', '$3', '$4').
+Select -> select Fields from Bucket Where GroupBy 
+                                          : make_select('$1', '$2', '$3', '$4', '$5', '$6').
+Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
+Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
+
+%% EXPLAIN STATEMENT
+Explain -> explain Query : make_explain('$2').
 
 %% 20.9 DESCRIBE STATEMENT
 Describe -> describe Bucket : make_describe('$2').
@@ -155,8 +172,8 @@ Field -> NumericValueExpression : '$1'.
 %Field -> Identifier    : canonicalise_col('$1').
 Field -> asterisk : make_wildcard('$1').
 
-Buckets -> Buckets comma Bucket : make_list('$1', '$3').
-Buckets -> Bucket               : '$1'.
+%% Support early error on multi-table select
+Buckets -> Bucket comma Bucket : make_list('$1', '$3').
 
 Bucket -> Identifier   : '$1'.
 
@@ -197,6 +214,8 @@ Comp -> nomatch                : '$1'.
 %% Comp -> notapprox           : '$1'.
 
 CreateTable -> create table : create_table.
+
+ShowTables -> show tables : [{type, show_tables}].
 
 NotNull -> not_ null : '$1'.
 
@@ -316,7 +335,7 @@ KeyFieldList -> KeyField : ['$1'].
 KeyField -> quantum left_paren KeyFieldArgList right_paren :
     element(2, make_modfun(quantum, '$3')).
 KeyField -> Identifier OptOrdering  : 
-    #param_v1{name = [element(2, '$1')], ordering = '$2'}.
+    ?SQL_PARAM{name = [element(2, '$1')], ordering = '$2'}.
 
 OptOrdering -> '$empty' : undefined.
 OptOrdering -> asc : ascending.
@@ -348,6 +367,7 @@ RowValue -> FieldValue : ['$1'].
 
 FieldValue -> integer : '$1'.
 FieldValue -> float : '$1'.
+FieldValue -> TruthValue : '$1'.
 FieldValue -> CharacterLiteral : '$1'.
 FieldValue -> Identifier : '$1'.
 
@@ -376,12 +396,13 @@ Erlang code.
 
 -record(outputs,
         {
-          type :: create | describe | insert | select,
+          type :: create | describe | explain | insert | select,
           buckets = [],
           fields  = [],
           limit   = [],
           where   = [],
-          ops     = []
+          ops     = [],
+          group_by
          }).
 
 -include("riak_ql_ddl.hrl").
@@ -420,27 +441,91 @@ convert(#outputs{type    = select,
                  buckets = B,
                  fields  = F,
                  limit   = L,
-                 where   = W}) ->
+                 where   = W,
+                 group_by = G} = Outputs) ->
+    ok = validate_select_query(Outputs),
     [
      {type, select},
      {tables, B},
      {fields, F},
      {limit, L},
-     {where, W}
+     {where, W},
+     {group_by, G}
     ];
 convert(#outputs{type = create} = O) ->
     O.
 
-%% make_atom({binary, SomeWord}) ->
-%%     {atom, binary_to_atom(SomeWord, utf8)}.
+validate_select_query(Outputs) ->
+    ok = assert_group_by_select(Outputs),
+    ok = assert_group_by_is_valid(Outputs).
 
-make_select(A, B, C, D) -> make_select(A, B, C, D, {where, []}).
+%% If the query uses GROUP BY then check that the identifiers in the select
+%% all exist in the GROUP BY.
+assert_group_by_select(#outputs{ group_by = [] }) ->
+    ok;
+assert_group_by_select(#outputs{ fields = Fields, group_by = GroupBy }) ->
+    Identifiers = lists:flatten(
+        [lists:reverse(find_group_identifiers(ColumnSelect, [])) || ColumnSelect <- Fields]),
+    IllegalIdentifiers =
+        [to_identifier_name(Identifier)|| Identifier <- Identifiers, not is_identifier_in_groups(Identifier, GroupBy)],
+    case IllegalIdentifiers of
+        [] ->
+            ok;
+        _ ->
+            return_error_flat("Field(s) " ++ string:join(IllegalIdentifiers,", ") ++ " are specified in the select statement but not the GROUP BY.")
+    end.
+
+
+%%
+assert_group_by_is_valid(#outputs{ group_by = GroupBy }) ->
+    case lists:member({identifier, [<<"*">>]}, GroupBy) of
+        false ->
+            ok;
+        true ->
+            return_error_flat("GROUP BY can only contain table columns but '*' was found.")
+    end.
+
+%%
+is_identifier_in_groups({identifier, [F]}, GroupBy) ->
+    lists:member({identifier, F}, GroupBy);
+is_identifier_in_groups(Identifier, GroupBy) ->
+    lists:member(Identifier, GroupBy).
+
+%% Identifier field name as a string.
+to_identifier_name({identifier, [F]}) ->
+    binary_to_list(F);
+to_identifier_name({identifier, F}) ->
+    binary_to_list(F).
+
+%% Recurse through a column in the select clause to find identifiers that must
+%% be specified in the GROUP BY.
+find_group_identifiers({identifier, [<<"*">>]} = Identifier, Acc) ->
+    [Identifier|Acc];
+find_group_identifiers({identifier, _} = Identifier, Acc) ->
+    [Identifier|Acc];
+find_group_identifiers({negate, Expr}, Acc) ->
+    find_group_identifiers(Expr, Acc);
+find_group_identifiers({Op, Left, Right}, Acc) when is_atom(Op) ->
+    find_group_identifiers(Right, find_group_identifiers(Left, Acc));
+find_group_identifiers({{window_agg_fn, _}, _}, Acc) ->
+    %% identifiers in aggregate functions are ok
+    Acc;
+find_group_identifiers({_, _}, Acc) ->
+    Acc.
+
+make_select({select, multi_table_error}, _B, _C, _D) ->
+    return_error(0, <<"Must provide exactly one table name">>);
+make_select(A, B, C, D) ->
+    make_select(A, B, C, D, {where, []}).
+
+make_select(A, B, C, D, E) -> make_select(A, B, C, D, E, {group_by, []}).
 
 make_select({select, _SelectBytes},
             Select,
             {from, _FromBytes},
             {Type, D},
-            {_WhereType, E}) ->
+            {_Where, E},
+            {group_by, GroupFields}) ->
     Bucket = case Type of
                  identifier -> D;
                  list   -> {list, [X || X <- D]};
@@ -452,11 +537,12 @@ make_select({select, _SelectBytes},
                    end,
     FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
     FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
-    _O = #outputs{type    = select,
-                  fields  = FieldsWrappedIdentifiers,
-                  buckets = Bucket,
-                  where   = E
-                 }.
+    #outputs{type    = select,
+             fields  = FieldsWrappedIdentifiers,
+             buckets = Bucket,
+             where   = E,
+             group_by = lists:flatten([GroupFields])
+            }.
 
 
 wrap_identifier({identifier, IdentifierName})
@@ -469,6 +555,11 @@ make_describe({identifier, D}) ->
      {type, describe},
      {identifier, D}
     ].
+
+%% For explain just change the output type
+make_explain(#outputs{type = select} = S) ->
+    Props = convert(S),
+    lists:keyreplace(type, 1, Props, {type, explain}).
 
 make_insert({identifier, Table}, Fields, Values) ->
     FieldsAsList = case is_list(Fields) of
@@ -765,6 +856,16 @@ make_table_element_list(A, {table_element_list, B}) ->
 make_table_element_list(A, B) ->
     {table_element_list, lists:flatten([A, B])}.
 
+% extract_key_field_list({list, []}, Extracted) ->
+%     Extracted;
+% extract_key_field_list({list,
+%                         [Modfun = #hash_fn_v1{} | Rest]},
+%                        Extracted) ->
+%     [Modfun | extract_key_field_list({list, Rest}, Extracted)];
+% extract_key_field_list({list, [Field | Rest]}, Extracted) ->
+%     [?SQL_PARAM{name = [Field]} |
+%      extract_key_field_list({list, Rest}, Extracted)].
+
 make_table_definition(TableName, Contents) ->
     make_table_definition(TableName, Contents, []).
 make_table_definition({identifier, Table}, Contents, Properties) ->
@@ -798,7 +899,7 @@ make_modfun(quantum, {list, Args}) ->
     {modfun, #hash_fn_v1{
                 mod  = riak_ql_quanta,
                 fn   = quantum,
-                args = [#param_v1{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
+                args = [?SQL_PARAM{name = [Param]}, Quantity, binary_to_existing_atom(Unit, utf8)],
                 type = timestamp
                }}.
 
@@ -862,7 +963,7 @@ assert_keys_present(_GoodDDL) ->
 %% @doc Ensure all fields appearing in PRIMARY KEY are not null.
 assert_primary_key_fields_non_null(?DDL{local_key = #key_v1{ast = LK},
                                         fields = Fields}) ->
-    PKFieldNames = [N || #param_v1{name = [N]} <- LK],
+    PKFieldNames = [N || ?SQL_PARAM{name = [N]} <- LK],
     OnlyPKFields = [F || #riak_field_v1{name = N} = F <- Fields,
                          lists:member(N, PKFieldNames)],
     NonNullFields =
@@ -897,7 +998,7 @@ assert_primary_and_local_keys_match(?DDL{partition_key = #key_v1{ast = Primary},
 %%
 assert_partition_key_fields_not_descending(#ddl_v1{ partition_key = #key_v1{ ast = PK }}) ->
     [ordering_in_partition_key_error(N, O)
-        || #param_v1{ name = [N], ordering = O } <- PK, O /= undefined],
+        || ?SQL_PARAM{ name = [N], ordering = O } <- PK, O /= undefined],
     ok.
 
 %%
@@ -907,7 +1008,7 @@ ordering_in_partition_key_error(N, Ordering) when is_binary(N) ->
 
 %%
 assert_unique_fields_in_pk(?DDL{local_key = #key_v1{ast = LK}}) ->
-    Fields = [N || #param_v1{name = [N]} <- LK],
+    Fields = [N || ?SQL_PARAM{name = [N]} <- LK],
     case length(Fields) == length(lists:usort(Fields)) of
         true ->
             ok;
@@ -990,11 +1091,11 @@ assert_quantum_is_last_in_partition_key2([_|Tail]) ->
 %% Assert that any paramerts in the local key that use the desc keyword are
 %% types that support it.
 assert_desc_key_types(#ddl_v1{ local_key = #key_v1{ ast = LKAST } } = DDL) ->
-    [assert_desc_key_field_type(DDL, P) || #param_v1{ ordering = descending } = P <- LKAST],
+    [assert_desc_key_field_type(DDL, P) || ?SQL_PARAM{ ordering = descending } = P <- LKAST],
     ok.
 
 %%
-assert_desc_key_field_type(DDL, #param_v1{ name = [Name] }) ->
+assert_desc_key_field_type(DDL, ?SQL_PARAM{ name = [Name] }) ->
     {ok, Type} = riak_ql_ddl:get_field_type(DDL, Name),
     case Type of
         sint64 ->
@@ -1014,9 +1115,9 @@ is_field(Field, Fields) ->
     (lists:keyfind(name_of(Field), 2, Fields) /= false).
 
 %%
-name_of(#param_v1{ name = [N] }) ->
+name_of(?SQL_PARAM{ name = [N] }) ->
     N;
-name_of(#hash_fn_v1{ args = [#param_v1{ name = [N] }|_] }) ->
+name_of(#hash_fn_v1{ args = [?SQL_PARAM{ name = [N] }|_] }) ->
     N.
 
 which_duplicate(FF) ->
@@ -1032,9 +1133,9 @@ which_duplicate([_|T], Acc) ->
 
 %% Pull the name out of the appropriate record
 query_field_name(#hash_fn_v1{args = Args}) ->
-    Param = lists:keyfind(param_v1, 1, Args),
+    Param = lists:keyfind(?SQL_PARAM_RECORD_NAME, 1, Args),
     query_field_name(Param);
-query_field_name(#param_v1{name = Field}) ->
+query_field_name(?SQL_PARAM{name = Field}) ->
     Field.
 
 -spec return_error_flat(string()) -> no_return().

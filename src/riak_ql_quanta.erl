@@ -1,6 +1,19 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%% riak_ql_quanta.erl - a library for quantising time for Time Series
+%%
+%% @doc This module serves to generate time quanta on multi - (day, hour, minute,
+%% second) boundaries. The quantum are based on an origin time of Jan 1, 1970 
+%% 00:00:00 (Unix Epoch).
+%% The function <em>quantum/3</em> takes a time in milliseconds to bucketize, 
+%% a size of the quantum, and the units of said quantum.
+%% For instance, the following call would create buckets for timestamps on 15
+%% minute boundaries: <em>quantum(Time, 15, m)</em>. The quantum time is returned in 
+%% milliseconds since the Unix epoch.
+%% The function <em>quanta/4</em> takes 2 times in milliseconds and size of the quantum
+%% and the of units of said quantum and returns a list of quantum boundaries that span the time
+%%
+%% Copyright (c) 2015-2016 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,24 +30,15 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
-
-%% @doc This module serves to generate time quanta on multi - (day, hour, minute,
-%% second) boundaries. The quantum are based on an origin time of Jan 1, 1970 00:00:00 (Unix Epoch).
-%% The function <em>quantum/3</em> takes a time in milliseconds to bucketize, a size of the quantum, and the
-%% units of said quantum. For instance, the following call would create buckets for timestamps on 15
-%% minute boundaries: <em>quantum(Time, 15, m)</em>. The quantum time is returned in milliseconds since the
-%% Unix epoch.
-%% the function <em>quanta/4</em> takes 2 times in milliseconds and size of the quantum
-%% and the of units of said quantum and returns a list of quantum boundaries that span the time
 -module(riak_ql_quanta).
 
 -export([
-	 quantum/3,
-	 quanta/4,
+         quantum/3,
+         quanta/4,
          timestamp_to_ms/1,
          ms_to_timestamp/1,
          unit_to_millis/2
-	]).
+        ]).
 
 -type time_ms() :: non_neg_integer().
 %% A timestamp in millisconds representing number of millisconds from Unix epoch
@@ -72,13 +76,13 @@ quanta(StartTime, EndTime, QuantaSize, Unit) when StartTime > EndTime ->
 quanta(StartTime, EndTime, QuantaSize, Unit) ->
     Start = quantum(StartTime, QuantaSize, Unit),
     case Start of
-	{error, _} = E -> E;
-	_Other         -> End = EndTime,
-			  Diff = End - Start,
-			  Slice = unit_to_ms(Unit) * QuantaSize,
-			  NSlices = accommodate(Diff, Slice),
-			  Quanta = gen_quanta(NSlices, Start, Slice, []),
-			  {NSlices, Quanta}
+        {error, _} = E -> E;
+        _Other         -> End = EndTime,
+                          Diff = End - Start,
+                          Slice = unit_to_ms(Unit) * QuantaSize,
+                          NSlices = accommodate(Diff, Slice),
+                          Quanta = gen_quanta(NSlices, Start, Slice, []),
+                          {NSlices, Quanta}
     end.
 
 %% compute ceil(Length / Unit)
@@ -96,9 +100,9 @@ gen_quanta(N, Start, Slice, Acc) when is_integer(N) andalso N > 1 ->
 %% time belongs. Note that Time - Quanta is less than or equal to QuantaSize * Unit (in milliseconds).
 -spec quantum(time_ms(), non_neg_integer(), time_unit()) -> time_ms() | err().
 quantum(Time, QuantaSize, Unit) when Unit == d;
-				     Unit == h;
-				     Unit == m;
-				     Unit == s ->
+                                     Unit == h;
+                                     Unit == m;
+                                     Unit == s ->
     Ms = unit_to_ms(Unit),
     Diff = Time rem (QuantaSize*Ms),
     Time - Diff;
@@ -216,25 +220,25 @@ split_quanta_test() ->
 -ifdef(EQC).
 prop_quantum_bounded_test() ->
     ?assertEqual(
-        true,
-        eqc:quickcheck(
-            eqc:numtests(1000, prop_quantum_bounded()))
-    ).
+       true,
+       eqc:quickcheck(
+         eqc:numtests(1000, prop_quantum_bounded()))
+      ).
 
 %% Ensure that Quantas are always bounded, meaning that any time is no more
 %% than one quantum ahead of the quantum start.
 prop_quantum_bounded() ->
     ?FORALL(
-        {Date, Time, {Quanta, Unit}},
-        {date_gen(), time_gen(), quantum_gen()},
-        begin
-            DateTime = {Date, Time},
-            SecondsFrom0To1970 = ?DAYS_FROM_0_TO_1970 * (unit_to_ms(d) div 1000),
-            DateMs = (calendar:datetime_to_gregorian_seconds(DateTime) - SecondsFrom0To1970)*1000,
-            QuantaMs = quantum(DateMs, Quanta, Unit),
-            QuantaSize = quantum_in_ms(Quanta, Unit),
-            (DateMs - QuantaMs) =< QuantaSize
-        end).
+       {Date, Time, {Quanta, Unit}},
+       {date_gen(), time_gen(), quantum_gen()},
+       begin
+           DateTime = {Date, Time},
+           SecondsFrom0To1970 = ?DAYS_FROM_0_TO_1970 * (unit_to_ms(d) div 1000),
+           DateMs = (calendar:datetime_to_gregorian_seconds(DateTime) - SecondsFrom0To1970)*1000,
+           QuantaMs = quantum(DateMs, Quanta, Unit),
+           QuantaSize = quantum_in_ms(Quanta, Unit),
+           (DateMs - QuantaMs) =< QuantaSize
+       end).
 
 quantum_now_from_datetime(DateTime, Quanta, Unit) ->
     SecondsFrom0To1970 = ?DAYS_FROM_0_TO_1970 * (unit_to_ms(d) div 1000),
@@ -254,10 +258,7 @@ time_gen() ->
 
 quantum_gen() ->
     oneof([ {choose(1,2000), h},
-           {choose(1, 60), m}]).
+            {choose(1, 60), m}]).
 
 -endif.
-
-
-
 -endif.
