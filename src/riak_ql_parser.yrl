@@ -868,13 +868,18 @@ make_table_element_list(A, B) ->
 
 make_table_definition(TableName, Contents) ->
     make_table_definition(TableName, Contents, []).
+
 make_table_definition({identifier, Table}, Contents, Properties) ->
-    {validate_ddl(
-       ?DDL{table = Table,
-            partition_key = find_partition_key(Contents),
-            local_key = find_local_key(Contents),
-            fields = find_fields(Contents)}),
-     validate_table_properties(Properties)}.
+    DDL1 = ?DDL{
+        table = Table,
+        partition_key = find_partition_key(Contents),
+        local_key = find_local_key(Contents),
+        fields = find_fields(Contents) },
+    %% validate here so code afterwards doesn't require error checks
+    ok = validate_ddl(DDL1),
+    DDL2 = DDL1?DDL{
+        minimum_capability = riak_ql_ddl:get_minimum_capability(DDL1) },
+    {DDL2, validate_table_properties(Properties)}.
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
@@ -950,7 +955,7 @@ validate_ddl(DDL) ->
     ok = assert_quantum_fn_args(DDL),
     ok = assert_quantum_is_last_in_partition_key(DDL),
     ok = assert_desc_key_types(DDL),
-    DDL.
+    ok.
 
 %% @doc Ensure DDL has keys
 assert_keys_present(?DDL{local_key = LK, partition_key = PK})
@@ -996,7 +1001,7 @@ assert_primary_and_local_keys_match(?DDL{partition_key = #key_v1{ast = Primary},
     end.
 
 %%
-assert_partition_key_fields_not_descending(#ddl_v1{ partition_key = #key_v1{ ast = PK }}) ->
+assert_partition_key_fields_not_descending(?DDL{ partition_key = #key_v1{ ast = PK }}) ->
     [ordering_in_partition_key_error(N, O)
         || ?SQL_PARAM{ name = [N], ordering = O } <- PK, O /= undefined],
     ok.
@@ -1035,7 +1040,7 @@ assert_partition_key_fields_exist(?DDL{ fields = Fields,
                               [string:join(MissingFields, ", ")])
     end.
 
-assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } } = DDL) ->
+assert_quantum_fn_args(?DDL{ partition_key = #key_v1{ ast = PKAST } } = DDL) ->
     [assert_quantum_fn_args2(DDL, Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
     ok.
 
@@ -1063,7 +1068,7 @@ assert_quantum_fn_args2(DDL, [Param, Unit, Measure]) ->
             return_error_flat("Quantum time unit must be a positive integer.", [])
     end.
 
-assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+assert_not_more_than_one_quantum(?DDL{ partition_key = #key_v1{ ast = PKAST } }) ->
     QuantumFns =
         [Fn || #hash_fn_v1{ } = Fn <- PKAST],
     case length(QuantumFns) =< 1 of
@@ -1074,7 +1079,7 @@ assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST }
                 "More than one quantum function in the partition key.", [])
     end.
 
-assert_quantum_is_last_in_partition_key(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+assert_quantum_is_last_in_partition_key(?DDL{ partition_key = #key_v1{ ast = PKAST } }) ->
     assert_quantum_is_last_in_partition_key2(PKAST).
 
 %%
@@ -1090,7 +1095,7 @@ assert_quantum_is_last_in_partition_key2([_|Tail]) ->
 
 %% Assert that any paramerts in the local key that use the desc keyword are
 %% types that support it.
-assert_desc_key_types(#ddl_v1{ local_key = #key_v1{ ast = LKAST } } = DDL) ->
+assert_desc_key_types(?DDL{ local_key = #key_v1{ ast = LKAST } } = DDL) ->
     [assert_desc_key_field_type(DDL, P) || ?SQL_PARAM{ ordering = descending } = P <- LKAST],
     ok.
 

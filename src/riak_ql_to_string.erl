@@ -92,8 +92,8 @@ op_to_string(Op) ->
 flat_format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
 
--spec ddl_rec_to_sql(#ddl_v1{}) -> string().
-ddl_rec_to_sql(#ddl_v1{table         = Tb,
+-spec ddl_rec_to_sql(?DDL{}) -> string().
+ddl_rec_to_sql(?DDL{table         = Tb,
                        fields        = Fs,
                        partition_key = PK,
                        local_key     = LK}) ->
@@ -271,7 +271,7 @@ ddl_rec_to_string_test() ->
           "quantum(Tres, 1, 'd')), "
           "Uno, Dos, Tres))",
     Lexed = riak_ql_lexer:get_tokens(SQL),
-    {ddl, DDL = #ddl_v1{}, _} = riak_ql_parser:ql_parse(Lexed),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
     ?assertEqual(
         SQL,
         ddl_rec_to_sql(DDL)

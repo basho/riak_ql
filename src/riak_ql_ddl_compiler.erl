@@ -271,29 +271,9 @@ build_get_ddl_compiler_version_fn(LineNo) ->
 %% this is gnarly because the field order is compile-time dependent
 -spec build_get_ddl_fn(?DDL{}, pos_integer(), ast()) ->
                               {expr(), pos_integer()}.
-build_get_ddl_fn(?DDL{table         = T,
-                      fields        = F,
-                      partition_key = PK,
-                      local_key     = LK}, LineNo, []) ->
-    PosT     = ?DDL.table,
-    PosF     = ?DDL.fields,
-    PosPK    = ?DDL.partition_key,
-    PosLK    = ?DDL.local_key,
-    %% the order is dependent on the order the fields are listed in the record at
-    %% compile time hence this rather obscure dance of the positions
-    %% The record name is deliberatly put last in the list to check it is
-    %% actually working ;-)
-    {_Poses, List} =
-        unzip_sorted(
-          [{PosT,  make_binary(T, LineNo)},
-           {PosF,  expand_fields(F, LineNo)},
-           {PosPK, expand_key(PK, LineNo)},
-           {PosLK, expand_key(LK, LineNo)},
-           {1,     make_atom(?DDL_RECORD_NAME, LineNo)}]),
-    Body = make_tuple(List, LineNo),
-    Cl = make_clause([], [], Body, LineNo),
-    Fn = make_fun(get_ddl, 0, [Cl], LineNo),
-    {Fn, LineNo + 1}.
+build_get_ddl_fn(DDL, LineNo, []) ->
+    Fn = flat_format("get_ddl() -> ~p.", [DDL]),
+    {?Q(Fn), LineNo + 1}.
 
 %% Build the AST for a function returning a list of the order
 %% of the table field orders
@@ -356,92 +336,6 @@ field_type(?DDL{ fields = Fields }, FieldName) ->
     #riak_field_v1{ type = Type } =
         lists:keyfind(FieldName, #riak_field_v1.name, Fields),
     Type.
-
-% revert_ordering_on_local_key({A,B,C,D}) ->
-%     [A,B,apply_ordering(C, descending)].
-
-expand_fields(Fs, LineNo) ->
-    Fields = [expand_field(X, LineNo) || X <- Fs],
-    make_conses(lists:reverse(Fields), LineNo, {nil, LineNo}).
-
-expand_field(#riak_field_v1{name     = Nm,
-                            position = Pos,
-                            type     = Ty,
-                            optional = Opt}, LineNo) ->
-    PosNm  =  #riak_field_v1.name,
-    PosPos =  #riak_field_v1.position,
-    PosTy  =  #riak_field_v1.type,
-    PosOpt =  #riak_field_v1.optional,
-    {_Poses, List} =
-        unzip_sorted(
-          [{PosNm,  make_binary(Nm, LineNo)},
-           {PosPos, make_integer(Pos, LineNo)},
-           {PosTy,  make_atom(Ty, LineNo)},
-           {PosOpt, make_atom(Opt, LineNo)},
-           {1,      make_atom(riak_field_v1, LineNo)}]),
-    make_tuple(List, LineNo).
-
-expand_key(none, LineNo) ->
-    make_atom(none, LineNo);
-expand_key(#key_v1{ast = []}, LineNo) ->
-    make_tuple([make_atom(key_v1, LineNo), {nil, LineNo}], LineNo);
-expand_key(#key_v1{ast = AST}, LineNo) ->
-    Rest = expand_ast(AST, LineNo),
-    make_tuple([make_atom(key_v1, LineNo) | [Rest]], LineNo).
-
-expand_ast(AST, LineNo) when is_list(AST) ->
-    Fields = [expand_a2(X, LineNo) || X <- AST],
-    make_conses(lists:reverse(Fields), LineNo, {nil, LineNo}).
-
-% <<<<<<< HEAD
-expand_a2(?SQL_PARAM{name = _Nm, ordering = _Ordering} = Param, _LineNo) ->
-    %% Bins = [make_binary(X, LineNo) || X <- Nm],
-    %% Conses = make_conses(Bins, LineNo, {nil, LineNo}),
-    %% make_tuple([make_atom(param_v1, LineNo),
-    %%             [Conses],
-    %%             make_atom(Ordering, LineNo)], LineNo);
-    erl_parse:abstract(Param);
-% =======
-% expand_a2(?SQL_PARAM{name = Nm}, LineNo) ->
-%     Bins = [make_binary(X, LineNo) || X <- Nm],
-%     Conses = make_conses(Bins, LineNo, {nil, LineNo}),
-%     make_tuple([make_atom(?SQL_PARAM_RECORD_NAME, LineNo) | [Conses]], LineNo);
-% >>>>>>> 3b5de80fddb781bb1aa15c4e42fc8ff907f4a516
-expand_a2(#hash_fn_v1{mod  = Mod,
-                      fn   = Fn,
-                      args = Args,
-                      type = Ty}, LineNo) ->
-    PosMod  = #hash_fn_v1.mod,
-    PosFn   = #hash_fn_v1.fn,
-    PosArgs = #hash_fn_v1.args,
-    PosType = #hash_fn_v1.type,
-    {_Pos, List} =
-        unzip_sorted(
-          [{PosMod,  make_atom(Mod, LineNo)},
-           {PosFn,   make_atom(Fn, LineNo)},
-           {PosArgs, expand_args(Args, LineNo)},
-           {PosType, make_atom(Ty, LineNo)},
-           {1,       make_atom(hash_fn_v1, LineNo)}]),
-    make_tuple(List, LineNo).
-
-expand_args(Args, LineNo) ->
-    Args2 = lists:reverse([expand_args2(X, LineNo) || X <- Args]),
-    make_conses(Args2, LineNo, {nil, LineNo}).
-
-%% this first clause jumps out to a different expansion tree
-%% to expand the parameter in the fuction args
-expand_args2(Arg, LineNo) when is_record(Arg, ?SQL_PARAM_RECORD_NAME) ->
-    expand_a2(Arg, LineNo);
-expand_args2(Arg, LineNo) when is_binary(Arg) ->
-    make_binary(Arg, LineNo);
-expand_args2(Arg, LineNo) when is_integer(Arg) ->
-    make_integer(Arg, LineNo);
-expand_args2(Arg, LineNo) when is_float(Arg) ->
-    make_float(Arg, LineNo);
-expand_args2(Arg, LineNo) when is_list(Arg) ->
-    make_string(Arg, LineNo);
-expand_args2(Arg, LineNo) when is_atom(Arg) ->
-    make_atom(Arg, LineNo).
 
 -spec build_is_valid_fn([#riak_field_v1{}], pos_integer()) ->
                                {expr(), pos_integer()}.
@@ -607,13 +501,6 @@ make_attrs(Bucket, LineNo) when is_binary(Bucket)    ->
 make_fun(FunName, Arity, Clause, LineNo) ->
     {function, LineNo, FunName, Arity, Clause}.
 
--spec make_binary(binary(), pos_integer()) -> expr().
-make_binary(B, LineNo) when is_binary(B) ->
-    {bin, LineNo, [{bin_element, LineNo, {string, LineNo, binary_to_list(B)}, default, default}]}.
-
--spec make_float(float(), pos_integer()) -> expr().
-make_float(F, LineNo) when is_float(F) -> {float, LineNo, F}.
-
 -spec make_integer(integer(), pos_integer()) -> expr().
 make_integer(I, LineNo) when is_integer(I) -> {integer, LineNo, I}.
 
@@ -690,9 +577,6 @@ make_export_attr(LineNo) ->
 
 flat_format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
-
-unzip_sorted(L) ->
-    lists:unzip(lists:sort(L)).
 
 -ifdef(TEST).
 -compile(export_all).

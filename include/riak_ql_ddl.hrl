@@ -58,14 +58,22 @@
           ast = [] :: [#hash_fn_v1{} | ?SQL_PARAM{}]
          }).
 
--define(DDL, #ddl_v1).
--define(DDL_RECORD_NAME, ddl_v1).
--define(DDL_RECORD_VERSION, 1).
+-define(DDL, #ddl_v2).
+-define(DDL_RECORD_NAME, ddl_v2).
+-define(DDL_RECORD_VERSION, 2).
+-type ddl_version() :: v1 | v2.
 -record(ddl_v1, {
           table              :: binary(),
           fields        = [] :: [#riak_field_v1{}],
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
+         }).
+-record(?DDL_RECORD_NAME, {
+          table              :: binary(),
+          fields        = [] :: [#riak_field_v1{}],
+          partition_key      :: #key_v1{} | none,
+          local_key          :: #key_v1{},
+          minimum_capability = v1 :: ddl_version()
          }).
 
 -endif.

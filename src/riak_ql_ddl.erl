@@ -27,6 +27,7 @@
          apply_ordering/2,
          flip_binary/1,
          get_field_type/2,
+         get_minimum_capability/1,
          make_module_name/1, make_module_name/2
         ]).
 
@@ -583,6 +584,30 @@ get_field_type(?DDL{ fields = Fields }, FieldName) when is_binary(FieldName) ->
             notfound
     end.
 
+%% Determing the minimum capability value that is required to run operations
+%% on this table.
+-spec get_minimum_capability(?DDL{}) -> ddl_version().
+get_minimum_capability(DDL) ->
+    get_descending_keys_required_cap(DDL).
+
+%%
+get_descending_keys_required_cap(?DDL{ local_key = #key_v1{ ast = AST } }) ->
+    lists:foldl(fun get_descending_keys_required_cap_fold/2, v1, AST).
+
+%%
+get_descending_keys_required_cap_fold(?SQL_PARAM{ ordering = descending }, Acc) ->
+    max_version(v2, Acc);
+get_descending_keys_required_cap_fold(_, Acc) ->
+    Acc.
+
+%%
+max_version(A,B) when A == v2 orelse B == v2 -> v2;
+max_version(_,_) -> v1.
+
+%%% -------------------------------------------------------------------
+%%% TESTS
+%%% -------------------------------------------------------------------
+
 -ifdef(TEST).
 -compile(export_all).
 
@@ -592,10 +617,15 @@ get_field_type(?DDL{ fields = Fields }, FieldName) when is_binary(FieldName) ->
 -include_lib("eunit/include/eunit.hrl").
 
 make_module_name_test() ->
-    ?assertEqual('riak_ql_table_fafa$1', make_module_name(<<"fafa">>)),
     ?assertEqual('riak_ql_table_fafa$2', make_module_name(<<"fafa">>, 2)),
     ?assertEqual('riak_ql_table_FaFa$1', make_module_name(<<"FaFa">>, 1)),
-    ?assertEqual('riak_ql_table_Fa%32%94%36$43', make_module_name(<<"Fa ^$">>, 43)).
+    ?assertEqual(
+        'riak_ql_table_Fa%32%94%36$43', make_module_name(<<"Fa ^$">>, 43)),
+    %% the arity 1 version is equivalent to the arity 2 with the version macro
+    ?assertEqual(
+        make_module_name(<<"fafa">>, ?DDL_RECORD_VERSION),
+        make_module_name(<<"fafa">>)),
+    ok.
 
 %%
 %% Helper Fn for unit tests

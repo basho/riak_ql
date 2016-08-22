@@ -577,3 +577,45 @@ desc_cannot_be_defined_on_the_partition_key_test() ->
           <<"Order can only be used in the local key, 'b' set to descending">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
     ).
+
+table_with_desc_keys_has_minimum_cap_v2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c DESC))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+        v2,
+        DDL?DDL.minimum_capability
+    ).
+
+table_with_asc_keys_has_minimum_cap_v1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c ASC))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+        v1,
+        DDL?DDL.minimum_capability
+    ).
+
+table_with_no_local_key_order_defined_is_v1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+        v1,
+        DDL?DDL.minimum_capability
+    ).
