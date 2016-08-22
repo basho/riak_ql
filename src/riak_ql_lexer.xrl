@@ -169,9 +169,9 @@ post_p([], Acc) ->
 post_p([{identifier, TokenChars} | T], Acc) when is_list(TokenChars)->
     post_p(T, [{identifier, list_to_binary(TokenChars)} | Acc]);
 post_p([{float, TokenChars} | T], Acc) ->
-    post_p(T, [{float, parse_float(TokenChars)} | Acc]);
+    post_p(T, [{float, fpdec_to_float(TokenChars)} | Acc]);
 post_p([{float_sci, TokenChars} | T], Acc) ->
-    post_p(T, [{float, sci_to_float(TokenChars)} | Acc]);
+    post_p(T, [{float, fpsci_to_float(TokenChars)} | Acc]);
 post_p([H | T], Acc) ->
     post_p(T, [H | Acc]).
 
@@ -203,7 +203,7 @@ accurate_strip(S, C) ->
             S
     end.
 
-sci_to_float(Chars) ->
+fpsci_to_float(Chars) ->
     [Mantissa, Exponent] = re:split(Chars, "E|e", [{return, list}]),
     M2 = normalise_mant(Mantissa),
     E2 = normalise_exp(Exponent),
@@ -223,9 +223,9 @@ normalise_exp("+" ++ No) -> "+" ++ No;
 normalise_exp("-" ++ No) -> "-" ++ No;
 normalise_exp(No)        -> "+" ++ No.
 
-parse_float([$- | _RemainTokenChars] = TokenChars) ->
+fpdec_to_float([$- | _RemainTokenChars] = TokenChars) ->
     list_to_float(TokenChars);
-parse_float([$. | _RemainTokenChars] = TokenChars) ->
+fpdec_to_float([$. | _RemainTokenChars] = TokenChars) ->
     list_to_float([$0 | TokenChars]);
-parse_float(TokenChars) ->
+fpdec_to_float(TokenChars) ->
     list_to_float(TokenChars).

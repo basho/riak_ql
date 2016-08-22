@@ -268,7 +268,6 @@ build_get_ddl_compiler_version_fn(LineNo) ->
                      [?RIAK_QL_DDL_COMPILER_VERSION]),
     {?Q(Fn), LineNo + 1}.
 
-%% this is gnarly because the field order is compile-time dependent
 -spec build_get_ddl_fn(?DDL{}, pos_integer(), ast()) ->
                               {expr(), pos_integer()}.
 build_get_ddl_fn(DDL, LineNo, []) ->
