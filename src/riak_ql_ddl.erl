@@ -25,9 +25,14 @@
 
 -export([
          apply_ordering/2,
+         convert/2,
+         current_version/0,
+         ddl_record_version/1,
+         first_version/0,
          flip_binary/1,
          get_field_type/2,
          get_minimum_capability/1,
+         is_version_greater/2,
          make_module_name/1, make_module_name/2
         ]).
 
@@ -53,10 +58,13 @@
 -type filter()     :: term().
 
 -type ddl() :: ?DDL{}.
+-type any_ddl() :: #ddl_v1{} | ?DDL{}.
 
 -export_type([
+              any_ddl/0,
               data_value/0,
               ddl/0,
+              ddl_version/0,
               field_identifier/0,
               filter/0,
               selection/0,
@@ -121,10 +129,9 @@ make_module_name(Table) ->
 %% @doc Generate a unique, but readable and recognizable, module name
 %%      for Table at a certain Version, by 'escaping' non-ascii chars
 %%      in Table a la C++.
-make_module_name(Table, Version)
-  when is_binary(Table), is_integer(Version) ->
+make_module_name(Table, _Version) when is_binary(Table) ->
     T4BL3 = << <<(maybe_mangle_char(C))/binary>> || <<C>> <= Table>>,
-    ModName = <<"riak_ql_table_", T4BL3/binary, $$, (list_to_binary(integer_to_list(Version)))/binary>>,
+    ModName = <<"riak_ql_table_", T4BL3/binary, "$1">>,
     binary_to_atom(ModName, latin1).
 
 maybe_mangle_char(C) when (C >= $a andalso C =< $z);
@@ -605,6 +612,122 @@ max_version(A,B) when A == v2 orelse B == v2 -> v2;
 max_version(_,_) -> v1.
 
 %%% -------------------------------------------------------------------
+%%% DDL UPGRADES
+%%% -------------------------------------------------------------------
+
+first_version() ->
+    v1.
+
+current_version() ->
+    ?DDL_RECORD_VERSION.
+
+%% Convert a ddl record to a different version.
+-spec convert(ddl_version(), DDL::tuple()) -> [].
+convert(Version, DDL) when is_atom(Version) ->
+    CurrentVersion = ddl_record_version(element(1, DDL)),
+    case is_version_greater(Version, CurrentVersion) of
+        equal ->
+            DDL;
+        true  ->
+            VersionSteps = sublist_elements(CurrentVersion, Version, [v1,v2]),
+            upgrade_ddl(VersionSteps, DDL);
+        false ->
+            [V1,V2] = sublist_elements(CurrentVersion, Version, [v2,v1]),
+            downgrade_ddl(V1,V2, DDL)
+    end.
+
+%%
+-spec is_version_greater(ddl_version()) -> equal | boolean().
+is_version_greater(V, V)  -> equal;
+is_version_greater(v1,v2) -> false;
+is_version_greater(v2,v1) -> true.
+
+%%
+ddl_record_version(ddl_v1) -> v1;
+ddl_record_version(ddl_v2) -> v2;
+ddl_record_version(V) when is_atom(V)
+                           -> throw(unknown_version).
+
+%%
+downgrade_ddl(v2, v1, DDL1) ->
+    case ddl_minimum_capability2(DDL1) of
+        v1 ->
+            #ddl_v1{
+                table              = DDL1#ddl_v2.table,
+                fields             = DDL1#ddl_v2.fields,
+                partition_key      = DDL1#ddl_v2.partition_key,
+                local_key          = downgrade_v2_local_key(DDL1#ddl_v2.local_key)
+            };
+        _ ->
+            {error, cannot_downgrade}
+    end.
+
+%%
+upgrade_ddl([_], DDL) ->
+    [DDL];
+upgrade_ddl([v1,v2 = To|Tail], DDL1) ->
+    DDL2 = #ddl_v2{
+        table              = DDL1#ddl_v1.table,
+        fields             = DDL1#ddl_v1.fields,
+        partition_key      = DDL1#ddl_v1.partition_key,
+        local_key          = upgrade_v1_local_key(DDL1#ddl_v1.local_key),
+        minimum_capability = ddl_minimum_capability(DDL1, v1)
+    },
+    DDL3 = DDL2#ddl_v2{
+        minimum_capability = ddl_minimum_capability(DDL2, v1)
+    },
+    [DDL3 | upgrade_ddl([To|Tail], DDL3)].
+
+%%
+upgrade_v1_local_key(#key_v1{ ast = AST }) ->
+    #key_v1{ ast =
+        [#param_v2{ name = N, ordering = ascending } || #param_v1{ name = N } <- AST]
+    }.
+
+%% Downgrade a v2 local key to v1, the key should already be checked that
+%% it is safe to downgrade before it is called.
+downgrade_v2_local_key(#key_v1{ ast = AST }) ->
+    #key_v1{ ast =
+        [#param_v1{ name = N } || #param_v2{ name = N } <- AST]
+    }.
+
+%%
+ddl_minimum_capability(DDL, DefaultMin) ->
+    Min = ddl_minimum_capability2(DDL),
+    case is_version_greater(Min, DefaultMin) of
+        false -> Min;
+        _     -> DefaultMin
+    end.
+
+%%
+ddl_minimum_capability2(#ddl_v1{ }) ->
+    v1;
+ddl_minimum_capability2(#ddl_v2{ local_key = ?DDL_KEY{ ast = AST } }) ->
+    DescParams = [P || #param_v2{ ordering = descending } = P <- AST],
+    case DescParams of
+        [] -> v1;
+        _  -> v2
+    end.
+
+%% Return a sublist within a list when only the start and end elements within
+%% the list are known, not the index.
+sublist_elements(_, _, []) ->
+    [];
+sublist_elements(From, To, [From|Tail]) ->
+    [From|sublist_elements_inner(To, Tail)];
+sublist_elements(From, To, [_|Tail]) ->
+    sublist_elements(From, To, Tail).
+
+%%
+sublist_elements_inner(_, []) ->
+    [];
+sublist_elements_inner(To, [To|_]) ->
+    [To];
+sublist_elements_inner(To, [Other|    Tail]) ->
+    [Other|sublist_elements_inner(To, Tail)].
+
+
+%%% -------------------------------------------------------------------
 %%% TESTS
 %%% -------------------------------------------------------------------
 
@@ -617,15 +740,15 @@ max_version(_,_) -> v1.
 -include_lib("eunit/include/eunit.hrl").
 
 make_module_name_test() ->
-    ?assertEqual('riak_ql_table_fafa$2', make_module_name(<<"fafa">>, 2)),
-    ?assertEqual('riak_ql_table_FaFa$1', make_module_name(<<"FaFa">>, 1)),
-    ?assertEqual(
-        'riak_ql_table_Fa%32%94%36$43', make_module_name(<<"Fa ^$">>, 43)),
-    %% the arity 1 version is equivalent to the arity 2 with the version macro
-    ?assertEqual(
-        make_module_name(<<"fafa">>, ?DDL_RECORD_VERSION),
-        make_module_name(<<"fafa">>)),
-    ok.
+    ?assertEqual('riak_ql_table_fafa$1', make_module_name(<<"fafa">>, 2)),
+    ?assertEqual('riak_ql_table_FaFa$1', make_module_name(<<"FaFa">>, 1)).
+    % ?assertEqual(
+    %     'riak_ql_table_Fa%32%94%36$43', make_module_name(<<"Fa ^$">>, 43)),
+    % %% the arity 1 version is equivalent to the arity 2 with the version macro
+    % ?assertEqual(
+    %     make_module_name(<<"fafa">>, ?DDL_RECORD_VERSION),
+    %     make_module_name(<<"fafa">>)),
+    % ok.
 
 %%
 %% Helper Fn for unit tests
@@ -1316,5 +1439,41 @@ fold_where_tree_test() ->
                       {fn_called_with_wrong_arity, 'COUNT', 1, 2}
                      ]
              }).
+
+upgrade_ddl_v1_test() ->
+    DDL_v1 = #ddl_v1{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] }
+    },
+    ?assertEqual(
+        #ddl_v2{
+            table = <<"tab">>,
+            local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] }
+        },
+        convert(v2, DDL_v1)
+    ).
+
+downgrade_ddl_v2_test() ->
+    DDL_v2 = #ddl_v2{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] }
+    },
+    ?assertEqual(
+        #ddl_v1{
+            table = <<"tab">>,
+            local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] }
+        },
+        convert(v1, DDL_v2)
+    ).
+
+downgrade_ddl_v2_with_desc_test() ->
+    DDL_v2 = #ddl_v2{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = descending }] }
+    },
+    ?assertEqual(
+        {error, cannot_downgrade},
+        convert(v1, DDL_v2)
+    ).
 
 -endif.

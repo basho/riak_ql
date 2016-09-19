@@ -38,7 +38,7 @@
 
 -define(SQL_PARAM, #param_v2).
 -define(SQL_PARAM_RECORD_NAME, param_v2).
--define(SQL_PARAM_RECORD_VERSION, 2).
+-define(SQL_PARAM_RECORD_VERSION, v2).
 -record(param_v1, {
           name = [<<>>] :: [binary()]
          }).
@@ -54,13 +54,15 @@
           type      :: riak_ql_ddl:simple_field_type()
          }).
 
+-define(DDL_KEY, #key_v1).
+-define(DDL_KEY_RECORD_NAME, key_v1).
 -record(key_v1, {
           ast = [] :: [#hash_fn_v1{} | ?SQL_PARAM{}]
          }).
 
 -define(DDL, #ddl_v2).
 -define(DDL_RECORD_NAME, ddl_v2).
--define(DDL_RECORD_VERSION, 2).
+-define(DDL_RECORD_VERSION, v2).
 -type ddl_version() :: v1 | v2.
 -record(ddl_v1, {
           table              :: binary(),
