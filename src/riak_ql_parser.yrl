@@ -45,6 +45,12 @@ KeyFieldArgList
 KeyFieldArg
 NotNull
 GroupBy
+Limit
+SortDirection
+SorterField
+SorterFieldList
+NullsGroup
+OrderBy
 
 %% ValueExpression
 %% CommonValueExpression
@@ -76,18 +82,21 @@ FieldValue
 
 Terminals
 
-or_
 and_
+asc
+asterisk
 boolean
 by
 character_literal
 comma
 create
+desc
 describe
 double
 equals_operator
 explain
 false
+first
 float
 from
 greater_than_operator
@@ -98,15 +107,20 @@ integer
 into
 group
 key
+last
 limit
 left_paren
 less_than_operator
 lte
-asterisk
 minus_sign
 nomatch
 not_
 null
+nulls
+offset
+only
+or_
+order
 plus_sign
 primary
 quantum
@@ -135,6 +149,30 @@ Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
 GroupBy -> group by Fields: {group_by, '$3'}.
 
+SortDirection -> asc: '$1'.
+SortDirection -> desc: '$1'.
+NullsGroup -> first: {nulls_first, <<"nulls first">>}.  %% combine tokens
+NullsGroup -> last: {nulls_last, <<"nulls last">>}.
+SorterField -> Identifier                                : make_ordby_item('$1', undefined, undefined).
+SorterField -> Identifier SortDirection                  : make_ordby_item('$1', '$2', undefined).
+SorterField -> Identifier nulls NullsGroup               : make_ordby_item('$1', undefined, '$3').
+SorterField -> Identifier SortDirection nulls NullsGroup : make_ordby_item('$1', '$2', '$4').
+SorterFieldList ->
+    SorterField comma SorterFieldList : ['$1'] ++ '$3'.
+SorterFieldList ->
+    SorterField : ['$1'].
+OrderBy -> order by SorterFieldList: '$3'.
+
+Limit -> limit integer                     : {'$2', {integer, 0}, false}.
+Limit -> limit integer offset integer      : {'$2', '$4', false}.
+Limit -> limit integer                only : {'$2', {integer, 0}, true}.
+Limit -> limit integer offset integer only : {'$2', '$4', true}.
+
+Query -> Select OrderBy       : make_orderby('$1', '$2', {undefined, undefined, undefined}).
+Query -> Select OrderBy Limit : make_orderby('$1', '$2', '$3').
+Query -> Select         Limit : make_orderby('$1', [], '$2').
+Query -> Select               : '$1'.
+
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
@@ -142,10 +180,7 @@ StatementWithoutSemicolon -> Explain : '$1'.
 StatementWithoutSemicolon -> Insert : '$1'.
 StatementWithoutSemicolon -> ShowTables : '$1'.
 
-Query -> Select limit integer : add_limit('$1', '$2', '$3').
-Query -> Select               : '$1'.
-
-Select -> select Fields from Bucket Where GroupBy 
+Select -> select Fields from Bucket Where GroupBy
                                           : make_select('$1', '$2', '$3', '$4', '$5', '$6').
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
@@ -391,10 +426,13 @@ Erlang code.
           type :: create | describe | explain | insert | select,
           buckets = [],
           fields  = [],
-          limit   = [],
           where   = [],
           ops     = [],
-          group_by
+          group_by,
+          order_by,
+          limit,
+          offset,
+          only
          }).
 
 -include("riak_ql_ddl.hrl").
@@ -429,20 +467,26 @@ fix_up_keys(?DDL{partition_key = none, local_key = LK} = DDL) ->
 fix_up_keys(A) ->
     A.
 
-convert(#outputs{type    = select,
-                 buckets = B,
-                 fields  = F,
-                 limit   = L,
-                 where   = W,
-                 group_by = G} = Outputs) ->
+convert(#outputs{type     = select,
+                 buckets  = B,
+                 fields   = F,
+                 where    = W,
+                 group_by = G,
+                 limit    = L,
+                 offset   = Of,
+                 order_by = Ob,
+                 only     = On} = Outputs) ->
     ok = validate_select_query(Outputs),
     [
      {type, select},
-     {tables, B},
-     {fields, F},
-     {limit, L},
-     {where, W},
-     {group_by, G}
+     {tables,   B},
+     {fields,   F},
+     {where,    W},
+     {group_by, G},
+     {limit,    L},
+     {offset,   Of},
+     {order_by, Ob},
+     {only,     On}
     ];
 convert(#outputs{type = create} = O) ->
     O.
@@ -566,8 +610,37 @@ make_insert({identifier, Table}, Fields, Values) ->
      {values, Values}
     ].
 
-add_limit(A, _B, {integer, C}) ->
-    A#outputs{limit = C}.
+
+%% per Requirements in
+%% https://docs.google.com/document/d/1OUtQwOq2LL3UVGm8mdgPzctpXHV8Dt1SpuX1q6OS9pk:
+%% "If NULLS LAST is specified, null values sort after all non-null
+%%  values; if NULLS FIRST is specified, null values sort before all
+%%  non-null values. If neither is specified, the default behavior is
+%%  NULLS LAST when ASC is specified or implied, and NULLS FIRST when
+%%  DESC is specified (thus, the default is to act as though nulls are
+%%  larger than non-nulls)."
+make_ordby_item(Fld, {asc, _} = Dir, undefined) ->
+    {Fld, Dir, {nulls_last, <<"nulls last">>}};
+make_ordby_item(Fld, {desc, _} = Dir, undefined) ->
+    {Fld, Dir, {nulls_first, <<"nulls first">>}};
+make_ordby_item(Fld, Dir, Nulls) ->
+    {Fld,
+     if Dir /= undefined -> Dir;
+        el/=se -> {asc, <<"asc">>} end,
+     if Nulls /= undefined -> Nulls;
+        el/=se -> {nulls_last, <<"nulls last">>} end}.
+
+make_orderby(A, OrdBy, {Lim, Off, Only}) ->
+    OrderBy =
+        [{F, Dir, NullsGroup} ||
+            {{identifier, F}, {Dir, _DirToken}, {NullsGroup, _NullsGroupToken}} <- OrdBy],
+    A#outputs{order_by = OrderBy,
+              limit = strip_int(Lim), offset = strip_int(Off),
+              only = Only}.  %% 'only' is a boolean token, ready as is
+
+strip_int({integer, A}) -> A;
+strip_int(undefined)    -> undefined.
+
 
 make_expr({LiteralFlavor, Literal},
           {Op, _},
