@@ -73,9 +73,12 @@
 -type guards() :: [exprs()].
 -type ast()    :: [expr() | exprs() | guards()].
 
--spec get_compiler_version() -> riak_ql_component:component_version().
+%% MD5 checksum of this module.
+-spec get_compiler_version() -> integer().
 get_compiler_version() ->
-    ?RIAK_QL_DDL_COMPILER_VERSION.
+    Attributes = module_info(attributes),
+    {vsn, [Vsn]} = lists:keyfind(vsn, 1, Attributes),
+    Vsn.
 
 %% Create a list of supported versions from the current one
 %% down to the original version 1
@@ -85,7 +88,7 @@ get_compiler_capabilities() ->
 
 %% Compile the DDL to its helper module AST.
 -spec compile(?DDL{}) ->
-    {module, ast()} | {error, tuple()}.
+    {module(), ast()} | {error, tuple()}.
 compile({ok, ?DDL{} = DDL}) ->
     %% handle output directly from riak_ql_parser
     compile(DDL);

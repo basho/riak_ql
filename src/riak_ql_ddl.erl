@@ -116,12 +116,11 @@
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
 
--spec make_module_name(Table::binary()) ->
-                              module().
+-spec make_module_name(Table::binary()) -> module().
 %% @doc Generate a unique module name for Table at version 1. @see
 %%      make_module_name/2.
 make_module_name(Table) ->
-    make_module_name(Table, ?DDL_RECORD_VERSION).
+    make_module_name(Table, riak_ql_ddl_compiler:get_compiler_version()).
 
 -spec make_module_name(Table   :: binary(),
                        Version :: riak_ql_component:component_version()) ->
@@ -129,13 +128,14 @@ make_module_name(Table) ->
 %% @doc Generate a unique, but readable and recognizable, module name
 %%      for Table at a certain Version, by 'escaping' non-ascii chars
 %%      in Table a la C++.
-make_module_name(Table, _Version) when is_binary(Table) ->
-    T4BL3 = << <<(maybe_mangle_char(C))/binary>> || <<C>> <= Table>>,
-    ModName = <<"riak_ql_table_", T4BL3/binary, "$1">>,
+make_module_name(Table1, CompilerVersion) when is_binary(Table1), is_integer(CompilerVersion) ->
+    Table2 = << <<(maybe_mangle_char(C))/binary>> || <<C>> <= Table1>>,
+    ModName = <<"riak_ql_table_", Table2/binary, "_", (integer_to_binary(CompilerVersion))/binary>>,
     binary_to_atom(ModName, latin1).
 
 maybe_mangle_char(C) when (C >= $a andalso C =< $z);
                           (C >= $A andalso C =< $Z);
+                          (C >= $0 andalso C =< $9);
                           (C == $_) ->
     <<C>>;
 maybe_mangle_char(C) ->
@@ -627,7 +627,7 @@ convert(Version, DDL) when is_atom(Version) ->
     CurrentVersion = ddl_record_version(element(1, DDL)),
     case is_version_greater(Version, CurrentVersion) of
         equal ->
-            DDL;
+            [DDL];
         true  ->
             VersionSteps = sublist_elements(CurrentVersion, Version, [v1,v2]),
             upgrade_ddl(VersionSteps, DDL);
@@ -637,7 +637,7 @@ convert(Version, DDL) when is_atom(Version) ->
     end.
 
 %%
--spec is_version_greater(ddl_version()) -> equal | boolean().
+-spec is_version_greater(ddl_version(), ddl_version()) -> equal | boolean().
 is_version_greater(V, V)  -> equal;
 is_version_greater(v1,v2) -> false;
 is_version_greater(v2,v1) -> true.
@@ -646,20 +646,20 @@ is_version_greater(v2,v1) -> true.
 ddl_record_version(ddl_v1) -> v1;
 ddl_record_version(ddl_v2) -> v2;
 ddl_record_version(V) when is_atom(V)
-                           -> throw(unknown_version).
+                           -> throw({unknown_ddl_version, V}).
 
 %%
 downgrade_ddl(v2, v1, DDL1) ->
     case ddl_minimum_capability2(DDL1) of
         v1 ->
-            #ddl_v1{
-                table              = DDL1#ddl_v2.table,
-                fields             = DDL1#ddl_v2.fields,
-                partition_key      = DDL1#ddl_v2.partition_key,
-                local_key          = downgrade_v2_local_key(DDL1#ddl_v2.local_key)
-            };
+            [#ddl_v1{
+                            table              = DDL1#ddl_v2.table,
+                            fields             = DDL1#ddl_v2.fields,
+                            partition_key      = DDL1#ddl_v2.partition_key,
+                            local_key          = downgrade_v2_local_key(DDL1#ddl_v2.local_key)
+                        }];
         _ ->
-            {error, cannot_downgrade}
+            [{error, cannot_downgrade}]
     end.
 
 %%
@@ -669,20 +669,27 @@ upgrade_ddl([v1,v2 = To|Tail], DDL1) ->
     DDL2 = #ddl_v2{
         table              = DDL1#ddl_v1.table,
         fields             = DDL1#ddl_v1.fields,
-        partition_key      = DDL1#ddl_v1.partition_key,
-        local_key          = upgrade_v1_local_key(DDL1#ddl_v1.local_key),
+        partition_key      = upgrade_v1_key(DDL1#ddl_v1.partition_key),
+        local_key          = upgrade_v1_key(DDL1#ddl_v1.local_key),
         minimum_capability = ddl_minimum_capability(DDL1, v1)
     },
     DDL3 = DDL2#ddl_v2{
         minimum_capability = ddl_minimum_capability(DDL2, v1)
     },
-    [DDL3 | upgrade_ddl([To|Tail], DDL3)].
+    [DDL1 | upgrade_ddl([To|Tail], DDL3)].
 
 %%
-upgrade_v1_local_key(#key_v1{ ast = AST }) ->
-    #key_v1{ ast =
-        [#param_v2{ name = N, ordering = ascending } || #param_v1{ name = N } <- AST]
+upgrade_v1_key(#key_v1{ ast = AST } = Key) ->
+    Key#key_v1{ ast =
+        [upgrade_v1_param(X) || X <- AST]
     }.
+
+%% upgrade param_v1 records to v2, if they are not this type of record then
+%% just return it, since it is a hash_fn.
+upgrade_v1_param(#param_v1{ name = N }) ->
+    #param_v2{ name = N, ordering = ascending };
+upgrade_v1_param(X) ->
+    X.
 
 %% Downgrade a v2 local key to v1, the key should already be checked that
 %% it is safe to downgrade before it is called.
@@ -739,16 +746,20 @@ sublist_elements_inner(To, [Other|    Tail]) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-make_module_name_test() ->
-    ?assertEqual('riak_ql_table_fafa$1', make_module_name(<<"fafa">>, 2)),
-    ?assertEqual('riak_ql_table_FaFa$1', make_module_name(<<"FaFa">>, 1)).
-    % ?assertEqual(
-    %     'riak_ql_table_Fa%32%94%36$43', make_module_name(<<"Fa ^$">>, 43)),
-    % %% the arity 1 version is equivalent to the arity 2 with the version macro
-    % ?assertEqual(
-    %     make_module_name(<<"fafa">>, ?DDL_RECORD_VERSION),
-    %     make_module_name(<<"fafa">>)),
-    % ok.
+make_module_name_1_test() ->
+    ?assertEqual(
+        list_to_atom("riak_ql_table_mytab_" ++ integer_to_list(riak_ql_ddl_compiler:get_compiler_version())),
+        make_module_name(<<"mytab">>)
+    ).
+
+make_module_name_2_test() ->
+    ?assertEqual(riak_ql_table_fafa_1, make_module_name(<<"fafa">>, 1)).
+
+%% upper case, underscores and numbers ok
+make_module_name_3_test() ->
+    ?assertEqual(riak_ql_table_MY_TAB12345_1, make_module_name(<<"MY_TAB12345">>, 1)).
+
+
 
 %%
 %% Helper Fn for unit tests
@@ -1446,10 +1457,11 @@ upgrade_ddl_v1_test() ->
         local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] }
     },
     ?assertEqual(
-        #ddl_v2{
+        [DDL_v1, 
+         #ddl_v2{
             table = <<"tab">>,
             local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] }
-        },
+         }],
         convert(v2, DDL_v1)
     ).
 
