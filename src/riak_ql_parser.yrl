@@ -118,7 +118,6 @@ not_
 null
 nulls
 offset
-only
 or_
 order
 plus_sign
@@ -163,12 +162,10 @@ SorterFieldList ->
     SorterField : ['$1'].
 OrderBy -> order by SorterFieldList: '$3'.
 
-Limit -> limit integer                     : {'$2', {integer, 0}, false}.
-Limit -> limit integer offset integer      : {'$2', '$4', false}.
-Limit -> limit integer                only : {'$2', {integer, 0}, true}.
-Limit -> limit integer offset integer only : {'$2', '$4', true}.
+Limit -> limit integer                     : {'$2', {integer, 0}}.
+Limit -> limit integer offset integer      : {'$2', '$4'}.
 
-Query -> Select OrderBy       : make_orderby('$1', '$2', {undefined, undefined, undefined}).
+Query -> Select OrderBy       : make_orderby('$1', '$2', {undefined, undefined}).
 Query -> Select OrderBy Limit : make_orderby('$1', '$2', '$3').
 Query -> Select         Limit : make_orderby('$1', [], '$2').
 Query -> Select               : '$1'.
@@ -431,8 +428,7 @@ Erlang code.
           group_by,
           order_by,
           limit,
-          offset,
-          only
+          offset
          }).
 
 -include("riak_ql_ddl.hrl").
@@ -474,8 +470,7 @@ convert(#outputs{type     = select,
                  group_by = G,
                  limit    = L,
                  offset   = Of,
-                 order_by = Ob,
-                 only     = On} = Outputs) ->
+                 order_by = Ob} = Outputs) ->
     ok = validate_select_query(Outputs),
     [
      {type, select},
@@ -485,8 +480,7 @@ convert(#outputs{type     = select,
      {group_by, G},
      {limit,    L},
      {offset,   Of},
-     {order_by, Ob},
-     {only,     On}
+     {order_by, Ob}
     ];
 convert(#outputs{type = create} = O) ->
     O.
@@ -630,13 +624,12 @@ make_ordby_item(Fld, Dir, Nulls) ->
      if Nulls /= undefined -> Nulls;
         el/=se -> {nulls_last, <<"nulls last">>} end}.
 
-make_orderby(A, OrdBy, {Lim, Off, Only}) ->
+make_orderby(A, OrdBy, {Lim, Off}) ->
     OrderBy =
         [{F, Dir, NullsGroup} ||
             {{identifier, F}, {Dir, _DirToken}, {NullsGroup, _NullsGroupToken}} <- OrdBy],
     A#outputs{order_by = OrderBy,
-              limit = strip_int(Lim), offset = strip_int(Off),
-              only = Only}.  %% 'only' is a boolean token, ready as is
+              limit = strip_int(Lim), offset = strip_int(Off)}.
 
 strip_int({integer, A}) -> A;
 strip_int(undefined)    -> undefined.

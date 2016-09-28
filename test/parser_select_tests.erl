@@ -149,7 +149,7 @@ group_by_one_field_test() ->
                   {fields, [{identifier, [<<"b">>]}]},
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, [{identifier, <<"b">>}]},
-                  {limit,undefined},{offset,undefined},{order_by,undefined},{only,undefined}
+                  {limit,undefined},{offset,undefined},{order_by,undefined}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
@@ -165,7 +165,7 @@ group_by_two_fields_test() ->
                   {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, [{identifier, <<"a">>}, {identifier, <<"b">>}]},
-                  {limit,undefined},{offset,undefined},{order_by,undefined},{only,undefined}
+                  {limit,undefined},{offset,undefined},{order_by,undefined}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
@@ -182,8 +182,7 @@ order_by_1_test() ->
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, []},
                   {limit,undefined},{offset,undefined},
-                  {order_by,[{<<"a">>, asc, nulls_last}, {<<"b">>, asc, nulls_last}]},
-                  {only,undefined}
+                  {order_by,[{<<"a">>, asc, nulls_last}, {<<"b">>, asc, nulls_last}]}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
@@ -200,8 +199,7 @@ order_by_2_test() ->
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, []},
                   {limit,undefined},{offset,undefined},
-                  {order_by,[{<<"a">>, desc, nulls_first}, {<<"b">>, asc, nulls_last}]},
-                  {only,undefined}
+                  {order_by,[{<<"a">>, desc, nulls_first}, {<<"b">>, asc, nulls_last}]}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
@@ -218,8 +216,7 @@ order_by_3_test() ->
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, []},
                   {limit,undefined},{offset,undefined},
-                  {order_by,[{<<"a">>, desc, nulls_last}, {<<"b">>, asc, nulls_last}]},
-                  {only,undefined}
+                  {order_by,[{<<"a">>, desc, nulls_last}, {<<"b">>, asc, nulls_last}]}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).

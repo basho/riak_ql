@@ -27,7 +27,6 @@ NOT = (N|n)(O|o)(T|t)
 NULL = (N|n)(U|u)(L|l)(L|l)
 NULLS = (N|n)(U|u)(L|l)(L|l)(S|s)
 OFFSET = (O|o)(F|f)(F|f)(S|s)(E|e)(T|t)
-ONLY = (O|o)(N|n)(L|l)(Y|y)
 OR = (O|o)(R|r)
 ORDER = (O|o)(R|r)(D|d)(E|e)(R|r)
 PRIMARY = (P|p)(R|r)(I|i)(M|m)(A|a)(R|r)(Y|y)
@@ -103,7 +102,6 @@ Rules.
 {NULL} : {token, {null, list_to_binary(TokenChars)}}.
 {NULLS} : {token, {nulls, list_to_binary(TokenChars)}}.
 {OFFSET} : {token, {offset, list_to_binary(TokenChars)}}.
-{ONLY} : {token, {only, list_to_binary(TokenChars)}}.
 {OR} : {token, {or_, list_to_binary(TokenChars)}}.
 {ORDER} : {token, {order, list_to_binary(TokenChars)}}.
 {PRIMARY} : {token, {primary, list_to_binary(TokenChars)}}.

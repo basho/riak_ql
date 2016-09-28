@@ -92,11 +92,11 @@ op_to_string(Op) ->
 flat_format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
 
--spec ddl_rec_to_sql(#ddl_v1{}) -> string().
-ddl_rec_to_sql(#ddl_v1{table         = Tb,
-                       fields        = Fs,
-                       partition_key = PK,
-                       local_key     = LK}) ->
+-spec ddl_rec_to_sql(?DDL{}) -> string().
+ddl_rec_to_sql(?DDL{table         = Tb,
+                    fields        = Fs,
+                    partition_key = PK,
+                    local_key     = LK}) ->
     "CREATE TABLE " ++ binary_to_list(Tb) ++ " (" ++ make_fields(Fs) ++ "PRIMARY KEY ((" ++ pk_to_sql(PK) ++ "), " ++ lk_to_sql(LK) ++ "))".
 
 make_fields(Fs) ->
