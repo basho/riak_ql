@@ -762,31 +762,31 @@ remove_exprs({A, B, C}) ->
 remove_exprs(A) ->
     A.
 
-%% Functions are disabled so return an error.
 make_funcall({identifier, FuncName}, Args) ->
-    Fn = canonicalise_window_aggregate_fn(FuncName),
-    case get_func_type(Fn) of
-        window_aggregate_fn ->
-            %% FIXME this should be in the type checker in riak_kv_qry_compiler
-            {Fn2, Args2} = case {Fn, Args} of
-                               {'COUNT', [{asterisk, _Asterisk}]} ->
-                                   {'COUNT', [{identifier, <<"*">>}]};
-                               {_, [{asterisk, _Asterisk}]} ->
-                                   Msg1 = io_lib:format("Function '~s' does not support"
-                                                        " wild cards args.", [Fn]),
-                                   return_error(0, iolist_to_binary(Msg1));
-                               _ ->
-                                   {Fn, Args}
-                           end,
-            Args3 = [canonicalise_expr(X) || X <- Args2],
-            {{window_agg_fn, Fn2}, Args3};
-        not_supported ->
-            Msg2 = io_lib:format("Function not supported - '~s'.", [FuncName]),
-            return_error(0, iolist_to_binary(Msg2))
-    end;
+    CanonicalFuncName = canonicalise_window_aggregate_fn(FuncName),
+    make_funcall(get_func_type(CanonicalFuncName), CanonicalFuncName, FuncName, Args);
 make_funcall(_, _) ->
     % make dialyzer stop erroring on no local return.
     error.
+
+make_funcall(window_aggregate_fn, CanonicalFuncName, _FuncName, Args) ->
+  %% FIXME this should be in the type checker in riak_kv_qry_compiler
+  {Fn2, Args2} = case {CanonicalFuncName, Args} of
+                   {'COUNT', [{asterisk, _Asterisk}]} ->
+                     {'COUNT', [{identifier, <<"*">>}]};
+                   {_, [{asterisk, _Asterisk}]} ->
+                     Msg1 = io_lib:format("Function '~s' does not support"
+                                          " wild cards args.", [CanonicalFuncName]),
+                     return_error(0, iolist_to_binary(Msg1));
+                   _ ->
+                     {CanonicalFuncName, Args}
+                 end,
+  Args3 = [canonicalise_expr(X) || X <- Args2],
+  {{window_agg_fn, Fn2}, Args3};
+make_funcall(not_supported, _CanonicalFuncName, FuncName, _Args) ->
+  Msg2 = io_lib:format("Function not supported - '~s'.", [FuncName]),
+  return_error(0, iolist_to_binary(Msg2)).
+
 
 canonicalise_expr({identifier, X}) ->
     {identifier, [X]};
@@ -795,18 +795,17 @@ canonicalise_expr({expr, X}) ->
 canonicalise_expr(X) ->
     X.
 
-get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
-                             FuncName =:= 'MEAN'   orelse
-                             FuncName =:= 'SUM'    orelse
-                             FuncName =:= 'COUNT'  orelse
-                             FuncName =:= 'MIN'    orelse
-                             FuncName =:= 'MAX'    orelse
-                             FuncName =:= 'STDDEV' orelse
-                             FuncName =:= 'STDDEV_SAMP' orelse
-                             FuncName =:= 'STDDEV_POP' ->
-    window_aggregate_fn;
-get_func_type(FuncName) when is_atom(FuncName) ->
-    not_supported.
+get_func_type('AVG') -> window_aggregate_fn;
+get_func_type('MEAN') -> window_aggregate_fn;
+get_func_type('SUM') -> window_aggregate_fn; 
+get_func_type('COUNT') -> window_aggregate_fn;
+get_func_type('MIN') -> window_aggregate_fn; 
+get_func_type('MAX') -> window_aggregate_fn;
+get_func_type('STDDEV') -> window_aggregate_fn;
+get_func_type('STDDEV_SAMP') -> window_aggregate_fn;
+get_func_type('STDDEV_POP') -> window_aggregate_fn;
+get_func_type(FuncName) when is_atom(FuncName) -> 
+  not_supported.
 
 %% TODO
 %% this list to atom needs to change to list to existing atom
@@ -862,8 +861,8 @@ make_column({identifier, FieldName}, {DataType, _}, not_null) ->
        optional = false}.
 
 make_partition_and_local_keys(PFieldList, LFieldList) ->
-    PFields = lists:reverse(extract_key_field_list(PFieldList, [])),
-    LFields = lists:reverse(extract_key_field_list(LFieldList, [])),
+    PFields = lists:reverse(extract_key_field_list(PFieldList)),
+    LFields = lists:reverse(extract_key_field_list(LFieldList)),
     [
      {partition_key, #key_v1{ast = PFields}},
      {local_key,     #key_v1{ast = LFields}}
@@ -877,15 +876,13 @@ make_table_element_list(A, {table_element_list, B}) ->
 make_table_element_list(A, B) ->
     {table_element_list, lists:flatten([A, B])}.
 
-extract_key_field_list({list, []}, Extracted) ->
-    Extracted;
-extract_key_field_list({list,
-                        [Modfun = #hash_fn_v1{} | Rest]},
-                       Extracted) ->
-    [Modfun | extract_key_field_list({list, Rest}, Extracted)];
-extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [?SQL_PARAM{name = [Field]} |
-     extract_key_field_list({list, Rest}, Extracted)].
+extract_key_field_list({list, List}) ->
+    lists:map(fun extract_key_field/1, List).
+
+extract_key_field(#hash_fn_v1{}=Modfun) ->
+    Modfun;
+extract_key_field(Field) ->
+    ?SQL_PARAM{name = [Field]}.
 
 make_table_definition(TableName, Contents) ->
     make_table_definition(TableName, Contents, []).
@@ -898,22 +895,10 @@ make_table_definition({identifier, Table}, Contents, Properties) ->
      validate_table_properties(Properties)}.
 
 find_partition_key({table_element_list, Elements}) ->
-    find_partition_key(Elements);
-find_partition_key([{partition_key, Key} | _Rest]) ->
-    Key;
-find_partition_key([_Head | Rest]) ->
-    find_partition_key(Rest);
-find_partition_key(_) ->
-    none.
+    proplists:get_value(partition_key, Elements, none).
 
 find_local_key({table_element_list, Elements}) ->
-    find_local_key(Elements);
-find_local_key([{local_key, Key} | _Rest]) ->
-    Key;
-find_local_key([_Head | Rest]) ->
-    find_local_key(Rest);
-find_local_key(_) ->
-    none.
+    proplists:get_value(local_key, Elements, none).
 
 make_modfun(quantum, {list, Args}) ->
     [Param, Quantity, Unit] = lists:reverse(Args),
@@ -925,15 +910,15 @@ make_modfun(quantum, {list, Args}) ->
                }}.
 
 find_fields({table_element_list, Elements}) ->
-    find_fields(1, Elements, []).
+    find_fields_in_list(Elements, 1).
 
-find_fields(_Count, [], Found) ->
-    lists:reverse(Found);
-find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
-    PositionedField = Field#riak_field_v1{position = Count},
-    find_fields(Count + 1, Rest, [PositionedField | Elements]);
-find_fields(Count, [_Head | Rest], Elements) ->
-    find_fields(Count, Rest, Elements).
+find_fields_in_list([], _Count) ->
+    [];
+find_fields_in_list([#riak_field_v1{}=Field|Rest], Count) ->
+    [Field#riak_field_v1{position = Count} | 
+     find_fields_in_list(Rest, Count+1)];
+find_fields_in_list([_|Rest], Count) ->
+    find_fields_in_list(Rest, Count).
 
 prepend_table_proplist(L, P) ->
     [P | L].
