@@ -240,7 +240,7 @@ apply_ordering(Val, _) -> % ascending or undefined
 -spec flip_binary(binary()) -> binary().
 flip_binary(V) when is_binary(V) ->
     << <<(bnot X):8>> || <<X>> <= V >>.
-    
+
 %% Convert an error emitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
 -spec syntax_error_to_msg(query_syntax_error()) ->
@@ -655,12 +655,30 @@ downgrade_ddl(v2, v1, DDL1) ->
             [#ddl_v1{
                             table              = DDL1#ddl_v2.table,
                             fields             = DDL1#ddl_v2.fields,
-                            partition_key      = DDL1#ddl_v2.partition_key,
-                            local_key          = downgrade_v2_local_key(DDL1#ddl_v2.local_key)
+                            partition_key      = downgrade_v2_key(DDL1#ddl_v2.partition_key),
+                            local_key          = downgrade_v2_key(DDL1#ddl_v2.local_key)
                         }];
         _ ->
-            [{error, cannot_downgrade}]
+            [{error, {cannot_downgrade, v1}}]
     end.
+
+%% Downgrade a v2 local key to v1, the key should already be checked that
+%% it is safe to downgrade before it is called.
+downgrade_v2_key(#key_v1{ ast = AST }) ->
+    #key_v1{ ast =
+        [downgrade_v2_param(X) || X <- AST]
+    }.
+
+%%
+downgrade_v2_param(#param_v2{name = N}) ->
+    #param_v1{name = N};
+downgrade_v2_param(#hash_fn_v1{args = Args} = HashFn) ->
+    HashFn#hash_fn_v1{
+        args = [downgrade_v2_param(X) || X <- Args]
+    };
+downgrade_v2_param(X) ->
+    %% hash_fn arguments can be any kind of term
+    X.
 
 %%
 upgrade_ddl([_], DDL) ->
@@ -680,23 +698,21 @@ upgrade_ddl([v1,v2 = To|Tail], DDL1) ->
 
 %%
 upgrade_v1_key(#key_v1{ ast = AST } = Key) ->
-    Key#key_v1{ ast =
+    Key#key_v1{ast =
         [upgrade_v1_param(X) || X <- AST]
     }.
 
 %% upgrade param_v1 records to v2, if they are not this type of record then
 %% just return it, since it is a hash_fn.
-upgrade_v1_param(#param_v1{ name = N }) ->
-    #param_v2{ name = N, ordering = ascending };
+upgrade_v1_param(#param_v1{name = N}) ->
+    #param_v2{name = N, ordering = ascending};
+upgrade_v1_param(#hash_fn_v1{args = Args} = HashFn) ->
+    HashFn#hash_fn_v1{
+        args = [upgrade_v1_param(X) || X <- Args]
+    };
 upgrade_v1_param(X) ->
+    %% hash_fn arguments can be any kind of term
     X.
-
-%% Downgrade a v2 local key to v1, the key should already be checked that
-%% it is safe to downgrade before it is called.
-downgrade_v2_local_key(#key_v1{ ast = AST }) ->
-    #key_v1{ ast =
-        [#param_v1{ name = N } || #param_v2{ name = N } <- AST]
-    }.
 
 %%
 ddl_minimum_capability(DDL, DefaultMin) ->
@@ -1451,16 +1467,40 @@ fold_where_tree_test() ->
                      ]
              }).
 
+upgrade_ddl_with_hash_fn_test() ->
+    HashFn =
+        #hash_fn_v1{mod  = ?MODULE,
+                    fn   = mock_partition_fn,
+                    args = [#param_v1{name = [<<"a">>]}, 15, m],
+                    type = timestamp},
+    DDL_v1 = #ddl_v1{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [HashFn] },
+        partition_key = #key_v1{ ast = [] }
+    },
+    ?assertEqual(
+        [DDL_v1,
+         #ddl_v2{
+            table = <<"tab">>,
+            local_key = #key_v1{ ast = [HashFn#hash_fn_v1{ args = [#param_v2{name = [<<"a">>], ordering = ascending}, 15, m] }] },
+            partition_key = #key_v1{ ast = [] }
+         }],
+        convert(v2, DDL_v1)
+    ).
+
 upgrade_ddl_v1_test() ->
     DDL_v1 = #ddl_v1{
         table = <<"tab">>,
-        local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] }
+        local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] },
+        partition_key = #key_v1{ ast = [] }
+
     },
     ?assertEqual(
-        [DDL_v1, 
+        [DDL_v1,
          #ddl_v2{
             table = <<"tab">>,
-            local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] }
+            local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] },
+            partition_key = #key_v1{ ast = [] }
          }],
         convert(v2, DDL_v1)
     ).
@@ -1468,13 +1508,15 @@ upgrade_ddl_v1_test() ->
 downgrade_ddl_v2_test() ->
     DDL_v2 = #ddl_v2{
         table = <<"tab">>,
-        local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] }
+        local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] },
+        partition_key = #key_v1{ ast = [] }
     },
     ?assertEqual(
-        #ddl_v1{
-            table = <<"tab">>,
-            local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] }
-        },
+        [#ddl_v1{
+                    table = <<"tab">>,
+                    local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] },
+                    partition_key = #key_v1{ ast = [] }
+                }],
         convert(v1, DDL_v2)
     ).
 
@@ -1484,7 +1526,7 @@ downgrade_ddl_v2_with_desc_test() ->
         local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = descending }] }
     },
     ?assertEqual(
-        {error, cannot_downgrade},
+        [{error, {cannot_downgrade, v1}}],
         convert(v1, DDL_v2)
     ).
 

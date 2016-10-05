@@ -53,7 +53,9 @@
 
 -export([
          compile/1,
+         compile_and_load_disabled_module_from_tmp/1,
          compile_and_load_from_tmp/1,
+         compile_disabled_module/1,
          get_compiler_capabilities/0,
          get_compiler_version/0,
          write_source_to_files/3
@@ -86,6 +88,20 @@ get_compiler_version() ->
 get_compiler_capabilities() ->
     lists:seq(get_compiler_version(), 1, -1).
 
+%% Return the AST for a disabled module, a module can be disabled when a DDL
+%% is not available for a table because it has been downgraded to a version
+%% that is lower than what the table features required.
+-spec compile_disabled_module(Table::binary()) -> {module(), tuple()}.
+compile_disabled_module(Table) when is_binary(Table) ->
+    ModuleName = riak_ql_ddl:make_module_name(Table),
+    {ModuleName, merl:quote(disabled_table_source(ModuleName))}.
+
+%%
+disabled_table_source(ModuleName) ->
+    "-module(" ++ atom_to_list(ModuleName) ++ ").\n"
+    "-compile(export_all).\n"
+    "get_min_required_ddl_cap() -> disabled.".
+
 %% Compile the DDL to its helper module AST.
 -spec compile(?DDL{}) ->
     {module(), ast()} | {error, tuple()}.
@@ -97,7 +113,7 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {VFns,         LineNo2}  = build_validn_fns(Fields,    LineNo),
     {ACFns,        LineNo3}  = build_add_cols_fns(Fields,  LineNo2),
     {ExtractFn,    LineNo4}  = build_extract_fn([Fields],  LineNo3, []),
-    {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),
+    {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),    
     {GetPosnFn,    LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
     {GetPosnsFn,   LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
     {IsValidFn,    LineNo8}  = build_is_valid_fn(Fields,   LineNo7),
@@ -106,18 +122,27 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
     {FieldOrdersFn, LineNo10} = build_field_orders_fn(DDL, LineNo9),
     {RevertOrderingFn, LineNo11} = build_revert_ordering_on_local_key_fn(DDL, LineNo10),
+    {MinDDLCapFn, LineNo12} = build_min_ddl_version_fn(DDL, LineNo11),
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn, GetDDLFn, FieldOrdersFn, RevertOrderingFn]
+        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn, GetDDLFn, FieldOrdersFn, RevertOrderingFn, MinDDLCapFn]
         ++ HashFns
-        ++ [{eof, LineNo11}],
+        ++ [{eof, LineNo12}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
         Other ->
             exit(Other)
     end.
+
+%%
+build_min_ddl_version_fn(DDL, LineNo) ->
+    MinDDLVersion = riak_ql_ddl:get_minimum_capability(DDL),
+    Source =
+        "get_min_required_ddl_cap() -> " ++ atom_to_list(MinDDLVersion) ++ ".",
+    {?Q(Source), LineNo+1}.
+
 
 %% Compile the module, write it to /tmp then load it into the VM.
 -spec compile_and_load_from_tmp(?DDL{}) ->
@@ -127,6 +152,14 @@ compile_and_load_from_tmp({ok, {?DDL{} = DDL, _Props}}) ->
     compile_and_load_from_tmp(DDL);
 compile_and_load_from_tmp(?DDL{} = DDL) ->
     {Module, AST} = compile(DDL),
+    {ok, Module, Bin} = compile:forms(AST),
+    BeamFileName = "/tmp/" ++ atom_to_list(Module) ++ ".beam",
+    {module, Module} = code:load_binary(Module, BeamFileName, Bin).
+
+%%
+-spec compile_and_load_disabled_module_from_tmp(Table::binary()) -> {module, module()}.
+compile_and_load_disabled_module_from_tmp(Table) when is_binary(Table) ->
+    {Module, AST} = compile_disabled_module(Table),
     {ok, Module, Bin} = compile:forms(AST),
     BeamFileName = "/tmp/" ++ atom_to_list(Module) ++ ".beam",
     {module, Module} = code:load_binary(Module, BeamFileName, Bin).
@@ -571,7 +604,8 @@ make_export_attr(LineNo) ->
                                   {get_identity_plaintext_DEBUG, 0},
                                   {is_field_valid,               1},
                                   {revert_ordering_on_local_key, 1},
-                                  {validate_obj,                 1}
+                                  {validate_obj,                 1},
+                                  {get_min_required_ddl_cap,     0}
                                  ]}, LineNo + 1}.
 
 
