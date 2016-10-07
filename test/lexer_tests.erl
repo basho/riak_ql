@@ -193,6 +193,25 @@ ops_test_() ->
                ],
     ?_assertEqual(Expected, Got).
 
+is_null_test_() ->
+    Got = riak_ql_lexer:get_tokens("field_name IS NULL"),
+    Expected = [
+                {identifier,            <<"field_name">>},
+                {is_,                   <<"IS">>},
+                {null,                  <<"NULL">>}
+               ],
+    ?_assertEqual(Expected, Got).
+
+is_not_null_test_() ->
+    Got = riak_ql_lexer:get_tokens("field_name IS NOT NULL"),
+    Expected = [
+                {identifier,            <<"field_name">>},
+                {is_,                   <<"IS">>},
+                {not_,                  <<"NOT">>},
+                {null,                  <<"NULL">>}
+               ],
+    ?_assertEqual(Expected, Got).
+
 brackets_test_() ->
     Got = riak_ql_lexer:get_tokens(" ( )"),
     Expected = [
