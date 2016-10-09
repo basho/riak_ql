@@ -622,7 +622,7 @@ current_version() ->
     ?DDL_RECORD_VERSION.
 
 %% Convert a ddl record to a different version.
--spec convert(ddl_version(), DDL::tuple()) -> [].
+-spec convert(ddl_version(), DDL::any_ddl()) -> [any_ddl()].
 convert(Version, DDL) when is_atom(Version) ->
     CurrentVersion = ddl_record_version(element(1, DDL)),
     case is_version_greater(Version, CurrentVersion) of
