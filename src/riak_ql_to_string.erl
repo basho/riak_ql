@@ -130,7 +130,15 @@ make_q(#hash_fn_v1{mod  = riak_ql_quanta,
 extract([X]) -> X.
 
 lk_to_sql(LK) ->
-    string:join([binary_to_list(extract(X?SQL_PARAM.name)) || X <- LK#key_v1.ast], ", ").
+    string:join([param_to_string(P) || P <- LK#key_v1.ast], ", ").
+
+param_to_string(?SQL_PARAM{name = [Name], ordering = Order}) ->
+    case Order of
+        descending ->
+            binary_to_list(Name) ++ " DESC";
+        _ ->
+            binary_to_list(Name)
+    end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -270,6 +278,19 @@ ddl_rec_to_string_test() ->
           "PRIMARY KEY ((Uno, Dos, "
           "quantum(Tres, 1, 'd')), "
           "Uno, Dos, Tres))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql(DDL)
+    ).
+
+ddl_rec_to_string_desc_keys_test() ->
+    SQL = "CREATE TABLE mytab ("
+          "a timestamp not null, "
+          "b timestamp not null, "
+          "c timestamp not null, "
+          "PRIMARY KEY ((a, b, quantum(c, 1, 'd')), a, b, c DESC))",
     Lexed = riak_ql_lexer:get_tokens(SQL),
     {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
     ?assertEqual(
