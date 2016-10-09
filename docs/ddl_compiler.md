@@ -9,7 +9,7 @@ Table_def = "CREATE TABLE MyTable (myfamily varchar not null, myseries varchar n
 riak_ql_ddl_compiler:write_source_to_files("/tmp", DDL, AST).
 ```
 
-### 5.iii Generated DDL Modules
+### Generated DDL Modules
 
 The structure and interfaces of the generated modules is shown as per this `.erl` file which has been reverse generated from the AST that riak_kv_ddl_compiler emits. The comments contain details of the fields and keys used in the creation of the DDL.
 

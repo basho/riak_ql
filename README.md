@@ -59,16 +59,16 @@ Running `./rebar compile` transforms this pair of leex and yecc files into the e
 * `riak_ql_lexer.erl`
 * `riak_ql_parser.erl`
 
-For more details of the lexer and parser see the [Lexer And Parser](./doc/lexer_parser.md)
+For more details of the lexer and parser see the [Lexer And Parser](./docs/lexer_parser.md)
 
-To understand how the lexer/parser fits into the query pipeline see [Query Pipeline](./doc/the_query_pipeline.md)
+To understand how the lexer/parser fits into the query pipeline see [Query Pipeline](./docs/the_query_pipeline.md)
 
 There is a ruby script and set of SQL keywords which can be used to generate some of the lexer components of `riak_lexer.xrl`:
 
 * `priv/keyword_general.rb`
 * `priv/riak_ql_keywords.csv`
 
-For more details see the [Lexer Keywords](./doc/lexer_keywords.md)
+For more details see the [Lexer Keywords](./docs/lexer_keywords.md)
 
 This code generates one of two output records:
 
@@ -96,7 +96,7 @@ When a `CREATE TABLE...` statement if fed into the lexer/parser it generates a `
 
 The module `riak_ql_ddl_compiler.erl` performs the compilation and the module `riak_ql_ddl.erl` provides a set of wrappers around the compiled module to add utility functions to the API.
 
-For more details see the [DDL Compiler](./doc/ddl_compiler.md)
+For more details see the [DDL Compiler](./docs/ddl_compiler.md)
 
 ## Runtime Query Fns
 
