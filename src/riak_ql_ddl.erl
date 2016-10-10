@@ -33,9 +33,9 @@
 %% Relational operators allowed in a where clause.
 -type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
 
-%% NULL comparison operator (comparitor) allowed in where clause, but limited to
+%% NULL comparison operator (comparator) allowed in where clause, but limited to
 %% SQL "<field> IS [NOT] NULL"
--type null_comparitor() :: is_null | is_not_null.
+-type null_comparator() :: is_null | is_not_null.
 
 -type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
 -type data_value()       :: {integer, integer()}
@@ -49,7 +49,7 @@
                     | {expr, selection()}
                     | {negate, selection()}
                     | {relational_op(), selection(), selection()}
-                    | {null_comparitor(), field_identifier()}.
+                    | {null_comparator(), field_identifier()}.
 
 -type insertion()  :: field_identifier().
 -type filter()     :: term().
