@@ -21,8 +21,8 @@ Identifier
 Insert
 CharacterLiteral
 Where
-Cond
-NullCond
+ComparisonPredicate
+NullPredicate
 Comp
 NullComp
 Val
@@ -198,8 +198,11 @@ Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1',
 Funcall -> Identifier left_paren asterisk       right_paren : make_funcall('$1', ['$3']).
 Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3'] ++ '$4').
 
-NullCond -> Vals NullComp : make_expr('$1', '$2').
-Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
+%% NullComp is termed NullPredicatePart2 in the SQL spec, however it is more
+%% clearly a NullComparator, so termed NullComp here.
+NullPredicate -> Vals NullComp : make_expr('$1', '$2').
+%% Comp is short for CompOp as termed in the SQL spec.
+ComparisonPredicate -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
 Vals -> NumericValueExpression : '$1'.
 Vals -> regex            : '$1'.
@@ -298,9 +301,9 @@ TruthValue -> false : {boolean, false}.
 BooleanPrimary -> BooleanPredicand : '$1'.
 
 BooleanPredicand ->
-    NullCond : '$1'.
+    NullPredicate : '$1'.
 BooleanPredicand ->
-    Cond : '$1'.
+    ComparisonPredicate : '$1'.
 BooleanPredicand ->
     left_paren BooleanValueExpression right_paren : '$2'.
 
@@ -640,10 +643,10 @@ canonicalise_where(WhereClause) ->
     Canonical = canon2(WhereClause),
     _NewWhere = hoist(Canonical).
 
-canon2({Cond, A, B}) when is_binary(B) andalso not is_binary(A) ->
-    canonicalize_condition_order({Cond, B, A});
-canon2({Cond, A, B}) when Cond =:= and_ orelse
-                          Cond =:= or_  ->
+canon2({ComparisonPredicate, A, B}) when is_binary(B) andalso not is_binary(A) ->
+    canonicalize_condition_order({ComparisonPredicate, B, A});
+canon2({ComparisonPredicate, A, B}) when ComparisonPredicate =:= and_ orelse
+                                         ComparisonPredicate =:= or_  ->
     %% this is stack busting non-tail recursion
     %% but our where clauses are bounded in size so thats OK
     A1 = canon2(A),
@@ -653,8 +656,8 @@ canon2({Cond, A, B}) when Cond =:= and_ orelse
             A1;
         false ->
             case is_lower(A1, B1) of
-                true  -> {Cond, A1, B1};
-                false -> {Cond, B1, A1}
+                true  -> {ComparisonPredicate, A1, B1};
+                false -> {ComparisonPredicate, B1, A1}
             end
     end;
 canon2({Op, A, B}) ->
