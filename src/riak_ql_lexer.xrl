@@ -20,6 +20,7 @@ INSERT = (I|i)(N|n)(S|s)(E|e)(R|r)(T|t)
 INTO = (I|i)(N|n)(T|t)(O|o)
 LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
 NOT = (N|n)(O|o)(T|t)
+IS = (I|i)(S|s)
 NULL = (N|n)(U|u)(L|l)(L|l)
 OR = (O|o)(R|r)
 PRIMARY = (P|p)(R|r)(I|i)(M|m)(A|a)(R|r)(Y|y)
@@ -111,6 +112,7 @@ Rules.
 {FLOATDEC} : {token, {float, TokenChars}}.
 {FLOATSCI} : {token, {float_sci, TokenChars}}.
 
+{IS}          : {token, {is_,                 list_to_binary(TokenChars)}}.
 {EQ}          : {token, {equals_operator,     list_to_binary(TokenChars)}}.
 {APPROXMATCH} : {token, {approx, list_to_binary(TokenChars)}}.
 {GT}          : {token, {greater_than_operator, list_to_binary(TokenChars)}}.

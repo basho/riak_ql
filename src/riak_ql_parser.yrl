@@ -21,8 +21,10 @@ Identifier
 Insert
 CharacterLiteral
 Where
-Cond
+ComparisonPredicate
+NullPredicate
 Comp
+NullComp
 Val
 Vals
 Funcall
@@ -44,6 +46,8 @@ KeyField
 KeyFieldArgList
 KeyFieldArg
 NotNull
+IsNotNull
+IsNull
 GroupBy
 
 %% ValueExpression
@@ -96,6 +100,9 @@ identifier
 insert
 integer
 into
+is_
+is_not_null
+is_null
 group
 key
 limit
@@ -191,7 +198,11 @@ Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1',
 Funcall -> Identifier left_paren asterisk       right_paren : make_funcall('$1', ['$3']).
 Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3'] ++ '$4').
 
-Cond -> Vals Comp Vals : make_expr('$1', '$2', '$3').
+%% NullComp is termed NullPredicatePart2 in the SQL spec, however it is more
+%% clearly a NullComparator, so termed NullComp here.
+NullPredicate -> Vals NullComp : make_expr('$1', '$2').
+%% Comp is short for CompOp as termed in the SQL spec.
+ComparisonPredicate -> Vals Comp Vals : make_expr('$1', '$2', '$3').
 
 Vals -> NumericValueExpression : '$1'.
 Vals -> regex            : '$1'.
@@ -200,6 +211,9 @@ Vals -> Val              : '$1'.
 Val -> varchar            : '$1'.
 Val -> CharacterLiteral   : '$1'.
 Val -> TruthValue         : '$1'.
+
+NullComp -> IsNull             : '$1'.
+NullComp -> IsNotNull             : '$1'.
 
 %% Comp -> approx    : '$1'.
 Comp -> equals_operator        : '$1'.
@@ -216,6 +230,9 @@ CreateTable -> create table : create_table.
 ShowTables -> show tables : [{type, show_tables}].
 
 NotNull -> not_ null : '$1'.
+
+IsNull -> is_ null : {is_null, '$1'}.
+IsNotNull -> is_ not_ null: {is_not_null, '$2'}.
 
 %% %% 6.26 VALUE EXPRESSION
 
@@ -284,7 +301,9 @@ TruthValue -> false : {boolean, false}.
 BooleanPrimary -> BooleanPredicand : '$1'.
 
 BooleanPredicand ->
-    Cond : '$1'.
+    NullPredicate : '$1'.
+BooleanPredicand ->
+    ComparisonPredicate : '$1'.
 BooleanPredicand ->
     left_paren BooleanValueExpression right_paren : '$2'.
 
@@ -569,6 +588,8 @@ make_insert({identifier, Table}, Fields, Values) ->
 add_limit(A, _B, {integer, C}) ->
     A#outputs{limit = C}.
 
+make_expr({TypeA, A}, {B, _}) ->
+    {expr, {B, {TypeA, A}}}.
 make_expr({LiteralFlavor, Literal},
           {Op, _},
           {identifier, IdentifierName}) when LiteralFlavor /= identifier ->
@@ -622,10 +643,10 @@ canonicalise_where(WhereClause) ->
     Canonical = canon2(WhereClause),
     _NewWhere = hoist(Canonical).
 
-canon2({Cond, A, B}) when is_binary(B) andalso not is_binary(A) ->
-    canonicalize_condition_order({Cond, B, A});
-canon2({Cond, A, B}) when Cond =:= and_ orelse
-                          Cond =:= or_  ->
+canon2({ComparisonPredicate, A, B}) when is_binary(B) andalso not is_binary(A) ->
+    canonicalize_condition_order({ComparisonPredicate, B, A});
+canon2({ComparisonPredicate, A, B}) when ComparisonPredicate =:= and_ orelse
+                                         ComparisonPredicate =:= or_  ->
     %% this is stack busting non-tail recursion
     %% but our where clauses are bounded in size so thats OK
     A1 = canon2(A),
@@ -635,8 +656,8 @@ canon2({Cond, A, B}) when Cond =:= and_ orelse
             A1;
         false ->
             case is_lower(A1, B1) of
-                true  -> {Cond, A1, B1};
-                false -> {Cond, B1, A1}
+                true  -> {ComparisonPredicate, A1, B1};
+                false -> {ComparisonPredicate, B1, A1}
             end
     end;
 canon2({Op, A, B}) ->
@@ -653,6 +674,8 @@ canonicalize_condition_order({'>', Reference, Column}) ->
 canonicalize_condition_order({'<', Reference, Column}) ->
     canon2({'>', Column, Reference}).
 
+hoist({A, B}) ->
+    {A, B};
 hoist({and_, {and_, A, B}, C}) ->
     Hoisted = {and_, A, hoist({and_, B, C})},
     _Sort = sort(Hoisted);
@@ -688,6 +711,12 @@ sort({Op, A, B}) ->
         false -> {Op, B, A}
     end.
 
+is_lower({NullOp,{identifier, _}}, {_, _, _}) when NullOp =:= is_null orelse
+                                                   NullOp =:= is_not_null ->
+    false;
+is_lower({_, _, _}, {NullOp,{identifier, _}}) when NullOp =:= is_null orelse
+                                                   NullOp =:= is_not_null ->
+    false;
 is_lower(Ands, {_, _, _}) when is_list(Ands)->
     true;
 is_lower({_, _, _}, Ands) when is_list(Ands)->
