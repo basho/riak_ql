@@ -367,3 +367,25 @@ select_quoted_where_sql_test() ->
                                      {'=', <<"color spaces">>, {binary, <<"someone had painted it blue">>}}
                                     ]}
                            ]).
+
+select_where_field_is_null_test() ->
+    ?sql_comp_assert_match("select weather from GeoCheckin where user IS NULL", select,
+                           [{fields, [
+                                       {identifier, [<<"weather">>]}
+                                     ]},
+                            {tables, <<"GeoCheckin">>},
+                            {where, [
+                                        {is_null, {identifier, <<"user">>}}
+                                    ]}
+                            ]).
+
+select_where_field_is_not_null_test() ->
+    ?sql_comp_assert_match("select weather from GeoCheckin where user IS NOT NULL", select,
+                           [{fields, [
+                                       {identifier, [<<"weather">>]}
+                                     ]},
+                            {tables, <<"GeoCheckin">>},
+                            {where, [
+                                        {is_not_null, {identifier, <<"user">>}}
+                                    ]}
+                            ]).
