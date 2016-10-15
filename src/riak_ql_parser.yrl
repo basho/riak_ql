@@ -13,7 +13,6 @@ Explain
 Describe
 ShowTables
 Bucket
-Buckets
 Field
 FieldElem
 Fields
@@ -110,8 +109,6 @@ insert
 integer
 into
 is_
-is_not_null
-is_null
 group
 key
 last
@@ -208,9 +205,6 @@ FieldElem -> Val   : '$1'.
 Field -> NumericValueExpression : '$1'.
 %Field -> Identifier    : canonicalise_col('$1').
 Field -> asterisk : make_wildcard('$1').
-
-%% Support early error on multi-table select
-Buckets -> Bucket comma Bucket : make_list('$1', '$3').
 
 Bucket -> Identifier   : '$1'.
 
