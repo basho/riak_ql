@@ -283,9 +283,9 @@ is_query_valid(_, ?DDL{ table = T1 },
                {T2, _Select, _Where, _OrderBy}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_query_valid(Mod, _, {_Table, Selection, Where, OrderBy}) ->
-    ValidSelection = check_selections_valid(Mod, Selection, ?CANTBEBLANK),
-    ValidOrderBy   = check_orderby_valid(Mod, OrderBy),
-    ValidFilters   = check_filters_valid(Mod, Where),
+    ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
+    ValidOrderBy   = is_orderby_valid(Mod, OrderBy),
+    ValidFilters   = are_filters_valid(Mod, Where),
     is_query_valid_result([ValidSelection, ValidFilters, ValidOrderBy]).
 
 -spec is_insert_valid(module(), ?DDL{}, {term(), term(), term()}) ->
@@ -316,8 +316,8 @@ is_query_valid_result(Res) ->
       end,
       true, Res).
 
--spec check_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
-check_filters_valid(Mod, Where) ->
+-spec are_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
+are_filters_valid(Mod, Where) ->
     Errors = fold_where_tree(Where, [],
                              fun(Clause, Acc) ->
                                      is_filters_field_valid(Mod, Clause, Acc)
@@ -424,11 +424,11 @@ is_compatible_operator('!=', boolean, boolean)-> true;
 is_compatible_operator(_,    boolean, boolean)-> false;
 is_compatible_operator(_,_,_)                 -> true.
 
--spec check_selections_valid(module(), [selection()], boolean()) ->
+-spec are_selections_valid(module(), [selection()], boolean()) ->
                                   true | {false, [query_syntax_error()]}.
-check_selections_valid(_, [], ?CANTBEBLANK) ->
+are_selections_valid(_, [], ?CANTBEBLANK) ->
     {false, [{selections_cant_be_blank, []}]};
-check_selections_valid(Mod, Selections, _) ->
+are_selections_valid(Mod, Selections, _) ->
     CheckFn =
         fun(E, Acc) ->
                 is_selection_column_valid(Mod, E, Acc)
@@ -464,9 +464,9 @@ is_selection_column_valid(_, Other, Acc) ->
     [{unknown_column_type, Other} | Acc].
 
 
-check_orderby_valid(_Mod, undefined) ->
+is_orderby_valid(_Mod, undefined) ->
     true;
-check_orderby_valid(Mod, QualifiedFields) ->
+is_orderby_valid(Mod, QualifiedFields) ->
     CheckFn =
         fun({F, _DirQualifier, _NullsGroupQualifier}, Acc) ->
                 is_orderby_column_valid(Mod, F, Acc)
@@ -834,7 +834,7 @@ partial_wildcard_check_selections_valid_test() ->
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
        true,
-       check_selections_valid(Mod, Selections, ?CANTBEBLANK)
+       are_selections_valid(Mod, Selections, ?CANTBEBLANK)
       ).
 
 %% FIXME this cannot happen because SQL without selections cannot be lexed
@@ -852,7 +852,7 @@ partial_check_selections_valid_fail_test() ->
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
        {false, [{selections_cant_be_blank, []}]},
-       check_selections_valid(Mod, Selections, ?CANTBEBLANK)
+       are_selections_valid(Mod, Selections, ?CANTBEBLANK)
       ).
 
 %%
@@ -1302,7 +1302,7 @@ fold_where_tree_test() ->
                {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
                Q = test_parse(SQL),
                Selections = proplists:get_value(fields, Q),
-               Got = check_selections_valid(Mod, Selections, ?CANTBEBLANK),
+               Got = are_selections_valid(Mod, Selections, ?CANTBEBLANK),
                ?assertEqual(Expected, Got)).
 
 ?select_test(simple_column_select_1_test, "*", true).
