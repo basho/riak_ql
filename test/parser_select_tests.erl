@@ -310,3 +310,47 @@ field_in_aggregate_function_does_not_have_to_be_in_group_by_test() ->
         {select, [_|_]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
+
+select_hex_test() ->
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a = 0xDEADBEEF",
+    {select, Parsed_query} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql)),
+    ?assertEqual(
+        {where, [{'=', <<"a">>, {binary, mochihex:to_bin("DEADBEEF")}}]},
+        proplists:lookup(where, Parsed_query)
+    ).
+
+select_hex_all_chars_test() ->
+    All_chars = "0123456789aBbBcCdDeEfF",
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a = 0x"++All_chars,
+    {select, Parsed_query} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql)),
+    ?assertEqual(
+        {where, [{'=', <<"a">>, {binary, mochihex:to_bin(All_chars)}}]},
+        proplists:lookup(where, Parsed_query)
+    ).
+
+select_hex_odd_number_of_chars_in_hex_test() ->
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a = 0x0DDBEEF",
+    ?assertException(
+        error, {odd_hex_chars, <<"Hex strings must have an even number of characters.">>},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+select_hex_and_char_literals_parse_the_same_test() ->
+    Text = "QWERTY",
+    Varchar_sql =
+      "SELECT * FROM mytab "
+      "WHERE a = '"++Text++"'" ,
+    Hex_sql =
+      "SELECT * FROM mytab "
+      "WHERE a = 0x"++mochihex:to_hex(Text),
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Varchar_sql)),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Hex_sql))
+    ).
+
