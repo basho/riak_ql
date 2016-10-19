@@ -376,6 +376,7 @@ RowValueList -> RowValueList comma left_paren RowValue right_paren : '$1' ++ ['$
 RowValue -> RowValue comma FieldValue : '$1' ++ ['$3'].
 RowValue -> FieldValue : ['$1'].
 
+FieldValue -> null : '$1'.
 FieldValue -> integer : '$1'.
 FieldValue -> float : '$1'.
 FieldValue -> TruthValue : '$1'.

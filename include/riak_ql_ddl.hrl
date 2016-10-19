@@ -64,4 +64,6 @@
 -define(DDL_RECORD_NAME, ddl_v1).
 -define(DDL_RECORD_VERSION, 1).
 
+-define(SQL_NULL, []).
+
 -endif.

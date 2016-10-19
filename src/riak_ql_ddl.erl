@@ -78,7 +78,7 @@
          get_local_key/2, get_local_key/3,
          get_partition_key/2, get_partition_key/3,
          get_table/1,
-         insert_sql_columns/2,
+         insert_sql_columns/3,
          is_insert_valid/3,
          is_query_valid/3,
          make_key/3,
@@ -546,24 +546,96 @@ make_empty_insert_row(Mod) ->
     Positions = Mod:get_field_positions(),
     list_to_tuple(lists:duplicate(length(Positions), [])).
 
-%% If the INSERT command does not specify a list of columns
-%% the expected behaviour is that ALL columns are specified
-%% in the VALUES clause, so we insert a list of all columns
-%% for validation purposes
--spec insert_sql_columns(module(), [field_identifier()]) -> [field_identifier()].
-insert_sql_columns(Mod, []) when is_atom(Mod) ->
-    default_insert_columns(Mod);
-insert_sql_columns(_Mod, Fields) ->
-    Fields.
+any_unknown_column(_Fields, _FInMod, true) ->
+    true;
+any_unknown_column([], [], _AnyUnknown) ->
+    false;
+any_unknown_column([], _FInMod, false) ->
+    false;
+any_unknown_column([{identifier, [F]}|FieldsT], FInMod, false) ->
+    IsKnown = lists:any(fun(El) -> El =:= F end, FInMod),
+    any_unknown_column(FieldsT, FInMod, not IsKnown).
 
-%% Build the default column list, if none is specified
--spec default_insert_columns(module()) -> [field_identifier()].
-default_insert_columns(Mod) when is_atom(Mod) ->
-    ColPos = Mod:get_field_positions(),
-    FormatFn = fun({Col, _Pos}) when is_list(Col) ->
-                    {identifier, Col}
-               end,
-    lists:map(FormatFn, ColPos).
+%% If the INSERT command specifies only a partial list of columns, expand the
+%% list of columns to include those known by the DDL, ensuring that the values
+%% provided and those omitted align with the columns as provided by the caller.
+-spec insert_sql_columns(module(), [field_identifier()], [data_value()]) ->
+    {[field_identifier()],[[data_value()]]}.
+insert_sql_columns(Mod, Fields, Values) when is_atom(Mod) ->
+    FInMod = [ F || {[F], _I} <- Mod:get_field_positions() ],
+    case any_unknown_column(Fields, FInMod, false) of
+        true ->
+            %% will fail downstream
+            {Fields, Values};
+        _ ->
+            FInQuery0 = lists:flatten(proplists:get_all_values(identifier, Fields)),
+            FInQuery1 = insert_sql_columns_fields(FInMod, FInQuery0),
+            VInQuery1 = [ insert_sql_columns_row_values(Mod, FInQuery1, V) ||
+                V <- Values ],
+            
+            %% rearrange into DDL Module order
+            in_ddl_order(FInQuery1, VInQuery1, FInMod, Mod)
+    end.
+
+%% fields in query match fields in ddl, optimization to not rearrange
+in_ddl_order(FD, VQs, FD, _Mod) ->
+    {[{identifier, [F]} || F <- FD ], VQs};
+%% no values, all null, will likely fail downstream
+in_ddl_order(FQ, _VQs=[], FD, Mod) ->
+    VQs = [ {null, ?SQL_NULL} || _F <- FQ ],
+    in_ddl_order(FQ, VQs, FD, Mod);
+%% fields in query do not match fields in ddl
+in_ddl_order(FQ, VQs=[_VQH=[_VH|_VT]|_VQT], FD, Mod) ->
+    FVs = [ in_ddl_order_(FQ, VQ, FD, Mod, [], [], FQ, VQ) || VQ <- VQs ],
+    Fields = [ {identifier, [F]} || F <- element(1, hd(FVs)) ],
+    Values = [ element(2, FV) || FV <- FVs ],
+    {Fields, Values}.
+
+%% exhausted FD -> return to caller
+in_ddl_order_(_FQ, _VQ, _FD=[], _Mod, FAcc, VAcc, _AFQ, _AVQ) ->
+    {lists:reverse(FAcc), lists:reverse(VAcc)};
+%% exhausted FQ, VQ -> append null and swap in AFQ and AVQ, traverse ddl field
+in_ddl_order_(_FQ=[], _VQ=[], _FD=[HFD|TFD], Mod, FAcc, VAcc, AFQ, AVQ) ->
+    NullFV = {Mod:get_field_type([HFD]), ?SQL_NULL},
+    in_ddl_order_(AFQ, AVQ, TFD, Mod, [HFD|FAcc], [NullFV|VAcc], AFQ, AVQ);
+%% matched HFQ and HFD -> append and swap in AFQ and AVQ, traverse ddl field
+in_ddl_order_(_FQ=[HFQ|_TFQ], _VQ=[HVQ|_TVQ], _FD=[HFD|TFD], Mod, FAcc, VAcc, AFQ, AVQ) when HFQ =:= HFD ->
+    in_ddl_order_(AFQ, AVQ, TFD, Mod, [HFQ|FAcc], [HVQ|VAcc], AFQ, AVQ);
+%% not matched -> traverse query field/value
+in_ddl_order_(_FQ=[_HFQ|TFQ], _VQ=[_HVQ|TVQ], FD=[_HFD|_TFD], Mod, FAcc, VAcc, AFQ, AVQ) ->
+    in_ddl_order_(TFQ, TVQ, FD, Mod, FAcc, VAcc, AFQ, AVQ).
+
+%% Get all of the columns, preferring the query order and fleshing out the
+%% remainder with those defined in the DDL Module.
+insert_sql_columns_fields(FInMod, FInQuery0) ->
+    FInModLength = length(FInMod),
+    FInQuery0Length = length(FInQuery0),
+    case FInQuery0Length of
+        0 -> FInMod;
+        FInModLength -> FInQuery0;
+        _ -> FInQuery0 ++
+            [F || F <- FInMod, not lists:any(fun(FInQ) -> F =:= FInQ end, FInQuery0) ]
+    end.
+
+insert_sql_columns_row_values(Mod, FInQuery, Values) ->
+    Values1 = case length(Values) =< length(FInQuery) of
+        false -> lists:sublist(Values, length(FInQuery));
+        _ ->
+            case length(Values) =:= length(FInQuery) of
+                true -> Values;
+                _ ->
+                    Values ++
+                    [ {null, ?SQL_NULL} || _I <- lists:seq(length(Values) + 1, length(FInQuery)) ]
+            end
+    end,
+    FVInQuery = lists:zip(FInQuery, Values1),
+    lists:foldr(fun ({F, {Type, Value}}, Acc) ->
+                TV = case Type of
+                    null -> {Mod:get_field_type([F]), Value};
+                    _ -> {Type, Value}
+                end,
+                [TV|Acc]
+        end, [], FVInQuery).
 
 %% Get the type of a field from the DDL datastructure.
 %%
@@ -974,10 +1046,14 @@ parsed_sql_to_query(Proplist) ->
 
 %% is_query_valid expects a 3-tuple: table name, fields, values
 parsed_sql_to_insert(Mod, Proplist) ->
+    Table = proplists:get_value(table, Proplist, <<>>),
+    ValuesInQuery = proplists:get_value(values, Proplist, []),
+    FieldsInQuery = proplists:get_value(fields, Proplist, []),
+    {Fields, Values} = insert_sql_columns(Mod, FieldsInQuery, ValuesInQuery),
     {
-        proplists:get_value(table, Proplist, <<>>),
-        insert_sql_columns(Mod, proplists:get_value(fields, Proplist, [])),
-        proplists:get_value(values, Proplist, [])
+        Table,
+        Fields,
+        Values
     }.
 
 test_parse(SQL) ->
@@ -1016,6 +1092,100 @@ is_insert_valid_test_helper(Table_name, Table_def, Insert) ->
         "    PRIMARY KEY ((myfamily, myseries, QUANTUM(time, 15, 'm')), "
         "    myfamily, myseries, time))"
        ).
+
+insert_sql_columns_empty_fields_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn = [],
+    ValuesIn = [[{varchar, <<"family1">>},
+            {varchar, <<"series1">>},
+            {timestamp, 1000},
+            {varchar, <<"sunny">>},
+            {double, 37.0}]],
+    {FieldsOut, ValuesOut } = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    ?assertEqual(FInMod, FieldsOut),
+    ?assertEqual(ValuesIn, ValuesOut).
+
+insert_sql_columns_pk_fields_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn = lists:sublist(FInMod, 3),
+    ValuesIn = [[{varchar, <<"family1">>},
+            {varchar, <<"series1">>},
+            {timestamp, 1000}]],
+    {FieldsOut, ValuesOut } = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    %% expecting values specified plus nulls
+    ValuesExpected = [hd(ValuesIn) ++
+        lists:sublist(hd(ValuesOut), length(FieldsIn) + 1, length(FInMod) - length(FieldsIn))],
+    ?assertEqual(FInMod, FieldsOut),
+    ?assertEqual(ValuesExpected, ValuesOut).
+
+insert_sql_columns_all_fields_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn = FInMod,
+    ValuesIn = [[{varchar, <<"family1">>},
+            {varchar, <<"series1">>},
+            {timestamp, 1000},
+            {varchar, <<"sunny">>},
+            {double, 37.0}]],
+    {FieldsOut, ValuesOut} = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    ?assertEqual(FInMod, FieldsOut),
+    ?assertEqual(ValuesIn, ValuesOut).
+
+%% Shuffle two equal length lists equivalently
+shuffle2(L0, L1) ->
+    shuffle2(list_to_tuple(L0), list_to_tuple(L1), length(L0)).
+
+shuffle2(L0, L1, 0) ->
+    {tuple_to_list(L0), tuple_to_list(L1)};
+shuffle2(L0, L1, Len) ->
+    Rand = random:uniform(Len),
+    A0 = element(Len, L0),
+    A1 = element(Len, L1),
+    B0 = element(Rand, L0),
+    B1 = element(Rand, L1),
+    L01 = setelement(Len, L0, B0),
+    L11 = setelement(Len, L1, B1),
+    L02 = setelement(Rand, L01, A0),
+    L12 = setelement(Rand, L11, A1),
+    shuffle2(L02, L12, Len - 1).
+
+insert_sql_columns_shuffled_fields_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn0 = FInMod,
+    ValuesIn0 = [[{varchar, <<"family1">>},
+            {varchar, <<"series1">>},
+            {timestamp, 1000},
+            {varchar, <<"sunny">>},
+            {double, 37.0}]],
+    {FieldsIn,ValuesIn1} = shuffle2(FieldsIn0, hd(ValuesIn0)),
+    ValuesIn = [ValuesIn1],
+    {FieldsOut, ValuesOut} = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    ?assertEqual(FInMod, FieldsOut),
+    %% !IMPORTANT! values out should be in record order, not query order
+    ?assertEqual(ValuesIn0, ValuesOut).
+
+insert_sql_columns_multiple_rows_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn = FInMod,
+    ValuesIn = [
+        [{varchar, list_to_binary("family" ++ integer_to_list(I))},
+         {varchar, list_to_binary("series" ++ integer_to_list(I))},
+         {timestamp, I * 1000},
+         {varchar, <<"sunny">>},
+         {double, case I rem 3 of
+                    0 -> 37.0;
+                    1 -> 33.3;
+                    _ -> 34.2
+                  end}]
+        || I <- lists:seq(1, 10)
+    ],
+    {FieldsOut, ValuesOut } = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    ?assertEqual(FieldsIn, FieldsOut),
+    ?assertEqual(ValuesIn, ValuesOut).
 
 is_query_valid_1_test() ->
     ?assertEqual(
@@ -1174,6 +1344,14 @@ is_query_valid_no_subexpressions_1_test() ->
                                   "AND myfamily = 'bob' ")
       ).
 
+is_insert_valid_null_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, time, weather) VALUES"
+            "('hazen', 'world', 15, NULL)")).
+
 is_insert_valid_1_test() ->
     ?assertEqual(
         true,
@@ -1181,7 +1359,6 @@ is_insert_valid_1_test() ->
             "INSERT INTO mytab "
             "(myfamily, myseries, time, weather) VALUES"
             "('hazen', 'world', 15, 'sunny')")).
-
 
 is_insert_valid_2_test() ->
     ?assertEqual(
@@ -1228,6 +1405,15 @@ is_insert_valid_invalid_column_1_test() ->
             "INSERT INTO mytab "
             "(myfamily, myseries, peppermint, time) VALUES"
             "('hazen', 'world', 'cloudy', 15)")).
+
+is_insert_valid_multiple_rows_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 70, 'sunny', 45.0),"
+            "('hazen', 'world', 71, 'sunny', 44.0),"
+            "('hazen', 'world', 72, 'sunny', 46.0)")).
 
 fold_where_tree_test() ->
     Parsed = test_parse(
