@@ -281,6 +281,26 @@ select_hex_all_chars_test() ->
         proplists:lookup(where, Parsed_query)
     ).
 
+select_empty_hex_test() ->
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a = 0x",
+    {select, Parsed_query} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql)),
+    ?assertEqual(
+        {where, [{'=', <<"a">>, {binary, << >>}}]},
+        proplists:lookup(where, Parsed_query)
+    ).
+
+select_empty_hex_not_as_final_token_test() ->
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a = 0x AND b = 10",
+    {select, Parsed_query} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql)),
+    ?assertEqual(
+        {where, [{and_, {'=', <<"a">>, {binary, << >>}}, {'=',<<"b">>,{integer,10}}}]},
+        proplists:lookup(where, Parsed_query)
+    ).
+
 select_hex_odd_number_of_chars_in_hex_test() ->
     Query_sql =
         "SELECT * FROM mytab "
