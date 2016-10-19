@@ -352,6 +352,16 @@ select_empty_hex_not_as_final_token_test() ->
         proplists:lookup(where, Parsed_query)
     ).
 
+select_empty_hex_pattern_in_single_quotes_test() ->
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a = '0xABABABAB'",
+    {select, Parsed_query} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql)),
+    ?assertEqual(
+        {where, [{'=', <<"a">>, {binary, <<"0xABABABAB">>}}]},
+        proplists:lookup(where, Parsed_query)
+    ).
+
 select_hex_odd_number_of_chars_in_hex_test() ->
     Query_sql =
         "SELECT * FROM mytab "
