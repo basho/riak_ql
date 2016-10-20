@@ -570,7 +570,7 @@ insert_sql_columns(Mod, Fields, Values) when is_atom(Mod) ->
         _ ->
             FInQuery0 = lists:flatten(proplists:get_all_values(identifier, Fields)),
             FInQuery1 = insert_sql_columns_fields(FInMod, FInQuery0),
-            VInQuery1 = [ insert_sql_columns_row_values(Mod, FInQuery1, V) ||
+            VInQuery1 = [ insert_sql_columns_row_values(FInQuery1, V) ||
                 V <- Values ],
             
             %% rearrange into DDL Module order
@@ -617,7 +617,7 @@ insert_sql_columns_fields(FInMod, FInQuery0) ->
             [F || F <- FInMod, not lists:any(fun(FInQ) -> F =:= FInQ end, FInQuery0) ]
     end.
 
-insert_sql_columns_row_values(Mod, FInQuery, Values) ->
+insert_sql_columns_row_values(FInQuery, Values) ->
     Values1 = case length(Values) =< length(FInQuery) of
         false -> lists:sublist(Values, length(FInQuery));
         _ ->
@@ -628,14 +628,16 @@ insert_sql_columns_row_values(Mod, FInQuery, Values) ->
                     [ {null, ?SQL_NULL} || _I <- lists:seq(length(Values) + 1, length(FInQuery)) ]
             end
     end,
-    FVInQuery = lists:zip(FInQuery, Values1),
-    lists:foldr(fun ({F, {Type, Value}}, Acc) ->
-                TV = case Type of
-                    null -> {Mod:get_field_type([F]), Value};
-                    _ -> {Type, Value}
+    lists:foldr(fun ({Type, Value}, Acc) ->
+                TV = case {Type, Value} of
+                    %% implicit NULL
+                    {null, ?SQL_NULL} -> {null, ?SQL_NULL};
+                    %% explicit NULL
+                    {null, <<_Null/binary>>} -> {null, ?SQL_NULL};
+                    {Type, Value} -> {Type, Value}
                 end,
                 [TV|Acc]
-        end, [], FVInQuery).
+        end, [], Values1).
 
 %% Get the type of a field from the DDL datastructure.
 %%
@@ -1349,8 +1351,8 @@ is_insert_valid_null_test() ->
         true,
         is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "INSERT INTO mytab "
-            "(myfamily, myseries, time, weather) VALUES"
-            "('hazen', 'world', 15, NULL)")).
+            "(myfamily, myseries, time, weather, temperature) VALUES"
+            "('hazen', 'world', 15, 'nully', NULL)")).
 
 is_insert_valid_1_test() ->
     ?assertEqual(
