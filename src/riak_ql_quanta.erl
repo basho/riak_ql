@@ -108,12 +108,12 @@ quantum(_, _, Unit) ->
 
 %% Convert an integer and a time unit in binary to millis, assumed from the unix
 %% epoch.
--spec unit_to_millis(Value::integer(), Unit::binary()) -> integer() | error.
-unit_to_millis(Value, <<"s">>) -> Value*1000;
-unit_to_millis(Value, <<"m">>) -> Value*1000*60;
-unit_to_millis(Value, <<"h">>) -> Value*1000*60*60;
-unit_to_millis(Value, <<"d">>) -> Value*1000*60*60*24;
-unit_to_millis(Value, Unit) when is_integer(Value), is_binary(Unit) -> error.
+-spec unit_to_millis(Value::integer(), Unit::binary() | time_unit()) -> integer() | error.
+unit_to_millis(V, U) when U == s; U == <<"s">> -> V*1000;
+unit_to_millis(V, U) when U == m; U == <<"m">> -> V*1000*60;
+unit_to_millis(V, U) when U == h; U == <<"h">> -> V*1000*60*60;
+unit_to_millis(V, U) when U == d; U == <<"d">> -> V*1000*60*60*24;
+unit_to_millis(_, _) -> error.
 
 %% @doc Return the time in milliseconds since 00:00 GMT Jan 1, 1970 (Unix Epoch)
 -spec timestamp_to_ms(erlang:timestamp()) -> time_ms().
