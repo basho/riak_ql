@@ -507,7 +507,8 @@ convert(#outputs{type = create} = O) ->
 
 validate_select_query(Outputs) ->
     ok = assert_group_by_select(Outputs),
-    ok = assert_group_by_is_valid(Outputs).
+    ok = assert_group_by_is_valid(Outputs),
+    ok = assert_group_by_with_order_by(Outputs).
 
 %% If the query uses GROUP BY then check that the identifiers in the select
 %% all exist in the GROUP BY.
@@ -534,6 +535,13 @@ assert_group_by_is_valid(#outputs{ group_by = GroupBy }) ->
         true ->
             return_error_flat("GROUP BY can only contain table columns but '*' was found.")
     end.
+
+assert_group_by_with_order_by(#outputs{group_by = GroupBy, order_by = OrderBy})
+  when (GroupBy /= [] andalso OrderBy /= undefined) ->
+    return_error_flat("ORDER BY/LIMIT/OFFSET clauses are not supported for GROUP BY queries.");
+assert_group_by_with_order_by(_) ->
+    ok.
+
 
 %%
 is_identifier_in_groups({identifier, [F]}, GroupBy) ->

@@ -245,6 +245,17 @@ order_by_4_test() ->
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
+
+order_by_with_group_by_test() ->
+    Query_sql =
+        "SELECT a, b FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b ORDER BY a",
+    ?assertEqual(
+       {error, {0, riak_ql_parser, <<"ORDER BY/LIMIT/OFFSET clauses are not supported for GROUP BY queries.">>}},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
 selection_fields_must_be_in_group_by_1_test() ->
     Query_sql =
         "SELECT c FROM mytab "
