@@ -149,7 +149,9 @@ group_by_one_field_test() ->
                   {fields, [{identifier, [<<"b">>]}]},
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, [{identifier, <<"b">>}]},
-                  {limit,undefined},{offset,undefined},{order_by,undefined}
+                  {limit, undefined},
+                  {offset, undefined},
+                  {order_by, undefined}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
@@ -165,7 +167,9 @@ group_by_two_fields_test() ->
                   {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, [{identifier, <<"a">>}, {identifier, <<"b">>}]},
-                  {limit,undefined},{offset,undefined},{order_by,undefined}
+                  {limit,undefined},
+                  {offset, undefined},
+                  {order_by, undefined}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
@@ -174,15 +178,16 @@ order_by_1_test() ->
     Query_sql =
         "SELECT a, b FROM mytab "
         "WHERE a = 1 "
-        "ORDER BY a, b",
+        "ORDER BY a, b",  %% different default null-specs depending on ordering-spec
     ?assertEqual(
         {select, [
                   {tables, <<"mytab">>},
                   {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, []},
-                  {limit,undefined},{offset,undefined},
-                  {order_by,[{<<"a">>, asc, nulls_last}, {<<"b">>, asc, nulls_last}]}
+                  {limit, undefined},
+                  {offset, undefined},
+                  {order_by, [{<<"a">>, asc, nulls_last}, {<<"b">>, asc, nulls_last}]}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
@@ -191,15 +196,16 @@ order_by_2_test() ->
     Query_sql =
         "SELECT a, b FROM mytab "
         "WHERE a = 1 "
-        "ORDER BY a desc, b",
+        "ORDER BY a desc, b asc",  %% different defaults for null-spec #2
     ?assertEqual(
         {select, [
                   {tables, <<"mytab">>},
                   {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, []},
-                  {limit,undefined},{offset,undefined},
-                  {order_by,[{<<"a">>, desc, nulls_first}, {<<"b">>, asc, nulls_last}]}
+                  {limit, undefined},
+                  {offset, undefined},
+                  {order_by, [{<<"a">>, desc, nulls_first}, {<<"b">>, asc, nulls_last}]}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
@@ -208,19 +214,37 @@ order_by_3_test() ->
     Query_sql =
         "SELECT a, b FROM mytab "
         "WHERE a = 1 "
-        "ORDER BY a desc nulls last, b",
+        "ORDER BY a, b LIMIT 11 OFFSET 22",
     ?assertEqual(
         {select, [
                   {tables, <<"mytab">>},
                   {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
                   {group_by, []},
-                  {limit,undefined},{offset,undefined},
-                  {order_by,[{<<"a">>, desc, nulls_last}, {<<"b">>, asc, nulls_last}]}
+                  {limit, 11},
+                  {offset, 22},
+                  {order_by, [{<<"a">>, asc, nulls_last}, {<<"b">>, asc, nulls_last}]}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
+order_by_4_test() ->
+    Query_sql =
+        "SELECT a, b FROM mytab "
+        "WHERE a = 1 "
+        "LIMIT 11",  %% implied, empty ORDER BY
+    ?assertEqual(
+        {select, [
+                  {tables, <<"mytab">>},
+                  {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
+                  {where,  [{'=', <<"a">>, {integer, 1}}]},
+                  {group_by, []},
+                  {limit, 11},
+                  {offset, undefined},
+                  {order_by, []}
+                 ]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
 selection_fields_must_be_in_group_by_1_test() ->
     Query_sql =
         "SELECT c FROM mytab "
