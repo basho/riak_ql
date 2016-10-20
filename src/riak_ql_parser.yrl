@@ -5,55 +5,58 @@
 
 Nonterminals
 
-Statement
-StatementWithoutSemicolon
-Query
-Select
-Explain
-Describe
-ShowTables
 Bucket
+CharacterLiteral
+ColumnConstraint
+ColumnDefinition
+Comp
+ComparisonPredicate
+DataType
+Describe
+Explain
 Field
 FieldElem
 Fields
+Funcall
+GroupBy
 Identifier
 Insert
-CharacterLiteral
-Where
-ComparisonPredicate
-NullPredicate
-Comp
-NullComp
-Val
-Vals
-Funcall
-TableDefinition
-TableContentsSource
-TableElementList
-TableElements
-TableElement
-TableProperties
-TablePropertyList
-TableProperty
-TablePropertyValue
-ColumnDefinition
-ColumnConstraint
-KeyDefinition
-DataType
-KeyFieldList
-KeyField
-KeyFieldArgList
-KeyFieldArg
-NotNull
 IsNotNull
 IsNull
-GroupBy
-Limit
-SortDirection
-SorterField
-SorterFieldList
-NullsGroup
-OrderBy
+KeyDefinition
+KeyField
+KeyFieldArg
+KeyFieldArgList
+KeyFieldList
+LimitClause
+NotNull
+NullComp
+NullOrderSpec
+NullPredicate
+OrderingSpec
+Query
+ResultOffsetClause
+Select
+ShowTables
+SortKey
+SortSpecification
+SortSpecificationList
+Statement
+StatementWithoutSemicolon
+TableContentsSource
+TableDefinition
+TableElement
+TableElementList
+TableElements
+TableProperties
+TableProperty
+TablePropertyList
+TablePropertyValue
+Val
+Vals
+Where
+WindowClause
+WindowOrderClause
 
 %% ValueExpression
 %% CommonValueExpression
@@ -152,27 +155,31 @@ Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
 GroupBy -> group by Fields: {group_by, '$3'}.
 
-SortDirection -> asc: '$1'.
-SortDirection -> desc: '$1'.
-NullsGroup -> first: {nulls_first, <<"nulls first">>}.  %% combine tokens
-NullsGroup -> last: {nulls_last, <<"nulls last">>}.
-SorterField -> Identifier                                : make_ordby_item('$1', undefined, undefined).
-SorterField -> Identifier SortDirection                  : make_ordby_item('$1', '$2', undefined).
-SorterField -> Identifier nulls NullsGroup               : make_ordby_item('$1', undefined, '$3').
-SorterField -> Identifier SortDirection nulls NullsGroup : make_ordby_item('$1', '$2', '$4').
-SorterFieldList ->
-    SorterField comma SorterFieldList : ['$1'] ++ '$3'.
-SorterFieldList ->
-    SorterField : ['$1'].
-OrderBy -> order by SorterFieldList: '$3'.
+Query -> Select WindowClause : make_window_clause('$1', '$2').
+Query -> Select              : '$1'.
 
-Limit -> limit integer                     : {'$2', {integer, 0}}.
-Limit -> limit integer offset integer      : {'$2', '$4'}.
+WindowClause -> WindowOrderClause: '$1'.
+WindowOrderClause -> order by SortSpecificationList                                : make_orderby('$3', undefined, undefined).
+WindowOrderClause -> order by SortSpecificationList LimitClause                    : make_orderby('$3', '$4', undefined).
+WindowOrderClause -> order by SortSpecificationList LimitClause ResultOffsetClause : make_orderby('$3', '$4', '$5').
+WindowOrderClause ->                                LimitClause                    : make_orderby([], '$1', undefined).
+WindowOrderClause ->                                LimitClause ResultOffsetClause : make_orderby([], '$1', '$2').
 
-Query -> Select OrderBy       : make_orderby('$1', '$2', {undefined, undefined}).
-Query -> Select OrderBy Limit : make_orderby('$1', '$2', '$3').
-Query -> Select         Limit : make_orderby('$1', [], '$2').
-Query -> Select               : '$1'.
+LimitClause -> limit integer         : '$2'.
+ResultOffsetClause -> offset integer : '$2'.
+
+SortSpecificationList -> SortSpecification: ['$1'].
+SortSpecificationList -> SortSpecification comma SortSpecificationList: ['$1' | '$3'].
+SortSpecification -> SortKey                            : make_sort_spec('$1', undefined, undefined).
+SortSpecification -> SortKey OrderingSpec               : make_sort_spec('$1', '$2', undefined).
+SortSpecification -> SortKey              NullOrderSpec : make_sort_spec('$1', undefined, '$2').
+SortSpecification -> SortKey OrderingSpec NullOrderSpec : make_sort_spec('$1', '$2', '$3').
+
+SortKey -> Identifier: '$1'.
+OrderingSpec -> asc : '$1'.
+OrderingSpec -> desc: '$1'.
+NullOrderSpec -> nulls first: {nulls_first, <<"nulls first">>}.  %% combine tokens
+NullOrderSpec -> nulls last : {nulls_last, <<"nulls last">>}.
 
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
@@ -618,34 +625,39 @@ make_insert({identifier, Table}, Fields, Values) ->
     ].
 
 
-%% per Requirements in
-%% https://docs.google.com/document/d/1OUtQwOq2LL3UVGm8mdgPzctpXHV8Dt1SpuX1q6OS9pk:
+%% per Product Requirements
 %% "If NULLS LAST is specified, null values sort after all non-null
 %%  values; if NULLS FIRST is specified, null values sort before all
 %%  non-null values. If neither is specified, the default behavior is
 %%  NULLS LAST when ASC is specified or implied, and NULLS FIRST when
 %%  DESC is specified (thus, the default is to act as though nulls are
 %%  larger than non-nulls)."
-make_ordby_item(Fld, {asc, _} = Dir, undefined) ->
-    {Fld, Dir, {nulls_last, <<"nulls last">>}};
-make_ordby_item(Fld, {desc, _} = Dir, undefined) ->
-    {Fld, Dir, {nulls_first, <<"nulls first">>}};
-make_ordby_item(Fld, Dir, Nulls) ->
-    {Fld,
-     if Dir /= undefined -> Dir;
-        el/=se -> {asc, <<"asc">>} end,
-     if Nulls /= undefined -> Nulls;
-        el/=se -> {nulls_last, <<"nulls last">>} end}.
+make_sort_spec(Fld, {asc, _} = OrdSpec, undefined) ->
+    {Fld, OrdSpec, {nulls_last, <<"nulls last">>}};
+make_sort_spec(Fld, {desc, _} = OrdSpec, undefined) ->
+    {Fld, OrdSpec, {nulls_first, <<"nulls first">>}};
+make_sort_spec(Fld, OrdSpec, NullSpec) ->
+    {Fld, make_ord_spec(OrdSpec), make_null_spec(NullSpec)}.
 
-make_orderby(A, OrdBy, {Lim, Off}) ->
-    OrderBy =
-        [{F, Dir, NullsGroup} ||
-            {{identifier, F}, {Dir, _DirToken}, {NullsGroup, _NullsGroupToken}} <- OrdBy],
-    A#outputs{order_by = OrderBy,
-              limit = strip_int(Lim), offset = strip_int(Off)}.
+make_ord_spec(undefined) -> {asc, <<"asc">>};
+make_ord_spec(OrdSpec) -> OrdSpec.
+make_null_spec(undefined) -> {nulls_last, <<"nulls last">>};
+make_null_spec(NullSpec) -> NullSpec.
+
+
+make_orderby(OrdBy, Lim, Off) ->
+    {order_by,
+     [{F, OrdSpec, NullSpec} ||
+         {{identifier, F}, {OrdSpec, _OrdSpecToken}, {NullSpec, _NullSpecToken}} <- OrdBy],
+     strip_int(Lim), strip_int(Off)}.
 
 strip_int({integer, A}) -> A;
 strip_int(undefined)    -> undefined.
+
+make_window_clause(QueryExprBody, {order_by, OrderBy, Limit, Offset}) ->
+    QueryExprBody#outputs{order_by = OrderBy,
+                          limit    = Limit,
+                          offset   = Offset}.
 
 
 make_expr({TypeA, A}, {B, _}) ->
