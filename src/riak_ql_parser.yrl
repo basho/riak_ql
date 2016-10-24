@@ -11,6 +11,7 @@ Query
 Select
 Explain
 Describe
+Delete
 ShowTables
 Bucket
 Buckets
@@ -87,6 +88,7 @@ by
 character_literal
 comma
 create
+delete
 describe
 double
 equals_operator
@@ -148,6 +150,7 @@ StatementWithoutSemicolon -> Describe : '$1'.
 StatementWithoutSemicolon -> Explain : '$1'.
 StatementWithoutSemicolon -> Insert : '$1'.
 StatementWithoutSemicolon -> ShowTables : '$1'.
+StatementWithoutSemicolon -> Delete : convert('$1').
 
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
@@ -156,6 +159,11 @@ Select -> select Fields from Bucket Where GroupBy
                                           : make_select('$1', '$2', '$3', '$4', '$5', '$6').
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
+
+%% DELETE
+%% Section 14.9 of the SQL Foundation Document
+%% We only implement <delete statement: searched>
+Delete -> delete from Bucket Where : make_delete('$3', '$4').
 
 %% EXPLAIN STATEMENT
 Explain -> explain Query : make_explain('$2').
@@ -407,7 +415,7 @@ Erlang code.
 
 -record(outputs,
         {
-          type :: create | describe | explain | insert | select,
+          type :: create | describe | explain | insert | select | delete,
           buckets = [],
           fields  = [],
           limit   = [],
@@ -448,6 +456,16 @@ fix_up_keys(?DDL{partition_key = none, local_key = LK} = DDL) ->
 fix_up_keys(A) ->
     A.
 
+convert(#outputs{type    = delete,
+                 buckets = B,
+                 where   = W}) ->
+               %% the parser itself validates this query completely
+               %% in the absence of information about the table
+               [
+                {type,  delete},
+                {table, B},
+                {where, W}
+               ];
 convert(#outputs{type    = select,
                  buckets = B,
                  fields  = F,
@@ -523,6 +541,11 @@ find_group_identifiers({{window_agg_fn, _}, _}, Acc) ->
     Acc;
 find_group_identifiers({_, _}, Acc) ->
     Acc.
+
+make_delete({identifier, Bucket}, {_Where, W}) ->
+   #outputs{type    = delete,
+            buckets = Bucket,
+            where   = W}.
 
 make_select({select, multi_table_error}, _B, _C, _D) ->
     return_error(0, <<"Must provide exactly one table name">>);

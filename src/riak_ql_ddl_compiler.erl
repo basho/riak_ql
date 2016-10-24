@@ -100,13 +100,17 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {IsValidFn,    LineNo8}  = build_is_valid_fn(Fields,   LineNo7),
     {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8),
     {GetDDLFn,     LineNo10} = build_get_ddl_fn(DDL, LineNo9, []),
-    {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
+    {DeleteKeyFn,  LineNo11} = build_delete_key_fn(DDL, LineNo10, []),
+    {HashFns,      LineNo12} = build_identity_hash_fns(DDL, LineNo11),
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn, GetDDLFn]
+        ++ [
+            ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, 
+            DDLVersionFn, GetDDLFn, DeleteKeyFn
+           ]
         ++ HashFns
-        ++ [{eof, LineNo11}],
+        ++ [{eof, LineNo12}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
@@ -271,6 +275,18 @@ build_get_ddl_compiler_version_fn(LineNo) ->
 build_get_ddl_fn(DDL, LineNo, []) ->
     Fn = flat_format("get_ddl() -> ~p.", [DDL]),
     {?Q(Fn), LineNo + 1}.
+
+-spec build_delete_key_fn(?DDL{}, pos_integer, ast()) ->
+                              {expr(), pos_integer()}.
+build_delete_key_fn(DDL, LineNo, []) ->
+    Fn = flat_format("get_delete_key(W) ->"
+                     "LocalKey = ~p, "
+                     "case riak_ql_ddl_util:is_valid_delete_where_clause(W) of "
+                     "true -> riak_ql_ddl_util:make_delete_key(LocalKey, W); "
+                     "{error, Errors} -> {false, Errors} "
+                     "end.",
+                     [DDL?DDL.local_key]),
+    {?Q(Fn), LineNo + 1}.               
 
 -spec build_is_valid_fn([#riak_field_v1{}], pos_integer()) ->
                                {expr(), pos_integer()}.
@@ -502,9 +518,9 @@ make_export_attr(LineNo) ->
                                   {extract,                      2},
                                   {get_ddl,                      0},
                                   {get_identity_hashes,          0},
-                                  {get_identity_plaintext_DEBUG, 0}
+                                  {get_identity_plaintext_DEBUG, 0},
+                                  {get_delete_key,               1}
                                  ]}, LineNo + 1}.
-
 
 %% supporting functions
 
@@ -1011,9 +1027,6 @@ make_complex_ddl_ddl() ->
                                                          ]}
                                      ]},
        local_key = #key_v1{ast = [
-                                  #hash_fn_v1{mod  = crypto,
-                                              fn   = hash,
-                                              args = [ripemd]},
                                   ?SQL_PARAM{name = [<<"time">>]}
                                  ]}}.
 
