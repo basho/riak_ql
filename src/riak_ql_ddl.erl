@@ -749,18 +749,22 @@ make_plain_key_test() ->
     ?assertEqual(Expected, Got).
 
 make_functional_key_test() ->
-    Key = #key_v1{ast = [
-                         ?SQL_PARAM{name = [<<"user">>]},
-                         #hash_fn_v1{mod  = ?MODULE,
-                                     fn   = mock_partition_fn,
-                                     args = [
-                                             ?SQL_PARAM{name = [<<"time">>]},
-                                             15,
-                                             m
+    PKey = #key_v1{ast = [
+                          ?SQL_PARAM{name = [<<"user">>]},
+                          #hash_fn_v1{mod  = ?MODULE,
+                                      fn   = mock_partition_fn,
+                                      args = [
+                                              ?SQL_PARAM{name = [<<"time">>]},
+                                              15,
+                                              m
                                             ],
-                                     type = timestamp
-                                    }
-                        ]},
+                                      type = timestamp
+                                     }
+                         ]},
+    LKey = #key_v1{ast = [
+                          ?SQL_PARAM{name = [<<"user">>]},
+                          ?SQL_PARAM{name = [<<"time">>]}
+                         ]},
     DDL = make_ddl(<<"make_plain_key_test">>,
                    [
                     #riak_field_v1{name     = <<"user">>,
@@ -770,15 +774,15 @@ make_functional_key_test() ->
                                    position = 2,
                                    type     = timestamp}
                    ],
-                   Key, %% use the same key for both
-                   Key),
+                   PKey,
+                   LKey),
     Time = 12345,
     Vals = [
             {<<"user">>, <<"user_1">>},
             {<<"time">>, Time}
            ],
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Got = make_key(Mod, Key, Vals),
+    Got = make_key(Mod, PKey, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
     ?assertEqual(Expected, Got).
 
