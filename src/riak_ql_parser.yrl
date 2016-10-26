@@ -462,9 +462,9 @@ convert(#outputs{type    = delete,
                %% the parser itself validates this query completely
                %% in the absence of information about the table
                [
-                {type,   delete},
-                {tables, B},
-                {where,  W}
+                {type,  delete},
+                {table, B},
+                {where, W}
                ];
 convert(#outputs{type    = select,
                  buckets = B,

@@ -30,9 +30,9 @@ delete_sql_test() ->
     ?sql_comp_assert_match(
        "delete from argle where bish > 1", delete,
        [
-        {tables, <<"argle">>},
-        {where,  [
-                  {'>', <<"bish">>, {integer, 1}}
-                 ]}
+        {table, <<"argle">>},
+        {where, [
+                 {'>', <<"bish">>, {integer, 1}}
+                ]}
        ]).
 
