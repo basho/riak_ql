@@ -93,6 +93,16 @@ insert_null_case_insensitive_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Insert_sql))
     ).
 
+insert_literal_null_test() ->
+    Insert_sql =
+        "INSERT INTO mytab (col) VALUES ('null')",
+    ?assertEqual(
+        {insert,[{table,<<"mytab">>},
+                                    {fields,[{identifier,[<<"col">>]}]},
+                                    {values,[[{binary,<<"null">>}]]}]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Insert_sql))
+    ).
+
 insert_identifier_test() ->
     Insert_sql =
         "INSERT INTO mytab (col) VALUES (john)",
