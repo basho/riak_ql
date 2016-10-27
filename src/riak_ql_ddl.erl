@@ -628,16 +628,16 @@ insert_sql_columns_row_values(FInQuery, Values) ->
                     [ {null, ?SQL_NULL} || _I <- lists:seq(length(Values) + 1, length(FInQuery)) ]
             end
     end,
-    lists:foldr(fun ({Type, Value}, Acc) ->
-                TV = case {Type, Value} of
+    lists:map(fun ({Type, Value}) ->
+                case {Type, Value} of
                     %% implicit NULL
                     {null, ?SQL_NULL} -> {null, ?SQL_NULL};
                     %% explicit NULL
                     {null, <<_Null/binary>>} -> {null, ?SQL_NULL};
                     {Type, Value} -> {Type, Value}
-                end,
-                [TV|Acc]
-        end, [], Values1).
+                end
+        end,
+        Values1).
 
 %% Get the type of a field from the DDL datastructure.
 %%
