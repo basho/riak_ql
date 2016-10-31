@@ -538,3 +538,26 @@ partition_key_quantum_with_duplicate_fields_is_not_allowed_test() ->
         {error,{0,riak_ql_parser,<<"Primary key has duplicate fields (c)">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
     ).
+
+%% definition for a primary key without brackets for the local key
+missing_local_key_and_local_key_brackets_test() ->
+    Table_def =
+        "CREATE TABLE mytab1 ("
+        "a varchar NOT NULL, "
+        "ts timestamp NOT NULL, "
+        "PRIMARY KEY(quantum(ts,30,'d')) );",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"No local key specified.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+missing_local_keys_test() ->
+    Table_def =
+        "CREATE TABLE mytab1 ("
+        "a varchar NOT NULL, "
+        "ts timestamp NOT NULL, "
+        "PRIMARY KEY((quantum(ts,30,'d'))) );",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"No local key specified.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
