@@ -45,11 +45,11 @@ fn_type_signature('AVG', [timestamp]) -> double;
 fn_type_signature('COUNT', [_]) -> sint64;
 fn_type_signature('MAX', [double]) -> double;
 fn_type_signature('MAX', [sint64]) -> sint64;
-fn_type_signature('MAX', [timestamp]) -> sint64;
+fn_type_signature('MAX', [timestamp]) -> timestamp;
 fn_type_signature('MEAN', Args) -> fn_type_signature('AVG', Args);
 fn_type_signature('MIN', [double]) -> double;
 fn_type_signature('MIN', [sint64]) -> sint64;
-fn_type_signature('MIN', [timestamp]) -> sint64;
+fn_type_signature('MIN', [timestamp]) -> timestamp;
 fn_type_signature('STDDEV', Args) -> fn_type_signature('STDDEV_SAMP', Args);
 fn_type_signature('STDDEV_POP', [double]) -> double;
 fn_type_signature('STDDEV_POP', [sint64]) -> double;
@@ -59,7 +59,7 @@ fn_type_signature('STDDEV_SAMP', [sint64]) -> double;
 fn_type_signature('STDDEV_SAMP', [timestamp]) -> double;
 fn_type_signature('SUM', [double]) -> double;
 fn_type_signature('SUM', [sint64]) -> sint64;
-fn_type_signature('SUM', [timestamp]) -> sint64;
+fn_type_signature('SUM', [timestamp]) -> timestamp;
 fn_type_signature(Fn, Args) ->
     {error, {argument_type_mismatch, Fn, Args}}.
 
