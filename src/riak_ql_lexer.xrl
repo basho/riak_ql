@@ -22,6 +22,7 @@ INSERT = (I|i)(N|n)(S|s)(E|e)(R|r)(T|t)
 INTO = (I|i)(N|n)(T|t)(O|o)
 LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
 NOT = (N|n)(O|o)(T|t)
+IS = (I|i)(S|s)
 NULL = (N|n)(U|u)(L|l)(L|l)
 OR = (O|o)(R|r)
 PRIMARY = (P|p)(R|r)(I|i)(M|m)(A|a)(R|r)(Y|y)
@@ -39,6 +40,7 @@ WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
 WITH = (W|w)(I|i)(T|t)(H|h)
 
 CHARACTER_LITERAL = ('([^\']|(\'\'))*')
+HEX = 0x([0-9a-zA-Z]*)
 
 REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
@@ -108,6 +110,7 @@ Rules.
 {WHERE} : {token, {where, list_to_binary(TokenChars)}}.
 {WITH} : {token, {with, list_to_binary(TokenChars)}}.
 
+{HEX} : {token, {character_literal, clean_up_hex(TokenChars)}}.
 {INTNUM}   : {token, {integer, list_to_integer(TokenChars)}}.
 
 % float chars do not get converted to floats, if they are part of a word
@@ -115,6 +118,7 @@ Rules.
 {FLOATDEC} : {token, {float, TokenChars}}.
 {FLOATSCI} : {token, {float_sci, TokenChars}}.
 
+{IS}          : {token, {is_,                 list_to_binary(TokenChars)}}.
 {EQ}          : {token, {equals_operator,     list_to_binary(TokenChars)}}.
 {APPROXMATCH} : {token, {approx, list_to_binary(TokenChars)}}.
 {GT}          : {token, {greater_than_operator, list_to_binary(TokenChars)}}.
@@ -178,6 +182,14 @@ post_p([H | T], Acc) ->
 lex(String) ->
     {ok, Toks, _} = string(String),
     Toks.
+
+clean_up_hex([$0,$x|Hex]) ->
+    case length(Hex) rem 2 of
+        0 ->
+            mochihex:to_bin(Hex);
+        _ ->
+            error({odd_hex_chars,<<"Hex strings must have an even number of characters.">>})
+    end.
 
 clean_up_literal(Literal) ->
     RemovedOutsideQuotes = accurate_strip(Literal, $'),

@@ -619,3 +619,26 @@ table_with_no_local_key_order_defined_is_v1_test() ->
         v1,
         DDL?DDL.minimum_capability
     ).
+
+%% definition for a primary key without brackets for the local key
+missing_local_key_and_local_key_brackets_test() ->
+    Table_def =
+        "CREATE TABLE mytab1 ("
+        "a varchar NOT NULL, "
+        "ts timestamp NOT NULL, "
+        "PRIMARY KEY(quantum(ts,30,'d')) );",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"No local key specified.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+missing_local_keys_test() ->
+    Table_def =
+        "CREATE TABLE mytab1 ("
+        "a varchar NOT NULL, "
+        "ts timestamp NOT NULL, "
+        "PRIMARY KEY((quantum(ts,30,'d'))) );",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"No local key specified.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).

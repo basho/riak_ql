@@ -41,6 +41,10 @@
 %% Relational operators allowed in a where clause.
 -type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
 
+%% NULL comparison operator (comparator) allowed in where clause, but limited to
+%% SQL "<field> IS [NOT] NULL"
+-type null_comparator() :: is_null | is_not_null.
+
 -type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
 -type data_value()       :: {integer, integer()}
                           | {float, float()}
@@ -52,7 +56,8 @@
                     | selection_function()
                     | {expr, selection()}
                     | {negate, selection()}
-                    | {relational_op(), selection(), selection()}.
+                    | {relational_op(), selection(), selection()}
+                    | {null_comparator(), field_identifier()}.
 
 -type insertion()  :: field_identifier().
 -type filter()     :: term().
@@ -342,14 +347,23 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
     case Mod:is_field_valid([Field]) of
         true  ->
             ExpectedType = Mod:get_field_type([Field]),
-            case is_compatible_type(ExpectedType, RHS_type, normalise(RHS_Val)) of
-                true  -> Acc2 = Acc1;
-                false -> Acc2 = [{incompatible_type, Field, ExpectedType, RHS_type} | Acc1]
+            Acc2 = case is_compatible_type(ExpectedType, RHS_type, normalise(RHS_Val)) of
+                true  -> Acc1;
+                false -> [{incompatible_type, Field, ExpectedType, RHS_type} | Acc1]
             end,
             case is_compatible_operator(Op, ExpectedType, RHS_type) of
                 true  -> Acc2;
                 false -> [{incompatible_operator, Field, ExpectedType, Op} | Acc2]
             end;
+        false ->
+            [{unexpected_where_field, Field} | Acc1]
+    end;
+%% the case where field is [not] null is being tested
+is_filters_field_valid(Mod, {NullOp, {identifier, Field}}, Acc1) when NullOp =:= is_null orelse
+                                                                            NullOp =:= is_not_null ->
+    case Mod:is_field_valid([Field]) of
+        true ->
+            Acc1;
         false ->
             [{unexpected_where_field, Field} | Acc1]
     end;
