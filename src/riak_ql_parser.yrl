@@ -341,8 +341,15 @@ DataType -> boolean   : '$1'.
 
 PrimaryKey -> primary key : primary_key.
 
+%% definition for a primary key without brackets for the local key
+%% CREATE TABLE mytab1 (a varchar not null, ts timestamp not null, primary key (quantum(ts,30,'d')) );
 KeyDefinition ->
-    PrimaryKey left_paren KeyFieldList right_paren : make_local_key('$3').
+    PrimaryKey left_paren KeyFieldList right_paren : return_error_flat("No local key specified.").
+%% definition for a primary key with the local key brackets but no local key or
+%% comma after the partition key
+%% CREATE TABLE rts1130_6 (a varchar not null, ts timestamp not null, primary key ((quantum(ts,30,'d'))) );
+KeyDefinition ->
+    PrimaryKey left_paren left_paren KeyFieldList right_paren right_paren : return_error_flat("No local key specified.").
 KeyDefinition ->
     PrimaryKey left_paren left_paren KeyFieldList right_paren comma KeyFieldList right_paren : make_partition_and_local_keys('$4', '$7').
 
@@ -853,15 +860,6 @@ make_column({identifier, FieldName}, {DataType, _}, not_null) ->
        name     = FieldName,
        type     = DataType,
        optional = false}.
-
-%% if only the local key is defined
-%% use it as the partition key as well
-make_local_key(FieldList) ->
-    Key = #key_v1{ast = lists:reverse(extract_key_field_list(FieldList, []))},
-    [
-     {partition_key, Key},
-     {local_key,     Key}
-    ].
 
 make_partition_and_local_keys(PFieldList, LFieldList) ->
     PFields = lists:reverse(extract_key_field_list(PFieldList, [])),
