@@ -44,13 +44,13 @@ VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
 WHERE = (W|w)(H|h)(E|e)(R|r)(E|e)
 WITH = (W|w)(I|i)(T|t)(H|h)
 
-CHARACTER_LITERAL = ('([^\']|(\'\'))*')
+CHARACTER_LITERAL = '(''|[^'\n])*'
 HEX = 0x([0-9a-zA-Z]*)
 
 REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
-QUOTED = ("([^\"]|(\"\"))*")
 IDENTIFIER = ([a-zA-Z][a-zA-Z0-9_\-]*)
+QUOTED_IDENTIFIER = \"(\"\"|[^\"\n])*\"
 WHITESPACE = ([\000-\s]*)
 
 % characters not in the ascii range
@@ -150,8 +150,6 @@ Rules.
 {CHARACTER_LITERAL} :
   {token, {character_literal, clean_up_literal(TokenChars)}}.
 
-{QUOTED} : {token, {identifier, strip_quoted(TokenChars)}}.
-
 {REGEX} : {token, {regex, list_to_binary(TokenChars)}}.
 
 {COMMA} : {token, {comma, list_to_binary(TokenChars)}}.
@@ -161,7 +159,8 @@ Rules.
 
 \n : {end_token, {'$end'}}.
 
-{IDENTIFIER} : {token, {identifier, list_to_binary(TokenChars)}}.
+{IDENTIFIER} : {token, {identifier, clean_up_identifier(TokenChars)}}.
+{QUOTED_IDENTIFIER} : {token, {identifier, clean_up_identifier(TokenChars)}}.
 {UNICODE} : error(unicode_in_identifier).
 
 .  : error(iolist_to_binary(io_lib:format("Unexpected token '~s'.", [TokenChars]))).
@@ -193,6 +192,9 @@ lex(String) ->
     {ok, Toks, _} = string(String),
     Toks.
 
+clean_up_identifier(Literal) ->
+    clean_up_literal(Literal).
+
 clean_up_hex([$0,$x|Hex]) ->
     case length(Hex) rem 2 of
         0 ->
@@ -202,18 +204,27 @@ clean_up_hex([$0,$x|Hex]) ->
     end.
 
 clean_up_literal(Literal) ->
-    RemovedOutsideQuotes = accurate_strip(Literal, $'),
-    DeDoubledInternalQuotes = re:replace(RemovedOutsideQuotes,
-                                         "''", "'",
-                                         [global, {return, list}]),
-    list_to_binary(DeDoubledInternalQuotes).
+    Literal1 = case hd(Literal) of
+        $' -> accurate_strip(Literal, $');
+        $" ->
+            [error(unicode_in_quotes) || U <- Literal, U > 127],
+            accurate_strip(Literal, $");
+        _ -> Literal
+    end,
+    DeDupedInternalQuotes = dedup_quotes(Literal1),
+    list_to_binary(DeDupedInternalQuotes).
 
-strip_quoted(QuotedString) ->
-    % if there are unicode characters in the string, throw an error
-    [error(unicode_in_quotes) || U <- QuotedString, U > 127],
-
-    StrippedOutsideQuotes = accurate_strip(QuotedString, $"),
-    re:replace(StrippedOutsideQuotes, "\"\"", "\"", [global, {return, binary}]).
+%% dedup(licate) quotes, using pattern matching to reduce to O(n)
+dedup_quotes(S) ->
+    dedup_quotes(S, []).
+dedup_quotes([], Acc) ->
+    lists:reverse(Acc);
+dedup_quotes([H0,H1|T], Acc) when H0 =:= $' andalso H1 =:= $' ->
+    dedup_quotes(T, [H0|Acc]);
+dedup_quotes([H0,H1|T], Acc) when H0 =:= $" andalso H1 =:= $" ->
+    dedup_quotes(T, [H0|Acc]);
+dedup_quotes([H|T], Acc) ->
+    dedup_quotes(T, [H|Acc]).
 
 %% only strip one quote, to accept Literals ending in the quote
 %% character being stripped
