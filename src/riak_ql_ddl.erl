@@ -1135,14 +1135,19 @@ insert_sql_columns_all_fields_test() ->
     ?assertEqual(FInMod, FieldsOut),
     ?assertEqual(ValuesIn, ValuesOut).
 
-%% Shuffle two equal length lists equivalently
-shuffle2(L0, L1) ->
-    shuffle2(list_to_tuple(L0), list_to_tuple(L1), length(L0)).
+%% Weave two equal length lists equivalently, ensuring a reordering of the
+%% elements, but in a deterministic way compared to random shuffle.
+weave2(L0, L1) ->
+    weave2(list_to_tuple(L0), list_to_tuple(L1), length(L0)).
 
-shuffle2(L0, L1, 0) ->
+weave2(L0, L1, 0) ->
     {tuple_to_list(L0), tuple_to_list(L1)};
-shuffle2(L0, L1, Len) ->
-    Rand = random:uniform(Len),
+weave2(L0, L1, Len) ->
+    Rand = case Len rem 3 of
+               0 -> 2;
+               1 -> 1;
+               2 -> 3
+           end,
     A0 = element(Len, L0),
     A1 = element(Len, L1),
     B0 = element(Rand, L0),
@@ -1151,9 +1156,9 @@ shuffle2(L0, L1, Len) ->
     L11 = setelement(Len, L1, B1),
     L02 = setelement(Rand, L01, A0),
     L12 = setelement(Rand, L11, A1),
-    shuffle2(L02, L12, Len - 1).
+    weave2(L02, L12, Len - 1).
 
-insert_sql_columns_shuffled_fields_test() ->
+insert_sql_columns_waaved_fields_test() ->
     {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
     FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
     FieldsIn0 = FInMod,
@@ -1162,7 +1167,7 @@ insert_sql_columns_shuffled_fields_test() ->
             {timestamp, 1000},
             {varchar, <<"sunny">>},
             {double, 37.0}]],
-    {FieldsIn,ValuesIn1} = shuffle2(FieldsIn0, hd(ValuesIn0)),
+    {FieldsIn,ValuesIn1} = weave2(FieldsIn0, hd(ValuesIn0)),
     ValuesIn = [ValuesIn1],
     {FieldsOut, ValuesOut} = insert_sql_columns(Mod, FieldsIn, ValuesIn),
     ?assertEqual(FInMod, FieldsOut),
