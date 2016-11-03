@@ -24,7 +24,15 @@
 -include("riak_ql_ddl.hrl").
 
 -export([
+         apply_ordering/2,
+         convert/2,
+         current_version/0,
+         ddl_record_version/1,
+         first_version/0,
+         flip_binary/1,
          get_field_type/2,
+         get_minimum_capability/1,
+         is_version_greater/2,
          make_module_name/1, make_module_name/2
         ]).
 
@@ -55,10 +63,13 @@
 -type filter()     :: term().
 
 -type ddl() :: ?DDL{}.
+-type any_ddl() :: #ddl_v1{} | ?DDL{}.
 
 -export_type([
+              any_ddl/0,
               data_value/0,
               ddl/0,
+              ddl_version/0,
               field_identifier/0,
               filter/0,
               selection/0,
@@ -110,12 +121,11 @@
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
 
--spec make_module_name(Table::binary()) ->
-                              module().
+-spec make_module_name(Table::binary()) -> module().
 %% @doc Generate a unique module name for Table at version 1. @see
 %%      make_module_name/2.
 make_module_name(Table) ->
-    make_module_name(Table, ?DDL_RECORD_VERSION).
+    make_module_name(Table, riak_ql_ddl_compiler:get_compiler_version()).
 
 -spec make_module_name(Table   :: binary(),
                        Version :: riak_ql_component:component_version()) ->
@@ -123,14 +133,14 @@ make_module_name(Table) ->
 %% @doc Generate a unique, but readable and recognizable, module name
 %%      for Table at a certain Version, by 'escaping' non-ascii chars
 %%      in Table a la C++.
-make_module_name(Table, Version)
-  when is_binary(Table), is_integer(Version) ->
-    T4BL3 = << <<(maybe_mangle_char(C))/binary>> || <<C>> <= Table>>,
-    ModName = <<"riak_ql_table_", T4BL3/binary, $$, (list_to_binary(integer_to_list(Version)))/binary>>,
+make_module_name(Table1, CompilerVersion) when is_binary(Table1), is_integer(CompilerVersion) ->
+    Table2 = << <<(maybe_mangle_char(C))/binary>> || <<C>> <= Table1>>,
+    ModName = <<"riak_ql_table_", Table2/binary, "_", (integer_to_binary(CompilerVersion))/binary>>,
     binary_to_atom(ModName, latin1).
 
 maybe_mangle_char(C) when (C >= $a andalso C =< $z);
                           (C >= $A andalso C =< $Z);
+                          (C >= $0 andalso C =< $9);
                           (C == $_) ->
     <<C>>;
 maybe_mangle_char(C) ->
@@ -165,7 +175,8 @@ get_local_key(?DDL{table = T}=DDL, Obj)
     get_local_key(DDL, Obj, Mod).
 
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
-make_key(_Mod, none, _Vals) -> [];
+make_key(_Mod, none, _Vals) ->
+    [];
 make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso
                                              is_list(Vals) ->
     mk_k(AST, Vals, Mod, []).
@@ -181,27 +192,31 @@ mk_k([#hash_fn_v1{mod = Md,
     A2 = extract(Args, Vals, []),
     V  = erlang:apply(Md, Fn, A2),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
-mk_k([?SQL_PARAM{name = [Nm]} | T1], Vals, Mod, Acc) ->
-    {Nm, V} = lists:keyfind(Nm, 1, Vals),
-    Ty = Mod:get_field_type([Nm]),
-    mk_k(T1, Vals, Mod, [{Ty, V} | Acc]).
+mk_k([?SQL_PARAM{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
+    case lists:keyfind(Nm, 1, Vals) of
+        {Nm, V} ->
+            Ty = Mod:get_field_type([Nm]),
+            mk_k(T1, Vals, Mod, [{Ty, apply_ordering(V, Ordering)} | Acc]);
+        false ->
+            {error, {missing_value, Nm, Vals}}
+    end.
 
 -spec extract(list(), [{any(), any()}], [any()]) -> any().
 extract([], _Vals, Acc) ->
     lists:reverse(Acc);
-extract([?SQL_PARAM{name = [Nm]} | T], Vals, Acc) ->
+extract([?SQL_PARAM{name = [Nm], ordering = Ordering} | T], Vals, Acc) ->
     {Nm, Val} = lists:keyfind(Nm, 1, Vals),
-    extract(T, Vals, [Val | Acc]);
+    extract(T, Vals, [apply_ordering(Val, Ordering) | Acc]);
 extract([Constant | T], Vals, Acc) ->
     extract(T, Vals, [Constant | Acc]).
 
 -spec build([?SQL_PARAM{}], tuple(), atom(), any()) -> list().
 build([], _Obj, _Mod, A) ->
     lists:reverse(A);
-build([?SQL_PARAM{name = Nm} | T], Obj, Mod, A) ->
+build([?SQL_PARAM{name = Nm, ordering = Ordering} | T], Obj, Mod, A) ->
     Val = Mod:extract(Obj, Nm),
     Type = Mod:get_field_type(Nm),
-    build(T, Obj, Mod, [{Type, Val} | A]);
+    build(T, Obj, Mod, [{Type, apply_ordering(Val, Ordering)} | A]);
 build([#hash_fn_v1{mod  = Md,
                    fn   = Fn,
                    args = Args,
@@ -218,6 +233,18 @@ convert([?SQL_PARAM{name = Nm} | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Val | Acc]);
 convert([Constant | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Constant | Acc]).
+
+apply_ordering(Val, descending) when is_integer(Val) ->
+    -Val;
+apply_ordering(Val, descending) when is_binary(Val) ->
+    flip_binary(Val);
+apply_ordering(Val, _) -> % ascending or undefined
+    Val.
+
+%%
+-spec flip_binary(binary()) -> binary().
+flip_binary(V) when is_binary(V) ->
+    << <<(bnot X):8>> || <<X>> <= V >>.
 
 %% Convert an error emitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
@@ -284,9 +311,9 @@ is_query_valid(Mod, _, {_Table, Selection, Where}) ->
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
 
--spec is_insert_valid(module(), #ddl_v1{}, {term(), term(), term()}) ->
+-spec is_insert_valid(module(), ?DDL{}, {term(), term(), term()}) ->
                       true | {false, [query_syntax_error()]}.
-is_insert_valid(_, #ddl_v1{ table = T1 },
+is_insert_valid(_, ?DDL{ table = T1 },
                 {T2, _Fields, _Values}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_insert_valid(Mod, _DDL, {_Table, Fields, Values}) ->
@@ -643,14 +670,177 @@ insert_sql_columns_row_values(FInQuery, Values) ->
 %%
 %% NOTE: If a compiled helper module is a available then use
 %% `Mod:get_field_type/1'.
--spec get_field_type(#ddl_v1{}, binary()) -> {ok, simple_field_type()} | notfound.
-get_field_type(#ddl_v1{ fields = Fields }, FieldName) when is_binary(FieldName) ->
+-spec get_field_type(?DDL{}, binary()) -> {ok, simple_field_type()} | notfound.
+get_field_type(?DDL{ fields = Fields }, FieldName) when is_binary(FieldName) ->
     case lists:keyfind(FieldName, #riak_field_v1.name, Fields) of
       #riak_field_v1{ type = Type } ->
           {ok, Type};
       false ->
             notfound
     end.
+
+%% Determing the minimum capability value that is required to run operations
+%% on this table.
+-spec get_minimum_capability(?DDL{}) -> ddl_version().
+get_minimum_capability(DDL) ->
+    get_descending_keys_required_cap(DDL).
+
+%%
+get_descending_keys_required_cap(?DDL{ local_key = #key_v1{ ast = AST } }) ->
+    lists:foldl(fun get_descending_keys_required_cap_fold/2, v1, AST).
+
+%%
+get_descending_keys_required_cap_fold(?SQL_PARAM{ ordering = descending }, Acc) ->
+    max_version(v2, Acc);
+get_descending_keys_required_cap_fold(_, Acc) ->
+    Acc.
+
+%%
+max_version(A,B) when A == v2 orelse B == v2 -> v2;
+max_version(_,_) -> v1.
+
+%%% -------------------------------------------------------------------
+%%% DDL UPGRADES
+%%% -------------------------------------------------------------------
+
+first_version() ->
+    v1.
+
+current_version() ->
+    ?DDL_RECORD_VERSION.
+
+%% Convert a ddl record to a different version.
+-spec convert(ddl_version(), DDL::any_ddl()) -> [any_ddl()|{error,{cannot_downgrade,ddl_version()}}].
+convert(Version, DDL) when is_atom(Version) ->
+    CurrentVersion = ddl_record_version(element(1, DDL)),
+    case is_version_greater(Version, CurrentVersion) of
+        equal ->
+            [DDL];
+        true  ->
+            VersionSteps = sublist_elements(CurrentVersion, Version, [v1,v2]),
+            upgrade_ddl(VersionSteps, DDL);
+        false ->
+            [V1,V2] = sublist_elements(CurrentVersion, Version, [v2,v1]),
+            downgrade_ddl(V1,V2, DDL)
+    end.
+
+%%
+-spec is_version_greater(ddl_version(), ddl_version()) -> equal | boolean().
+is_version_greater(V, V)  -> equal;
+is_version_greater(v1,v2) -> false;
+is_version_greater(v2,v1) -> true.
+
+%%
+ddl_record_version(ddl_v1) -> v1;
+ddl_record_version(ddl_v2) -> v2;
+ddl_record_version(V) when is_atom(V)
+                           -> throw({unknown_ddl_version, V}).
+
+%%
+downgrade_ddl(v2, v1, DDL1) ->
+    case ddl_minimum_capability2(DDL1) of
+        v1 ->
+            [#ddl_v1{
+                            table              = DDL1#ddl_v2.table,
+                            fields             = DDL1#ddl_v2.fields,
+                            partition_key      = downgrade_v2_key(DDL1#ddl_v2.partition_key),
+                            local_key          = downgrade_v2_key(DDL1#ddl_v2.local_key)
+                        }];
+        _ ->
+            [{error, {cannot_downgrade, v1}}]
+    end.
+
+%% Downgrade a v2 local key to v1, the key should already be checked that
+%% it is safe to downgrade before it is called.
+downgrade_v2_key(#key_v1{ ast = AST }) ->
+    #key_v1{ ast =
+        [downgrade_v2_param(X) || X <- AST]
+    }.
+
+%%
+downgrade_v2_param(#param_v2{name = N}) ->
+    #param_v1{name = N};
+downgrade_v2_param(#hash_fn_v1{args = Args} = HashFn) ->
+    HashFn#hash_fn_v1{
+        args = [downgrade_v2_param(X) || X <- Args]
+    };
+downgrade_v2_param(X) ->
+    %% hash_fn arguments can be any kind of term
+    X.
+
+%%
+upgrade_ddl([_], DDL) ->
+    [DDL];
+upgrade_ddl([v1,v2 = To|Tail], DDL1) ->
+    DDL2 = #ddl_v2{
+        table              = DDL1#ddl_v1.table,
+        fields             = DDL1#ddl_v1.fields,
+        partition_key      = upgrade_v1_key(DDL1#ddl_v1.partition_key),
+        local_key          = upgrade_v1_key(DDL1#ddl_v1.local_key),
+        minimum_capability = ddl_minimum_capability(DDL1, v1)
+    },
+    DDL3 = DDL2#ddl_v2{
+        minimum_capability = ddl_minimum_capability(DDL2, v1)
+    },
+    [DDL1 | upgrade_ddl([To|Tail], DDL3)].
+
+%%
+upgrade_v1_key(#key_v1{ ast = AST } = Key) ->
+    Key#key_v1{ast =
+        [upgrade_v1_param(X) || X <- AST]
+    }.
+
+%% upgrade param_v1 records to v2, if they are not this type of record then
+%% just return it, since it is a hash_fn.
+upgrade_v1_param(#param_v1{name = N}) ->
+    #param_v2{name = N, ordering = ascending};
+upgrade_v1_param(#hash_fn_v1{args = Args} = HashFn) ->
+    HashFn#hash_fn_v1{
+        args = [upgrade_v1_param(X) || X <- Args]
+    };
+upgrade_v1_param(X) ->
+    %% hash_fn arguments can be any kind of term
+    X.
+
+%%
+ddl_minimum_capability(DDL, DefaultMin) ->
+    Min = ddl_minimum_capability2(DDL),
+    case is_version_greater(Min, DefaultMin) of
+        false -> Min;
+        _     -> DefaultMin
+    end.
+
+%%
+ddl_minimum_capability2(#ddl_v1{ }) ->
+    v1;
+ddl_minimum_capability2(#ddl_v2{ local_key = ?DDL_KEY{ ast = AST } }) ->
+    DescParams = [P || #param_v2{ ordering = descending } = P <- AST],
+    case DescParams of
+        [] -> v1;
+        _  -> v2
+    end.
+
+%% Return a sublist within a list when only the start and end elements within
+%% the list are known, not the index.
+sublist_elements(_, _, []) ->
+    [];
+sublist_elements(From, To, [From|Tail]) ->
+    [From|sublist_elements_inner(To, Tail)];
+sublist_elements(From, To, [_|Tail]) ->
+    sublist_elements(From, To, Tail).
+
+%%
+sublist_elements_inner(_, []) ->
+    [];
+sublist_elements_inner(To, [To|_]) ->
+    [To];
+sublist_elements_inner(To, [Other|    Tail]) ->
+    [Other|sublist_elements_inner(To, Tail)].
+
+
+%%% -------------------------------------------------------------------
+%%% TESTS
+%%% -------------------------------------------------------------------
 
 -ifdef(TEST).
 -compile(export_all).
@@ -660,11 +850,20 @@ get_field_type(#ddl_v1{ fields = Fields }, FieldName) when is_binary(FieldName) 
 
 -include_lib("eunit/include/eunit.hrl").
 
-make_module_name_test() ->
-    ?assertEqual('riak_ql_table_fafa$1', make_module_name(<<"fafa">>)),
-    ?assertEqual('riak_ql_table_fafa$2', make_module_name(<<"fafa">>, 2)),
-    ?assertEqual('riak_ql_table_FaFa$1', make_module_name(<<"FaFa">>, 1)),
-    ?assertEqual('riak_ql_table_Fa%32%94%36$43', make_module_name(<<"Fa ^$">>, 43)).
+make_module_name_1_test() ->
+    ?assertEqual(
+        list_to_atom("riak_ql_table_mytab_" ++ integer_to_list(riak_ql_ddl_compiler:get_compiler_version())),
+        make_module_name(<<"mytab">>)
+    ).
+
+make_module_name_2_test() ->
+    ?assertEqual(riak_ql_table_fafa_1, make_module_name(<<"fafa">>, 1)).
+
+%% upper case, underscores and numbers ok
+make_module_name_3_test() ->
+    ?assertEqual(riak_ql_table_MY_TAB12345_1, make_module_name(<<"MY_TAB12345">>, 1)).
+
+
 
 %%
 %% Helper Fn for unit tests
@@ -823,37 +1022,20 @@ make_plain_key_test() ->
     ?assertEqual(Expected, Got).
 
 make_functional_key_test() ->
-    Key = #key_v1{ast = [
-                         ?SQL_PARAM{name = [<<"user">>]},
-                         #hash_fn_v1{mod  = ?MODULE,
-                                     fn   = mock_partition_fn,
-                                     args = [
-                                             ?SQL_PARAM{name = [<<"time">>]},
-                                             15,
-                                             m
-                                            ],
-                                     type = timestamp
-                                    }
-                        ]},
-    DDL = make_ddl(<<"make_plain_key_test">>,
-                   [
-                    #riak_field_v1{name     = <<"user">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"time">>,
-                                   position = 2,
-                                   type     = timestamp}
-                   ],
-                   Key, %% use the same key for both
-                   Key),
-    Time = 12345,
+    Table_def =
+        "CREATE TABLE make_plain_key_test ("
+        "user VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((user, quantum(time, 15, 'm')), user, time))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
     Vals = [
             {<<"user">>, <<"user_1">>},
-            {<<"time">>, Time}
+            {<<"time">>, 12345}
            ],
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Got = make_key(Mod, Key, Vals),
-    Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
+    Got = make_key(Mod, DDL?DDL.local_key, Vals),
+    Expected = [{varchar, <<"user_1">>}, {timestamp, 12345}],
     ?assertEqual(Expected, Got).
 
 %%
@@ -1491,5 +1673,68 @@ fold_where_tree_test() ->
                       {fn_called_with_wrong_arity, 'COUNT', 1, 2}
                      ]
              }).
+
+upgrade_ddl_with_hash_fn_test() ->
+    HashFn =
+        #hash_fn_v1{mod  = ?MODULE,
+                    fn   = mock_partition_fn,
+                    args = [#param_v1{name = [<<"a">>]}, 15, m],
+                    type = timestamp},
+    DDL_v1 = #ddl_v1{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [HashFn] },
+        partition_key = #key_v1{ ast = [] }
+    },
+    ?assertEqual(
+        [DDL_v1,
+         #ddl_v2{
+            table = <<"tab">>,
+            local_key = #key_v1{ ast = [HashFn#hash_fn_v1{ args = [#param_v2{name = [<<"a">>], ordering = ascending}, 15, m] }] },
+            partition_key = #key_v1{ ast = [] }
+         }],
+        convert(v2, DDL_v1)
+    ).
+
+upgrade_ddl_v1_test() ->
+    DDL_v1 = #ddl_v1{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] },
+        partition_key = #key_v1{ ast = [] }
+
+    },
+    ?assertEqual(
+        [DDL_v1,
+         #ddl_v2{
+            table = <<"tab">>,
+            local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] },
+            partition_key = #key_v1{ ast = [] }
+         }],
+        convert(v2, DDL_v1)
+    ).
+
+downgrade_ddl_v2_test() ->
+    DDL_v2 = #ddl_v2{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] },
+        partition_key = #key_v1{ ast = [] }
+    },
+    ?assertEqual(
+        [#ddl_v1{
+                    table = <<"tab">>,
+                    local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] },
+                    partition_key = #key_v1{ ast = [] }
+                }],
+        convert(v1, DDL_v2)
+    ).
+
+downgrade_ddl_v2_with_desc_test() ->
+    DDL_v2 = #ddl_v2{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = descending }] }
+    },
+    ?assertEqual(
+        [{error, {cannot_downgrade, v1}}],
+        convert(v1, DDL_v2)
+    ).
 
 -endif.
