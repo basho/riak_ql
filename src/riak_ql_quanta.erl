@@ -70,6 +70,9 @@
 %% * a list of all the quantum boundaries
 %%   - the length of the list is the number of slices - 1
 -spec quanta(time_ms(), time_ms(), non_neg_integer(), time_unit()) -> {integer(), [integer()]} | {error, any()}.
+quanta(StartTime, EndTime, QuantaSize, Unit) when StartTime > EndTime ->
+    %% cheap trick to handle descending timestamps, reverse the arguments
+    quanta(EndTime, StartTime, QuantaSize, Unit); 
 quanta(StartTime, EndTime, QuantaSize, Unit) ->
     Start = quantum(StartTime, QuantaSize, Unit),
     case Start of
@@ -253,9 +256,15 @@ date_gen() ->
 time_gen() ->
     {choose(0, 23), choose(0, 59), choose(0, 59)}.
 
+%% We expect quanta to be bigger than their cardinality
+%% A quantum of 100 minutes is perfectly reasonable
 quantum_gen() ->
-    oneof([ {choose(1,2000), h},
-            {choose(1, 60), m}]).
+    oneof([ 
+            {choose(1, 1000), d},
+            {choose(1, 1000), h},
+            {choose(1, 1000), m},
+            {choose(1, 1000), s}
+          ]).
 
 -endif.
 -endif.

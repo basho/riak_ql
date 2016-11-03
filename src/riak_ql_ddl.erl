@@ -24,7 +24,15 @@
 -include("riak_ql_ddl.hrl").
 
 -export([
+         apply_ordering/2,
+         convert/2,
+         current_version/0,
+         ddl_record_version/1,
+         first_version/0,
+         flip_binary/1,
          get_field_type/2,
+         get_minimum_capability/1,
+         is_version_greater/2,
          make_module_name/1, make_module_name/2
         ]).
 
@@ -56,10 +64,13 @@
 -type filter()     :: term().
 
 -type ddl() :: ?DDL{}.
+-type any_ddl() :: #ddl_v1{} | ?DDL{}.
 
 -export_type([
+              any_ddl/0,
               data_value/0,
               ddl/0,
+              ddl_version/0,
               field_identifier/0,
               filter/0,
               selection/0,
@@ -79,7 +90,7 @@
          get_local_key/2, get_local_key/3,
          get_partition_key/2, get_partition_key/3,
          get_table/1,
-         insert_sql_columns/2,
+         insert_sql_columns/3,
          is_insert_valid/3,
          is_query_valid/3,
          make_key/3,
@@ -111,12 +122,11 @@
 -define(CANBEBLANK,  true).
 -define(CANTBEBLANK, false).
 
--spec make_module_name(Table::binary()) ->
-                              module().
+-spec make_module_name(Table::binary()) -> module().
 %% @doc Generate a unique module name for Table at version 1. @see
 %%      make_module_name/2.
 make_module_name(Table) ->
-    make_module_name(Table, ?DDL_RECORD_VERSION).
+    make_module_name(Table, riak_ql_ddl_compiler:get_compiler_version()).
 
 -spec make_module_name(Table   :: binary(),
                        Version :: riak_ql_component:component_version()) ->
@@ -124,14 +134,14 @@ make_module_name(Table) ->
 %% @doc Generate a unique, but readable and recognizable, module name
 %%      for Table at a certain Version, by 'escaping' non-ascii chars
 %%      in Table a la C++.
-make_module_name(Table, Version)
-  when is_binary(Table), is_integer(Version) ->
-    T4BL3 = << <<(maybe_mangle_char(C))/binary>> || <<C>> <= Table>>,
-    ModName = <<"riak_ql_table_", T4BL3/binary, $$, (list_to_binary(integer_to_list(Version)))/binary>>,
+make_module_name(Table1, CompilerVersion) when is_binary(Table1), is_integer(CompilerVersion) ->
+    Table2 = << <<(maybe_mangle_char(C))/binary>> || <<C>> <= Table1>>,
+    ModName = <<"riak_ql_table_", Table2/binary, "_", (integer_to_binary(CompilerVersion))/binary>>,
     binary_to_atom(ModName, latin1).
 
 maybe_mangle_char(C) when (C >= $a andalso C =< $z);
                           (C >= $A andalso C =< $Z);
+                          (C >= $0 andalso C =< $9);
                           (C == $_) ->
     <<C>>;
 maybe_mangle_char(C) ->
@@ -166,7 +176,8 @@ get_local_key(?DDL{table = T}=DDL, Obj)
     get_local_key(DDL, Obj, Mod).
 
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
-make_key(_Mod, none, _Vals) -> [];
+make_key(_Mod, none, _Vals) ->
+    [];
 make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso
                                              is_list(Vals) ->
     mk_k(AST, Vals, Mod, []).
@@ -182,27 +193,31 @@ mk_k([#hash_fn_v1{mod = Md,
     A2 = extract(Args, Vals, []),
     V  = erlang:apply(Md, Fn, A2),
     mk_k(T1, Vals, Mod, [{Ty, V} | Acc]);
-mk_k([?SQL_PARAM{name = [Nm]} | T1], Vals, Mod, Acc) ->
-    {Nm, V} = lists:keyfind(Nm, 1, Vals),
-    Ty = Mod:get_field_type([Nm]),
-    mk_k(T1, Vals, Mod, [{Ty, V} | Acc]).
+mk_k([?SQL_PARAM{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
+    case lists:keyfind(Nm, 1, Vals) of
+        {Nm, V} ->
+            Ty = Mod:get_field_type([Nm]),
+            mk_k(T1, Vals, Mod, [{Ty, apply_ordering(V, Ordering)} | Acc]);
+        false ->
+            {error, {missing_value, Nm, Vals}}
+    end.
 
 -spec extract(list(), [{any(), any()}], [any()]) -> any().
 extract([], _Vals, Acc) ->
     lists:reverse(Acc);
-extract([?SQL_PARAM{name = [Nm]} | T], Vals, Acc) ->
+extract([?SQL_PARAM{name = [Nm], ordering = Ordering} | T], Vals, Acc) ->
     {Nm, Val} = lists:keyfind(Nm, 1, Vals),
-    extract(T, Vals, [Val | Acc]);
+    extract(T, Vals, [apply_ordering(Val, Ordering) | Acc]);
 extract([Constant | T], Vals, Acc) ->
     extract(T, Vals, [Constant | Acc]).
 
 -spec build([?SQL_PARAM{}], tuple(), atom(), any()) -> list().
 build([], _Obj, _Mod, A) ->
     lists:reverse(A);
-build([?SQL_PARAM{name = Nm} | T], Obj, Mod, A) ->
+build([?SQL_PARAM{name = Nm, ordering = Ordering} | T], Obj, Mod, A) ->
     Val = Mod:extract(Obj, Nm),
     Type = Mod:get_field_type(Nm),
-    build(T, Obj, Mod, [{Type, Val} | A]);
+    build(T, Obj, Mod, [{Type, apply_ordering(Val, Ordering)} | A]);
 build([#hash_fn_v1{mod  = Md,
                    fn   = Fn,
                    args = Args,
@@ -219,6 +234,18 @@ convert([?SQL_PARAM{name = Nm} | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Val | Acc]);
 convert([Constant | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Constant | Acc]).
+
+apply_ordering(Val, descending) when is_integer(Val) ->
+    -Val;
+apply_ordering(Val, descending) when is_binary(Val) ->
+    flip_binary(Val);
+apply_ordering(Val, _) -> % ascending or undefined
+    Val.
+
+%%
+-spec flip_binary(binary()) -> binary().
+flip_binary(V) when is_binary(V) ->
+    << <<(bnot X):8>> || <<X>> <= V >>.
 
 %% Convert an error emitted from the :is_query_valid/3 function
 %% and convert it into a user-friendly, text message binary.
@@ -285,9 +312,9 @@ is_query_valid(Mod, _, {_Table, Selection, Where}) ->
     ValidFilters   = check_filters_valid(Mod, Where),
     is_query_valid_result(ValidSelection, ValidFilters).
 
--spec is_insert_valid(module(), #ddl_v1{}, {term(), term(), term()}) ->
+-spec is_insert_valid(module(), ?DDL{}, {term(), term(), term()}) ->
                       true | {false, [query_syntax_error()]}.
-is_insert_valid(_, #ddl_v1{ table = T1 },
+is_insert_valid(_, ?DDL{ table = T1 },
                 {T2, _Fields, _Values}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
 is_insert_valid(Mod, _DDL, {_Table, Fields, Values}) ->
@@ -547,37 +574,274 @@ make_empty_insert_row(Mod) ->
     Positions = Mod:get_field_positions(),
     list_to_tuple(lists:duplicate(length(Positions), [])).
 
-%% If the INSERT command does not specify a list of columns
-%% the expected behaviour is that ALL columns are specified
-%% in the VALUES clause, so we insert a list of all columns
-%% for validation purposes
--spec insert_sql_columns(module(), [field_identifier()]) -> [field_identifier()].
-insert_sql_columns(Mod, []) when is_atom(Mod) ->
-    default_insert_columns(Mod);
-insert_sql_columns(_Mod, Fields) ->
-    Fields.
+any_unknown_column(_Fields, _FInMod, true) ->
+    true;
+any_unknown_column([], [], _AnyUnknown) ->
+    false;
+any_unknown_column([], _FInMod, false) ->
+    false;
+any_unknown_column([{identifier, [F]}|FieldsT], FInMod, false) ->
+    IsKnown = lists:any(fun(El) -> El =:= F end, FInMod),
+    any_unknown_column(FieldsT, FInMod, not IsKnown).
 
-%% Build the default column list, if none is specified
--spec default_insert_columns(module()) -> [field_identifier()].
-default_insert_columns(Mod) when is_atom(Mod) ->
-    ColPos = Mod:get_field_positions(),
-    FormatFn = fun({Col, _Pos}) when is_list(Col) ->
-                    {identifier, Col}
-               end,
-    lists:map(FormatFn, ColPos).
+%% If the INSERT command specifies only a partial list of columns, expand the
+%% list of columns to include those known by the DDL, ensuring that the values
+%% provided and those omitted align with the columns as provided by the caller.
+-spec insert_sql_columns(module(), [field_identifier()], [data_value()]) ->
+    {[field_identifier()],[[data_value()]]}.
+insert_sql_columns(Mod, Fields, Values) when is_atom(Mod) ->
+    FInMod = [ F || {[F], _I} <- Mod:get_field_positions() ],
+    case any_unknown_column(Fields, FInMod, false) of
+        true ->
+            %% will fail downstream
+            {Fields, Values};
+        _ ->
+            FInQuery0 = lists:flatten(proplists:get_all_values(identifier, Fields)),
+            FInQuery1 = insert_sql_columns_fields(FInMod, FInQuery0),
+            VInQuery1 = [ insert_sql_columns_row_values(FInQuery1, V) ||
+                V <- Values ],
+            
+            %% rearrange into DDL Module order
+            in_ddl_order(FInQuery1, VInQuery1, FInMod, Mod)
+    end.
+
+%% fields in query match fields in ddl, optimization to not rearrange
+in_ddl_order(FD, VQs, FD, _Mod) ->
+    {[{identifier, [F]} || F <- FD ], VQs};
+%% no values, all null, will likely fail downstream
+in_ddl_order(FQ, _VQs=[], FD, Mod) ->
+    VQs = [ {null, ?SQL_NULL} || _F <- FQ ],
+    in_ddl_order(FQ, VQs, FD, Mod);
+%% fields in query do not match fields in ddl
+in_ddl_order(FQ, VQs=[_VQH=[_VH|_VT]|_VQT], FD, Mod) ->
+    FVs = [ in_ddl_order_(FQ, VQ, FD, Mod, [], [], FQ, VQ) || VQ <- VQs ],
+    Fields = [ {identifier, [F]} || F <- element(1, hd(FVs)) ],
+    Values = [ element(2, FV) || FV <- FVs ],
+    {Fields, Values}.
+
+%% exhausted FD -> return to caller
+in_ddl_order_(_FQ, _VQ, _FD=[], _Mod, FAcc, VAcc, _AFQ, _AVQ) ->
+    {lists:reverse(FAcc), lists:reverse(VAcc)};
+%% exhausted FQ, VQ -> append null and swap in AFQ and AVQ, traverse ddl field
+in_ddl_order_(_FQ=[], _VQ=[], _FD=[HFD|TFD], Mod, FAcc, VAcc, AFQ, AVQ) ->
+    NullFV = {Mod:get_field_type([HFD]), ?SQL_NULL},
+    in_ddl_order_(AFQ, AVQ, TFD, Mod, [HFD|FAcc], [NullFV|VAcc], AFQ, AVQ);
+%% matched HFQ and HFD -> append and swap in AFQ and AVQ, traverse ddl field
+in_ddl_order_(_FQ=[HFQ|_TFQ], _VQ=[HVQ|_TVQ], _FD=[HFD|TFD], Mod, FAcc, VAcc, AFQ, AVQ) when HFQ =:= HFD ->
+    in_ddl_order_(AFQ, AVQ, TFD, Mod, [HFQ|FAcc], [HVQ|VAcc], AFQ, AVQ);
+%% not matched -> traverse query field/value
+in_ddl_order_(_FQ=[_HFQ|TFQ], _VQ=[_HVQ|TVQ], FD=[_HFD|_TFD], Mod, FAcc, VAcc, AFQ, AVQ) ->
+    in_ddl_order_(TFQ, TVQ, FD, Mod, FAcc, VAcc, AFQ, AVQ).
+
+%% Get all of the columns, preferring the query order and fleshing out the
+%% remainder with those defined in the DDL Module.
+insert_sql_columns_fields(FInMod, FInQuery0) ->
+    FInModLength = length(FInMod),
+    FInQuery0Length = length(FInQuery0),
+    case FInQuery0Length of
+        0 -> FInMod;
+        FInModLength -> FInQuery0;
+        _ -> FInQuery0 ++
+            [F || F <- FInMod, not lists:any(fun(FInQ) -> F =:= FInQ end, FInQuery0) ]
+    end.
+
+insert_sql_columns_row_values(FInQuery, Values) ->
+    Values1 = case length(Values) =< length(FInQuery) of
+        false -> lists:sublist(Values, length(FInQuery));
+        _ ->
+            case length(Values) =:= length(FInQuery) of
+                true -> Values;
+                _ ->
+                    Values ++
+                    [ {null, ?SQL_NULL} || _I <- lists:seq(length(Values) + 1, length(FInQuery)) ]
+            end
+    end,
+    lists:map(fun ({Type, Value}) ->
+                case {Type, Value} of
+                    %% implicit NULL
+                    {null, ?SQL_NULL} -> {null, ?SQL_NULL};
+                    %% explicit NULL
+                    {null, <<_Null/binary>>} -> {null, ?SQL_NULL};
+                    {Type, Value} -> {Type, Value}
+                end
+        end,
+        Values1).
 
 %% Get the type of a field from the DDL datastructure.
 %%
 %% NOTE: If a compiled helper module is a available then use
 %% `Mod:get_field_type/1'.
--spec get_field_type(#ddl_v1{}, binary()) -> {ok, simple_field_type()} | notfound.
-get_field_type(#ddl_v1{ fields = Fields }, FieldName) when is_binary(FieldName) ->
+-spec get_field_type(?DDL{}, binary()) -> {ok, simple_field_type()} | notfound.
+get_field_type(?DDL{ fields = Fields }, FieldName) when is_binary(FieldName) ->
     case lists:keyfind(FieldName, #riak_field_v1.name, Fields) of
       #riak_field_v1{ type = Type } ->
           {ok, Type};
       false ->
             notfound
     end.
+
+%% Determing the minimum capability value that is required to run operations
+%% on this table.
+-spec get_minimum_capability(?DDL{}) -> ddl_version().
+get_minimum_capability(DDL) ->
+    get_descending_keys_required_cap(DDL).
+
+%%
+get_descending_keys_required_cap(?DDL{ local_key = #key_v1{ ast = AST } }) ->
+    lists:foldl(fun get_descending_keys_required_cap_fold/2, v1, AST).
+
+%%
+get_descending_keys_required_cap_fold(?SQL_PARAM{ ordering = descending }, Acc) ->
+    max_version(v2, Acc);
+get_descending_keys_required_cap_fold(_, Acc) ->
+    Acc.
+
+%%
+max_version(A,B) when A == v2 orelse B == v2 -> v2;
+max_version(_,_) -> v1.
+
+%%% -------------------------------------------------------------------
+%%% DDL UPGRADES
+%%% -------------------------------------------------------------------
+
+first_version() ->
+    v1.
+
+current_version() ->
+    ?DDL_RECORD_VERSION.
+
+%% Convert a ddl record to a different version.
+-spec convert(ddl_version(), DDL::any_ddl()) -> [any_ddl()|{error,{cannot_downgrade,ddl_version()}}].
+convert(Version, DDL) when is_atom(Version) ->
+    CurrentVersion = ddl_record_version(element(1, DDL)),
+    case is_version_greater(Version, CurrentVersion) of
+        equal ->
+            [DDL];
+        true  ->
+            VersionSteps = sublist_elements(CurrentVersion, Version, [v1,v2]),
+            upgrade_ddl(VersionSteps, DDL);
+        false ->
+            [V1,V2] = sublist_elements(CurrentVersion, Version, [v2,v1]),
+            downgrade_ddl(V1,V2, DDL)
+    end.
+
+%%
+-spec is_version_greater(ddl_version(), ddl_version()) -> equal | boolean().
+is_version_greater(V, V)  -> equal;
+is_version_greater(v1,v2) -> false;
+is_version_greater(v2,v1) -> true.
+
+%%
+ddl_record_version(ddl_v1) -> v1;
+ddl_record_version(ddl_v2) -> v2;
+ddl_record_version(V) when is_atom(V)
+                           -> throw({unknown_ddl_version, V}).
+
+%%
+downgrade_ddl(v2, v1, DDL1) ->
+    case ddl_minimum_capability2(DDL1) of
+        v1 ->
+            [#ddl_v1{
+                            table              = DDL1#ddl_v2.table,
+                            fields             = DDL1#ddl_v2.fields,
+                            partition_key      = downgrade_v2_key(DDL1#ddl_v2.partition_key),
+                            local_key          = downgrade_v2_key(DDL1#ddl_v2.local_key)
+                        }];
+        _ ->
+            [{error, {cannot_downgrade, v1}}]
+    end.
+
+%% Downgrade a v2 local key to v1, the key should already be checked that
+%% it is safe to downgrade before it is called.
+downgrade_v2_key(#key_v1{ ast = AST }) ->
+    #key_v1{ ast =
+        [downgrade_v2_param(X) || X <- AST]
+    }.
+
+%%
+downgrade_v2_param(#param_v2{name = N}) ->
+    #param_v1{name = N};
+downgrade_v2_param(#hash_fn_v1{args = Args} = HashFn) ->
+    HashFn#hash_fn_v1{
+        args = [downgrade_v2_param(X) || X <- Args]
+    };
+downgrade_v2_param(X) ->
+    %% hash_fn arguments can be any kind of term
+    X.
+
+%%
+upgrade_ddl([_], DDL) ->
+    [DDL];
+upgrade_ddl([v1,v2 = To|Tail], DDL1) ->
+    DDL2 = #ddl_v2{
+        table              = DDL1#ddl_v1.table,
+        fields             = DDL1#ddl_v1.fields,
+        partition_key      = upgrade_v1_key(DDL1#ddl_v1.partition_key),
+        local_key          = upgrade_v1_key(DDL1#ddl_v1.local_key),
+        minimum_capability = ddl_minimum_capability(DDL1, v1)
+    },
+    DDL3 = DDL2#ddl_v2{
+        minimum_capability = ddl_minimum_capability(DDL2, v1)
+    },
+    [DDL1 | upgrade_ddl([To|Tail], DDL3)].
+
+%%
+upgrade_v1_key(#key_v1{ ast = AST } = Key) ->
+    Key#key_v1{ast =
+        [upgrade_v1_param(X) || X <- AST]
+    }.
+
+%% upgrade param_v1 records to v2, if they are not this type of record then
+%% just return it, since it is a hash_fn.
+upgrade_v1_param(#param_v1{name = N}) ->
+    #param_v2{name = N, ordering = ascending};
+upgrade_v1_param(#hash_fn_v1{args = Args} = HashFn) ->
+    HashFn#hash_fn_v1{
+        args = [upgrade_v1_param(X) || X <- Args]
+    };
+upgrade_v1_param(X) ->
+    %% hash_fn arguments can be any kind of term
+    X.
+
+%%
+ddl_minimum_capability(DDL, DefaultMin) ->
+    Min = ddl_minimum_capability2(DDL),
+    case is_version_greater(Min, DefaultMin) of
+        false -> Min;
+        _     -> DefaultMin
+    end.
+
+%%
+ddl_minimum_capability2(#ddl_v1{ }) ->
+    v1;
+ddl_minimum_capability2(#ddl_v2{ local_key = ?DDL_KEY{ ast = AST } }) ->
+    DescParams = [P || #param_v2{ ordering = descending } = P <- AST],
+    case DescParams of
+        [] -> v1;
+        _  -> v2
+    end.
+
+%% Return a sublist within a list when only the start and end elements within
+%% the list are known, not the index.
+sublist_elements(_, _, []) ->
+    [];
+sublist_elements(From, To, [From|Tail]) ->
+    [From|sublist_elements_inner(To, Tail)];
+sublist_elements(From, To, [_|Tail]) ->
+    sublist_elements(From, To, Tail).
+
+%%
+sublist_elements_inner(_, []) ->
+    [];
+sublist_elements_inner(To, [To|_]) ->
+    [To];
+sublist_elements_inner(To, [Other|    Tail]) ->
+    [Other|sublist_elements_inner(To, Tail)].
+
+
+%%% -------------------------------------------------------------------
+%%% TESTS
+%%% -------------------------------------------------------------------
 
 -ifdef(TEST).
 -compile(export_all).
@@ -587,11 +851,20 @@ get_field_type(#ddl_v1{ fields = Fields }, FieldName) when is_binary(FieldName) 
 
 -include_lib("eunit/include/eunit.hrl").
 
-make_module_name_test() ->
-    ?assertEqual('riak_ql_table_fafa$1', make_module_name(<<"fafa">>)),
-    ?assertEqual('riak_ql_table_fafa$2', make_module_name(<<"fafa">>, 2)),
-    ?assertEqual('riak_ql_table_FaFa$1', make_module_name(<<"FaFa">>, 1)),
-    ?assertEqual('riak_ql_table_Fa%32%94%36$43', make_module_name(<<"Fa ^$">>, 43)).
+make_module_name_1_test() ->
+    ?assertEqual(
+        list_to_atom("riak_ql_table_mytab_" ++ integer_to_list(riak_ql_ddl_compiler:get_compiler_version())),
+        make_module_name(<<"mytab">>)
+    ).
+
+make_module_name_2_test() ->
+    ?assertEqual(riak_ql_table_fafa_1, make_module_name(<<"fafa">>, 1)).
+
+%% upper case, underscores and numbers ok
+make_module_name_3_test() ->
+    ?assertEqual(riak_ql_table_MY_TAB12345_1, make_module_name(<<"MY_TAB12345">>, 1)).
+
+
 
 %%
 %% Helper Fn for unit tests
@@ -750,37 +1023,20 @@ make_plain_key_test() ->
     ?assertEqual(Expected, Got).
 
 make_functional_key_test() ->
-    Key = #key_v1{ast = [
-                         ?SQL_PARAM{name = [<<"user">>]},
-                         #hash_fn_v1{mod  = ?MODULE,
-                                     fn   = mock_partition_fn,
-                                     args = [
-                                             ?SQL_PARAM{name = [<<"time">>]},
-                                             15,
-                                             m
-                                            ],
-                                     type = timestamp
-                                    }
-                        ]},
-    DDL = make_ddl(<<"make_plain_key_test">>,
-                   [
-                    #riak_field_v1{name     = <<"user">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"time">>,
-                                   position = 2,
-                                   type     = timestamp}
-                   ],
-                   Key, %% use the same key for both
-                   Key),
-    Time = 12345,
+    Table_def =
+        "CREATE TABLE make_plain_key_test ("
+        "user VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((user, quantum(time, 15, 'm')), user, time))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
     Vals = [
             {<<"user">>, <<"user_1">>},
-            {<<"time">>, Time}
+            {<<"time">>, 12345}
            ],
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Got = make_key(Mod, Key, Vals),
-    Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
+    Got = make_key(Mod, DDL?DDL.local_key, Vals),
+    Expected = [{varchar, <<"user_1">>}, {timestamp, 12345}],
     ?assertEqual(Expected, Got).
 
 %%
@@ -975,10 +1231,14 @@ parsed_sql_to_query(Proplist) ->
 
 %% is_query_valid expects a 3-tuple: table name, fields, values
 parsed_sql_to_insert(Mod, Proplist) ->
+    Table = proplists:get_value(table, Proplist, <<>>),
+    ValuesInQuery = proplists:get_value(values, Proplist, []),
+    FieldsInQuery = proplists:get_value(fields, Proplist, []),
+    {Fields, Values} = insert_sql_columns(Mod, FieldsInQuery, ValuesInQuery),
     {
-        proplists:get_value(table, Proplist, <<>>),
-        insert_sql_columns(Mod, proplists:get_value(fields, Proplist, [])),
-        proplists:get_value(values, Proplist, [])
+        Table,
+        Fields,
+        Values
     }.
 
 test_parse(SQL) ->
@@ -1017,6 +1277,105 @@ is_insert_valid_test_helper(Table_name, Table_def, Insert) ->
         "    PRIMARY KEY ((myfamily, myseries, QUANTUM(time, 15, 'm')), "
         "    myfamily, myseries, time))"
        ).
+
+insert_sql_columns_empty_fields_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn = [],
+    ValuesIn = [[{varchar, <<"family1">>},
+            {varchar, <<"series1">>},
+            {timestamp, 1000},
+            {varchar, <<"sunny">>},
+            {double, 37.0}]],
+    {FieldsOut, ValuesOut } = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    ?assertEqual(FInMod, FieldsOut),
+    ?assertEqual(ValuesIn, ValuesOut).
+
+insert_sql_columns_pk_fields_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn = lists:sublist(FInMod, 3),
+    ValuesIn = [[{varchar, <<"family1">>},
+            {varchar, <<"series1">>},
+            {timestamp, 1000}]],
+    {FieldsOut, ValuesOut } = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    %% expecting values specified plus nulls
+    ValuesExpected = [hd(ValuesIn) ++
+        lists:sublist(hd(ValuesOut), length(FieldsIn) + 1, length(FInMod) - length(FieldsIn))],
+    ?assertEqual(FInMod, FieldsOut),
+    ?assertEqual(ValuesExpected, ValuesOut).
+
+insert_sql_columns_all_fields_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn = FInMod,
+    ValuesIn = [[{varchar, <<"family1">>},
+            {varchar, <<"series1">>},
+            {timestamp, 1000},
+            {varchar, <<"sunny">>},
+            {double, 37.0}]],
+    {FieldsOut, ValuesOut} = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    ?assertEqual(FInMod, FieldsOut),
+    ?assertEqual(ValuesIn, ValuesOut).
+
+%% Weave two equal length lists equivalently, ensuring a reordering of the
+%% elements, but in a deterministic way compared to random shuffle.
+weave2(L0, L1) ->
+    weave2(list_to_tuple(L0), list_to_tuple(L1), length(L0)).
+
+weave2(L0, L1, 0) ->
+    {tuple_to_list(L0), tuple_to_list(L1)};
+weave2(L0, L1, Len) ->
+    Rand = case Len rem 3 of
+               0 -> 2;
+               1 -> 1;
+               2 -> 3
+           end,
+    A0 = element(Len, L0),
+    A1 = element(Len, L1),
+    B0 = element(Rand, L0),
+    B1 = element(Rand, L1),
+    L01 = setelement(Len, L0, B0),
+    L11 = setelement(Len, L1, B1),
+    L02 = setelement(Rand, L01, A0),
+    L12 = setelement(Rand, L11, A1),
+    weave2(L02, L12, Len - 1).
+
+insert_sql_columns_waaved_fields_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn0 = FInMod,
+    ValuesIn0 = [[{varchar, <<"family1">>},
+            {varchar, <<"series1">>},
+            {timestamp, 1000},
+            {varchar, <<"sunny">>},
+            {double, 37.0}]],
+    {FieldsIn,ValuesIn1} = weave2(FieldsIn0, hd(ValuesIn0)),
+    ValuesIn = [ValuesIn1],
+    {FieldsOut, ValuesOut} = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    ?assertEqual(FInMod, FieldsOut),
+    %% !IMPORTANT! values out should be in record order, not query order
+    ?assertEqual(ValuesIn0, ValuesOut).
+
+insert_sql_columns_multiple_rows_test() ->
+    {_DDL, Mod} = is_sql_valid_test_helper("mytab", ?LARGE_TABLE_DEF),
+    FInMod = [ {identifier,[F]} || {[F], _I} <- Mod:get_field_positions() ],
+    FieldsIn = FInMod,
+    ValuesIn = [
+        [{varchar, list_to_binary("family" ++ integer_to_list(I))},
+         {varchar, list_to_binary("series" ++ integer_to_list(I))},
+         {timestamp, I * 1000},
+         {varchar, <<"sunny">>},
+         {double, case I rem 3 of
+                    0 -> 37.0;
+                    1 -> 33.3;
+                    _ -> 34.2
+                  end}]
+        || I <- lists:seq(1, 10)
+    ],
+    {FieldsOut, ValuesOut } = insert_sql_columns(Mod, FieldsIn, ValuesIn),
+    ?assertEqual(FieldsIn, FieldsOut),
+    ?assertEqual(ValuesIn, ValuesOut).
 
 is_query_valid_1_test() ->
     ?assertEqual(
@@ -1175,6 +1534,14 @@ is_query_valid_no_subexpressions_1_test() ->
                                   "AND myfamily = 'bob' ")
       ).
 
+is_insert_valid_null_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab "
+            "(myfamily, myseries, time, weather, temperature) VALUES"
+            "('hazen', 'world', 15, 'nully', NULL)")).
+
 is_insert_valid_1_test() ->
     ?assertEqual(
         true,
@@ -1182,7 +1549,6 @@ is_insert_valid_1_test() ->
             "INSERT INTO mytab "
             "(myfamily, myseries, time, weather) VALUES"
             "('hazen', 'world', 15, 'sunny')")).
-
 
 is_insert_valid_2_test() ->
     ?assertEqual(
@@ -1229,6 +1595,15 @@ is_insert_valid_invalid_column_1_test() ->
             "INSERT INTO mytab "
             "(myfamily, myseries, peppermint, time) VALUES"
             "('hazen', 'world', 'cloudy', 15)")).
+
+is_insert_valid_multiple_rows_test() ->
+    ?assertEqual(
+        true,
+        is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
+            "INSERT INTO mytab VALUES"
+            "('hazen', 'world', 70, 'sunny', 45.0),"
+            "('hazen', 'world', 71, 'sunny', 44.0),"
+            "('hazen', 'world', 72, 'sunny', 46.0)")).
 
 fold_where_tree_test() ->
     Parsed = test_parse(
@@ -1299,5 +1674,68 @@ fold_where_tree_test() ->
                       {fn_called_with_wrong_arity, 'COUNT', 1, 2}
                      ]
              }).
+
+upgrade_ddl_with_hash_fn_test() ->
+    HashFn =
+        #hash_fn_v1{mod  = ?MODULE,
+                    fn   = mock_partition_fn,
+                    args = [#param_v1{name = [<<"a">>]}, 15, m],
+                    type = timestamp},
+    DDL_v1 = #ddl_v1{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [HashFn] },
+        partition_key = #key_v1{ ast = [] }
+    },
+    ?assertEqual(
+        [DDL_v1,
+         #ddl_v2{
+            table = <<"tab">>,
+            local_key = #key_v1{ ast = [HashFn#hash_fn_v1{ args = [#param_v2{name = [<<"a">>], ordering = ascending}, 15, m] }] },
+            partition_key = #key_v1{ ast = [] }
+         }],
+        convert(v2, DDL_v1)
+    ).
+
+upgrade_ddl_v1_test() ->
+    DDL_v1 = #ddl_v1{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] },
+        partition_key = #key_v1{ ast = [] }
+
+    },
+    ?assertEqual(
+        [DDL_v1,
+         #ddl_v2{
+            table = <<"tab">>,
+            local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] },
+            partition_key = #key_v1{ ast = [] }
+         }],
+        convert(v2, DDL_v1)
+    ).
+
+downgrade_ddl_v2_test() ->
+    DDL_v2 = #ddl_v2{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] },
+        partition_key = #key_v1{ ast = [] }
+    },
+    ?assertEqual(
+        [#ddl_v1{
+                    table = <<"tab">>,
+                    local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] },
+                    partition_key = #key_v1{ ast = [] }
+                }],
+        convert(v1, DDL_v2)
+    ).
+
+downgrade_ddl_v2_with_desc_test() ->
+    DDL_v2 = #ddl_v2{
+        table = <<"tab">>,
+        local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = descending }] }
+    },
+    ?assertEqual(
+        [{error, {cannot_downgrade, v1}}],
+        convert(v1, DDL_v2)
+    ).
 
 -endif.

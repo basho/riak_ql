@@ -538,3 +538,107 @@ partition_key_quantum_with_duplicate_fields_is_not_allowed_test() ->
         {error,{0,riak_ql_parser,<<"Primary key has duplicate fields (c)">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
     ).
+
+boolean_cannot_be_desc_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b BOOLEAN NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,
+          <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was boolean.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+float_cannot_be_desc_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b DOUBLE NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,
+          <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was double.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+desc_cannot_be_defined_on_the_partition_key_test() ->
+    Table_def =
+        "CREATE TABLE tab ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b DESC,quantum(c, 15, s)), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,
+          <<"Order can only be used in the local key, 'b' set to descending">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+table_with_desc_keys_has_minimum_cap_v2_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c DESC))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+        v2,
+        DDL?DDL.minimum_capability
+    ).
+
+table_with_asc_keys_has_minimum_cap_v1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c ASC))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+        v1,
+        DDL?DDL.minimum_capability
+    ).
+
+table_with_no_local_key_order_defined_is_v1_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((quantum(c, 15, 's')), c))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    ?assertEqual(
+        v1,
+        DDL?DDL.minimum_capability
+    ).
+
+%% definition for a primary key without brackets for the local key
+missing_local_key_and_local_key_brackets_test() ->
+    Table_def =
+        "CREATE TABLE mytab1 ("
+        "a varchar NOT NULL, "
+        "ts timestamp NOT NULL, "
+        "PRIMARY KEY(quantum(ts,30,'d')) );",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"No local key specified.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).
+
+missing_local_keys_test() ->
+    Table_def =
+        "CREATE TABLE mytab1 ("
+        "a varchar NOT NULL, "
+        "ts timestamp NOT NULL, "
+        "PRIMARY KEY((quantum(ts,30,'d'))) );",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"No local key specified.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
+    ).

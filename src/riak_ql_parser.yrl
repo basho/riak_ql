@@ -70,7 +70,7 @@ CreateTable
 PrimaryKey
 FunArg
 FunArgN
-
+OptOrdering
 OptFieldList
 IdentifierList
 RowValueList
@@ -82,12 +82,14 @@ Terminals
 
 or_
 and_
+asc
 blob
 boolean
 by
 character_literal
 comma
 create
+desc
 describe
 double
 equals_operator
@@ -153,7 +155,7 @@ StatementWithoutSemicolon -> ShowTables : '$1'.
 Query -> Select limit integer : add_limit('$1', '$2', '$3').
 Query -> Select               : '$1'.
 
-Select -> select Fields from Bucket Where GroupBy 
+Select -> select Fields from Bucket Where GroupBy
                                           : make_select('$1', '$2', '$3', '$4', '$5', '$6').
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
@@ -344,16 +346,29 @@ DataType -> boolean   : '$1'.
 
 PrimaryKey -> primary key : primary_key.
 
+%% definition for a primary key without brackets for the local key
+%% CREATE TABLE mytab1 (a varchar not null, ts timestamp not null, primary key (quantum(ts,30,'d')) );
 KeyDefinition ->
-    PrimaryKey left_paren KeyFieldList right_paren : make_local_key('$3').
+    PrimaryKey left_paren KeyFieldList right_paren : return_error_flat("No local key specified.").
+%% definition for a primary key with the local key brackets but no local key or
+%% comma after the partition key
+%% CREATE TABLE rts1130_6 (a varchar not null, ts timestamp not null, primary key ((quantum(ts,30,'d'))) );
+KeyDefinition ->
+    PrimaryKey left_paren left_paren KeyFieldList right_paren right_paren : return_error_flat("No local key specified.").
 KeyDefinition ->
     PrimaryKey left_paren left_paren KeyFieldList right_paren comma KeyFieldList right_paren : make_partition_and_local_keys('$4', '$7').
 
-KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
-KeyFieldList -> KeyField : make_list({list, []}, '$1').
+KeyFieldList -> KeyField comma KeyFieldList : ['$1' | '$3'].
+KeyFieldList -> KeyField : ['$1'].
 
-KeyField -> quantum left_paren KeyFieldArgList right_paren : make_modfun(quantum, '$3').
-KeyField -> Identifier : '$1'.
+KeyField -> quantum left_paren KeyFieldArgList right_paren :
+    element(2, make_modfun(quantum, '$3')).
+KeyField -> Identifier OptOrdering  :
+    ?SQL_PARAM{name = [element(2, '$1')], ordering = '$2'}.
+
+OptOrdering -> '$empty' : undefined.
+OptOrdering -> asc : ascending.
+OptOrdering -> desc : descending.
 
 KeyFieldArgList ->
     KeyFieldArg comma KeyFieldArgList : make_list('$3', '$1').
@@ -379,6 +394,7 @@ RowValueList -> RowValueList comma left_paren RowValue right_paren : '$1' ++ ['$
 RowValue -> RowValue comma FieldValue : '$1' ++ ['$3'].
 RowValue -> FieldValue : ['$1'].
 
+FieldValue -> null : '$1'.
 FieldValue -> integer : '$1'.
 FieldValue -> float : '$1'.
 FieldValue -> TruthValue : '$1'.
@@ -857,18 +873,7 @@ make_column({identifier, FieldName}, {DataType, _}, not_null) ->
        type     = DataType,
        optional = false}.
 
-%% if only the local key is defined
-%% use it as the partition key as well
-make_local_key(FieldList) ->
-    Key = #key_v1{ast = lists:reverse(extract_key_field_list(FieldList, []))},
-    [
-     {partition_key, Key},
-     {local_key,     Key}
-    ].
-
-make_partition_and_local_keys(PFieldList, LFieldList) ->
-    PFields = lists:reverse(extract_key_field_list(PFieldList, [])),
-    LFields = lists:reverse(extract_key_field_list(LFieldList, [])),
+make_partition_and_local_keys(PFields, LFields) ->
     [
      {partition_key, #key_v1{ast = PFields}},
      {local_key,     #key_v1{ast = LFields}}
@@ -882,25 +887,20 @@ make_table_element_list(A, {table_element_list, B}) ->
 make_table_element_list(A, B) ->
     {table_element_list, lists:flatten([A, B])}.
 
-extract_key_field_list({list, []}, Extracted) ->
-    Extracted;
-extract_key_field_list({list,
-                        [Modfun = #hash_fn_v1{} | Rest]},
-                       Extracted) ->
-    [Modfun | extract_key_field_list({list, Rest}, Extracted)];
-extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [?SQL_PARAM{name = [Field]} |
-     extract_key_field_list({list, Rest}, Extracted)].
-
 make_table_definition(TableName, Contents) ->
     make_table_definition(TableName, Contents, []).
+
 make_table_definition({identifier, Table}, Contents, Properties) ->
-    {validate_ddl(
-       ?DDL{table = Table,
-            partition_key = find_partition_key(Contents),
-            local_key = find_local_key(Contents),
-            fields = find_fields(Contents)}),
-     validate_table_properties(Properties)}.
+    DDL1 = ?DDL{
+        table = Table,
+        partition_key = find_partition_key(Contents),
+        local_key = find_local_key(Contents),
+        fields = find_fields(Contents) },
+    %% validate here so code afterwards doesn't require error checks
+    ok = validate_ddl(DDL1),
+    DDL2 = DDL1?DDL{
+        minimum_capability = riak_ql_ddl:get_minimum_capability(DDL1) },
+    {DDL2, validate_table_properties(Properties)}.
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
@@ -971,10 +971,12 @@ validate_ddl(DDL) ->
     ok = assert_primary_and_local_keys_match(DDL),
     ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
+    ok = assert_partition_key_fields_not_descending(DDL),
     ok = assert_not_more_than_one_quantum(DDL),
     ok = assert_quantum_fn_args(DDL),
     ok = assert_quantum_is_last_in_partition_key(DDL),
-    DDL.
+    ok = assert_desc_key_types(DDL),
+    ok.
 
 %% @doc Ensure DDL has keys
 assert_keys_present(?DDL{local_key = LK, partition_key = PK})
@@ -1019,6 +1021,18 @@ assert_primary_and_local_keys_match(?DDL{partition_key = #key_v1{ast = Primary},
             return_error_flat("Local key does not match primary key")
     end.
 
+%%
+assert_partition_key_fields_not_descending(?DDL{ partition_key = #key_v1{ ast = PK }}) ->
+    [ordering_in_partition_key_error(N, O)
+        || ?SQL_PARAM{ name = [N], ordering = O } <- PK, O /= undefined],
+    ok.
+
+%%
+-spec ordering_in_partition_key_error(binary(), atom()) -> no_return().
+ordering_in_partition_key_error(N, Ordering) when is_binary(N) ->
+    return_error_flat("Order can only be used in the local key, '~s' set to ~p", [N, Ordering]).
+
+%%
 assert_unique_fields_in_pk(?DDL{local_key = #key_v1{ast = LK}}) ->
     Fields = [N || ?SQL_PARAM{name = [N]} <- LK],
     case length(Fields) == length(lists:usort(Fields)) of
@@ -1047,7 +1061,7 @@ assert_partition_key_fields_exist(?DDL{ fields = Fields,
                               [string:join(MissingFields, ", ")])
     end.
 
-assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } } = DDL) ->
+assert_quantum_fn_args(?DDL{ partition_key = #key_v1{ ast = PKAST } } = DDL) ->
     [assert_quantum_fn_args2(DDL, Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
     ok.
 
@@ -1075,7 +1089,7 @@ assert_quantum_fn_args2(DDL, [Param, Unit, Measure]) ->
             return_error_flat("Quantum time unit must be a positive integer.", [])
     end.
 
-assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+assert_not_more_than_one_quantum(?DDL{ partition_key = #key_v1{ ast = PKAST } }) ->
     QuantumFns =
         [Fn || #hash_fn_v1{ } = Fn <- PKAST],
     case length(QuantumFns) =< 1 of
@@ -1086,7 +1100,7 @@ assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST }
                 "More than one quantum function in the partition key.", [])
     end.
 
-assert_quantum_is_last_in_partition_key(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+assert_quantum_is_last_in_partition_key(?DDL{ partition_key = #key_v1{ ast = PKAST } }) ->
     assert_quantum_is_last_in_partition_key2(PKAST).
 
 %%
@@ -1099,6 +1113,28 @@ assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }|_]) ->
         "The quantum function must be the last element of the partition key.", []);
 assert_quantum_is_last_in_partition_key2([_|Tail]) ->
     assert_quantum_is_last_in_partition_key2(Tail).
+
+%% Assert that any paramerts in the local key that use the desc keyword are
+%% types that support it.
+assert_desc_key_types(?DDL{ local_key = #key_v1{ ast = LKAST } } = DDL) ->
+    [assert_desc_key_field_type(DDL, P) || ?SQL_PARAM{ ordering = descending } = P <- LKAST],
+    ok.
+
+%%
+assert_desc_key_field_type(DDL, ?SQL_PARAM{ name = [Name] }) ->
+    {ok, Type} = riak_ql_ddl:get_field_type(DDL, Name),
+    case Type of
+        sint64 ->
+            ok;
+        varchar ->
+            ok;
+        timestamp ->
+            ok;
+        _ ->
+            return_error_flat(
+                "Elements in the local key marked descending (DESC) must be of "
+                "type sint64 or varchar, but was ~p.", [Type])
+    end.
 
 %% Check that the field name exists in the list of fields.
 is_field(Field, Fields) ->
