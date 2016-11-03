@@ -35,6 +35,14 @@
           optional = false :: boolean()
          }).
 
+-record(riak_field_v2, {
+          name     = <<>>  :: binary(),
+          position         :: undefined | pos_integer(),
+          type             :: undefined | riak_ql_ddl:simple_field_type(),
+          type_alias       :: undefined | riak_ql_ddl:simple_field_alias(),
+          optional = false :: boolean()
+         }).
+
 
 -define(SQL_PARAM, #param_v1).
 -define(SQL_PARAM_RECORD_NAME, param_v1).
@@ -60,8 +68,15 @@
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
          }).
--define(DDL, #ddl_v1).
--define(DDL_RECORD_NAME, ddl_v1).
--define(DDL_RECORD_VERSION, 1).
+
+-record(ddl_v2, {
+          table              :: binary(),
+          fields        = [] :: [#riak_field_v2{}],
+          partition_key      :: #key_v1{} | none,
+          local_key          :: #key_v1{}
+         }).
+-define(DDL, #ddl_v2).
+-define(DDL_RECORD_NAME, ddl_v2).
+-define(DDL_RECORD_VERSION, 2).
 
 -endif.

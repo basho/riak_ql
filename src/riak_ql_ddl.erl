@@ -29,6 +29,7 @@
         ]).
 
 -type simple_field_type()         :: varchar | sint64 | double | timestamp | boolean.
+-type simple_field_alias()        :: blob.
 
 %% Relational operators allowed in a where clause.
 -type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.

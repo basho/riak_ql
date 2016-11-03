@@ -82,6 +82,7 @@ Terminals
 
 or_
 and_
+blob
 boolean
 by
 character_literal
@@ -208,6 +209,7 @@ Vals -> NumericValueExpression : '$1'.
 Vals -> regex            : '$1'.
 Vals -> Val              : '$1'.
 
+Val -> blob               : '$1'.
 Val -> varchar            : '$1'.
 Val -> CharacterLiteral   : '$1'.
 Val -> TruthValue         : '$1'.
@@ -336,6 +338,7 @@ ColumnConstraint -> NotNull : not_null.
 DataType -> double    : '$1'.
 DataType -> sint64    : '$1'.
 DataType -> timestamp : '$1'.
+DataType -> blob      : '$1'.
 DataType -> varchar   : '$1'.
 DataType -> boolean   : '$1'.
 
