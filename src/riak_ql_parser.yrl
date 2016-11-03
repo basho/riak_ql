@@ -861,12 +861,25 @@ make_list({list, A}, {_, B}) ->
 make_list({_T1, A}, {_T2, B}) ->
     {list, [A, B]}.
 
+%% Type aliases require a newer `riak_field' record
+make_column({identifier, FieldName}, {blob, _}) ->
+    #riak_field_v2{
+       name       = FieldName,
+       type       = varchar,
+       type_alias = blob,
+       optional   = true};
 make_column({identifier, FieldName}, {DataType, _}) ->
     #riak_field_v1{
        name     = FieldName,
        type     = DataType,
        optional = true}.
 
+make_column({identifier, FieldName}, {blob, _}, not_null) ->
+    #riak_field_v2{
+       name       = FieldName,
+       type       = varchar,
+       type_alias = blob,
+       optional = false};
 make_column({identifier, FieldName}, {DataType, _}, not_null) ->
     #riak_field_v1{
        name     = FieldName,
@@ -937,6 +950,9 @@ find_fields(_Count, [], Found) ->
 find_fields(Count, [Field = #riak_field_v1{} | Rest], Elements) ->
     PositionedField = Field#riak_field_v1{position = Count},
     find_fields(Count + 1, Rest, [PositionedField | Elements]);
+find_fields(Count, [Field = #riak_field_v2{} | Rest], Elements) ->
+    PositionedField = Field#riak_field_v2{position = Count},
+    find_fields(Count + 1, Rest, [PositionedField | Elements]);
 find_fields(Count, [_Head | Rest], Elements) ->
     find_fields(Count, Rest, Elements).
 
@@ -991,9 +1007,14 @@ assert_primary_key_fields_non_null(?DDL{local_key = #key_v1{ast = LK},
                                         fields = Fields}) ->
     PKFieldNames = [N || ?SQL_PARAM{name = [N]} <- LK],
     OnlyPKFields = [F || #riak_field_v1{name = N} = F <- Fields,
-                         lists:member(N, PKFieldNames)],
+                         lists:member(N, PKFieldNames)] ++
+        [F || #riak_field_v2{name = N} = F <- Fields,
+              lists:member(N, PKFieldNames)],
+
     NonNullFields =
         [binary_to_list(F) || #riak_field_v1{name = F, optional = Null}
+                                  <- OnlyPKFields, Null == true] ++
+        [binary_to_list(F) || #riak_field_v2{name = F, optional = Null}
                                   <- OnlyPKFields, Null == true],
     case NonNullFields of
         [] ->

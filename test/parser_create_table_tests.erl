@@ -111,6 +111,7 @@ create_all_types_sql_test() ->
         " isweather2 boolean,"
         " temp2 double,"
         " mysint642 sint64,"
+        " slimer blob,"
         " PRIMARY KEY ((user, geohash, quantum(time, 15, 'm')),"
         " user, geohash, time))",
     Toks = riak_ql_lexer:get_tokens(String),
@@ -177,7 +178,13 @@ create_all_types_sql_test() ->
                                name = <<"mysint642">>,
                                position = 11,
                                type = sint64,
-                               optional = true}
+                               optional = true},
+                            #riak_field_v2{
+                               name = <<"slimer">>,
+                               position = 12,
+                               type = varchar,
+                               optional = true,
+                               type_alias = blob}
                            ],
                   partition_key =
                       #key_v1{
