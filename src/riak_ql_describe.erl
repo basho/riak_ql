@@ -27,7 +27,9 @@
 -include("riak_ql_ddl.hrl").
 
 %%
--spec describe(?DDL{}) -> {ok, list()}.
+-spec describe(?DDL{}) -> {ok, {ColNames::[binary()],
+                                ColTypes::[riak_ql_ddl:simple_field_type()],
+                                Rows::[[any()]]}}.
 describe(?DDL{fields = FieldSpecs,
               partition_key = #key_v1{ast = PKSpec},
               local_key     = #key_v1{ast = LKSpec}}) ->
@@ -74,15 +76,15 @@ column_lk_position(Col, KSpec) ->
 
 %% Extract the quantum column information, if it exists in the table definition
 %% and put in two additional columns
--spec column_quantum_interval(Col :: binary(), PKSpec :: [?SQL_PARAM{}|#hash_fn_v1{}]) ->
-      [binary() | []].
+-spec column_quantum_interval(Col :: binary(), PKSpec::#hash_fn_v1{}|[]) ->
+      integer()|[].
 column_quantum_interval(Col, #hash_fn_v1{args = [?SQL_PARAM{name = [Col]}, Interval, _]}) ->
     Interval;
 column_quantum_interval(_, _) ->
     ?SQL_NULL.
 
--spec column_quantum_unit(Col::binary(), PKSpec::[?SQL_PARAM{}|#hash_fn_v1{}]) ->
-      [binary() | []].
+-spec column_quantum_unit(Col::binary(), PKSpec::#hash_fn_v1{}|[]) ->
+      binary()|[].
 column_quantum_unit(Col, #hash_fn_v1{args = [?SQL_PARAM{name = [Col]}, _, Unit]}) ->
     atom_to_binary(Unit, latin1);
 column_quantum_unit(_, _) ->
@@ -217,8 +219,6 @@ describe_table_columns_no_quantum_test() ->
     NullRow = [[],[],[],[],[]],
     assert_column_values(<<"Interval">>, NullRow, Result),
     assert_column_values(<<"Unit">>, NullRow, Result).
-
-
 
 describe_table_descending_keys_test() ->
     {ddl, DDL, []} =
