@@ -256,9 +256,15 @@ date_gen() ->
 time_gen() ->
     {choose(0, 23), choose(0, 59), choose(0, 59)}.
 
+%% We expect quanta to be bigger than their cardinality
+%% A quantum of 100 minutes is perfectly reasonable
 quantum_gen() ->
-    oneof([ {choose(1,2000), h},
-            {choose(1, 60), m}]).
+    oneof([ 
+            {choose(1, 1000), d},
+            {choose(1, 1000), h},
+            {choose(1, 1000), m},
+            {choose(1, 1000), s}
+          ]).
 
 -endif.
 -endif.

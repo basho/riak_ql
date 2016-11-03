@@ -78,4 +78,6 @@
           minimum_capability = v1 :: ddl_version()
          }).
 
+-define(SQL_NULL, []).
+
 -endif.
