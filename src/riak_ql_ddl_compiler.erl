@@ -53,7 +53,9 @@
 
 -export([
          compile/1,
+         compile_and_load_disabled_module_from_tmp/1,
          compile_and_load_from_tmp/1,
+         compile_disabled_module/1,
          get_compiler_capabilities/0,
          get_compiler_version/0,
          write_source_to_files/3
@@ -73,9 +75,12 @@
 -type guards() :: [exprs()].
 -type ast()    :: [expr() | exprs() | guards()].
 
--spec get_compiler_version() -> riak_ql_component:component_version().
+%% MD5 checksum of this module.
+-spec get_compiler_version() -> integer().
 get_compiler_version() ->
-    ?RIAK_QL_DDL_COMPILER_VERSION.
+    Attributes = module_info(attributes),
+    {vsn, [Vsn]} = lists:keyfind(vsn, 1, Attributes),
+    Vsn.
 
 %% Create a list of supported versions from the current one
 %% down to the original version 1
@@ -83,9 +88,23 @@ get_compiler_version() ->
 get_compiler_capabilities() ->
     lists:seq(get_compiler_version(), 1, -1).
 
+%% Return the AST for a disabled module, a module can be disabled when a DDL
+%% is not available for a table because it has been downgraded to a version
+%% that is lower than what the table features required.
+-spec compile_disabled_module(Table::binary()) -> {module(), tuple()}.
+compile_disabled_module(Table) when is_binary(Table) ->
+    ModuleName = riak_ql_ddl:make_module_name(Table),
+    {ModuleName, merl:quote(disabled_table_source(ModuleName))}.
+
+%%
+disabled_table_source(ModuleName) ->
+    "-module(" ++ atom_to_list(ModuleName) ++ ").\n"
+    "-compile(export_all).\n"
+    "get_min_required_ddl_cap() -> disabled.".
+
 %% Compile the DDL to its helper module AST.
 -spec compile(?DDL{}) ->
-    {module, ast()} | {error, tuple()}.
+    {module(), ast()} | {error, tuple()}.
 compile({ok, ?DDL{} = DDL}) ->
     %% handle output directly from riak_ql_parser
     compile(DDL);
@@ -94,25 +113,36 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {VFns,         LineNo2}  = build_validn_fns(Fields,    LineNo),
     {ACFns,        LineNo3}  = build_add_cols_fns(Fields,  LineNo2),
     {ExtractFn,    LineNo4}  = build_extract_fn([Fields],  LineNo3, []),
-    {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),
+    {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),    
     {GetPosnFn,    LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
     {GetPosnsFn,   LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
     {IsValidFn,    LineNo8}  = build_is_valid_fn(Fields,   LineNo7),
     {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8),
     {GetDDLFn,     LineNo10} = build_get_ddl_fn(DDL, LineNo9, []),
     {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
+    {FieldOrdersFn, LineNo10} = build_field_orders_fn(DDL, LineNo9),
+    {RevertOrderingFn, LineNo11} = build_revert_ordering_on_local_key_fn(DDL, LineNo10),
+    {MinDDLCapFn, LineNo12} = build_min_ddl_version_fn(DDL, LineNo11),
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn, GetDDLFn]
+        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn, GetDDLFn, FieldOrdersFn, RevertOrderingFn, MinDDLCapFn]
         ++ HashFns
-        ++ [{eof, LineNo11}],
+        ++ [{eof, LineNo12}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
         Other ->
             exit(Other)
     end.
+
+%%
+build_min_ddl_version_fn(DDL, LineNo) ->
+    MinDDLVersion = riak_ql_ddl:get_minimum_capability(DDL),
+    Source =
+        "get_min_required_ddl_cap() -> " ++ atom_to_list(MinDDLVersion) ++ ".",
+    {?Q(Source), LineNo+1}.
+
 
 %% Compile the module, write it to /tmp then load it into the VM.
 -spec compile_and_load_from_tmp(?DDL{}) ->
@@ -122,6 +152,14 @@ compile_and_load_from_tmp({ok, {?DDL{} = DDL, _Props}}) ->
     compile_and_load_from_tmp(DDL);
 compile_and_load_from_tmp(?DDL{} = DDL) ->
     {Module, AST} = compile(DDL),
+    {ok, Module, Bin} = compile:forms(AST),
+    BeamFileName = "/tmp/" ++ atom_to_list(Module) ++ ".beam",
+    {module, Module} = code:load_binary(Module, BeamFileName, Bin).
+
+%%
+-spec compile_and_load_disabled_module_from_tmp(Table::binary()) -> {module, module()}.
+compile_and_load_disabled_module_from_tmp(Table) when is_binary(Table) ->
+    {Module, AST} = compile_disabled_module(Table),
     {ok, Module, Bin} = compile:forms(AST),
     BeamFileName = "/tmp/" ++ atom_to_list(Module) ++ ".beam",
     {module, Module} = code:load_binary(Module, BeamFileName, Bin).
@@ -184,10 +222,10 @@ build_identity_hash_fns(?DDL{} = DDL, LineNo) ->
     {[?Q(HashFn), ?Q(DebugFn)], LineNo + 1}.
 
 %% not using DDL macro because this will be version specific
-make_plain_text(#ddl_v1{table         = Table,
-                        fields        = Fields,
-                        partition_key = PK,
-                        local_key     = LK}) ->
+make_plain_text(?DDL{table         = Table,
+                     fields        = Fields,
+                     partition_key = PK,
+                     local_key     = LK}) ->
    string:join(["\"TABLE"]
                ++ io_lib:format("~s", [Table])
                ++ ["FIELDS"]
@@ -271,6 +309,68 @@ build_get_ddl_compiler_version_fn(LineNo) ->
 build_get_ddl_fn(DDL, LineNo, []) ->
     Fn = flat_format("get_ddl() -> ~p.", [DDL]),
     {?Q(Fn), LineNo + 1}.
+
+%% Build the AST for a function returning a list of the order
+%% of the table field orders
+%%     `field_orders() -> [ascending, descending, ascending].'
+build_field_orders_fn(DDL, LineNum) ->
+    {?Q(build_field_orders_fn_string(DDL)), LineNum+1}.
+
+%%
+build_field_orders_fn_string(?DDL{ local_key = #key_v1{ ast = AST } }) ->
+    Orders = [order_from_key_field(F) || F <- AST],
+    lists:flatten(io_lib:format("field_orders() -> ~p.",[Orders])).
+
+%%
+order_from_key_field(?SQL_PARAM{ ordering = undefined }) ->
+    ascending;
+order_from_key_field(?SQL_PARAM{ ordering = Ordering }) ->
+    Ordering;
+order_from_key_field(_) ->
+    ascending.
+
+%% Convert a local key that has had the descending logic run on it to it's
+%% original value. Used to convert streamed list keys back to their original
+%% values.
+build_revert_ordering_on_local_key_fn(DDL, LineNum) ->
+    {?Q(build_revert_ordering_on_local_key_fn_string(DDL)), LineNum+1}.
+
+%%
+build_revert_ordering_on_local_key_fn_string(?DDL{ local_key = #key_v1{ ast = AST } } = DDL) ->
+    FieldNameArgs =
+        string:join([to_var_name_string(N) || ?SQL_PARAM{ name = N } <- AST], ","),
+    Results =
+        string:join([revert_ordering_on_local_key_element(DDL, P) || P <- AST], ","),
+    lists:flatten(io_lib:format(
+        "revert_ordering_on_local_key({~s}) -> [~s].",[FieldNameArgs, Results])).
+
+%%
+revert_ordering_on_local_key_element(DDL, ?SQL_PARAM{ name = N1, ordering = descending }) ->
+    N2 = to_var_name_string(N1),
+    case field_type(DDL, hd(N1)) of
+        varchar ->
+            "riak_ql_ddl:flip_binary(" ++ N2 ++ ")";
+        Type when Type == timestamp; Type == sint64 ->
+            %% in the case of integers we just negate the original negation
+            N2 ++ "*-1";
+        _ ->
+            N2
+    end;
+revert_ordering_on_local_key_element(_, ?SQL_PARAM{ name = N }) ->
+    to_var_name_string(N).
+
+%%
+to_var_name_string([FieldName]) ->
+    to_var_name_string(FieldName);
+to_var_name_string(FieldName) when is_binary(FieldName) ->
+    [H|Tail] = binary_to_list(FieldName),
+    [string:to_upper([H]) | Tail].
+
+%%
+field_type(?DDL{ fields = Fields }, FieldName) ->
+    #riak_field_v1{ type = Type } =
+        lists:keyfind(FieldName, #riak_field_v1.name, Fields),
+    Type.
 
 -spec build_is_valid_fn([#riak_field_v1{}], pos_integer()) ->
                                {expr(), pos_integer()}.
@@ -492,17 +592,20 @@ make_module_attr(ModName, LineNo) ->
 
 make_export_attr(LineNo) ->
     {{attribute, LineNo, export, [
-                                  {validate_obj,                 1},
                                   {add_column_info,              1},
+                                  {extract,                      2},
+                                  {field_orders,                 0},
+                                  {get_ddl,                      0},
                                   {get_ddl_compiler_version,     0},
-                                  {get_field_type,               1},
                                   {get_field_position,           1},
                                   {get_field_positions,          0},
-                                  {is_field_valid,               1},
-                                  {extract,                      2},
-                                  {get_ddl,                      0},
+                                  {get_field_type,               1},
                                   {get_identity_hashes,          0},
-                                  {get_identity_plaintext_DEBUG, 0}
+                                  {get_identity_plaintext_DEBUG, 0},
+                                  {is_field_valid,               1},
+                                  {revert_ordering_on_local_key, 1},
+                                  {validate_obj,                 1},
+                                  {get_min_required_ddl_cap,     0}
                                  ]}, LineNo + 1}.
 
 
@@ -981,41 +1084,14 @@ complex_ddl_test() ->
     ?assertEqual(?VALID, Result).
 
 make_complex_ddl_ddl() ->
-    ?DDL{
-       table = <<"temperatures">>,
-       fields = [
-                 #riak_field_v1{
-                    name     = <<"time">>,
-                    position = 1,
-                    type     = timestamp,
-                    optional = false},
-                 #riak_field_v1{
-                    name     = <<"user_id">>,
-                    position = 2,
-                    type     = varchar,
-                    optional = false}
-                ],
-       partition_key = #key_v1{ast = [
-                                      ?SQL_PARAM{name = [<<"time">>]},
-                                      #hash_fn_v1{mod  = crypto,
-                                                  fn   = hash,
-                                                  %% list isn't a valid arg
-                                                  %% type output from the
-                                                  %% lexer/parser
-                                                  args = [
-                                                          sha512,
-                                                          true,
-                                                          1,
-                                                          1.0,
-                                                          <<"abc">>
-                                                         ]}
-                                     ]},
-       local_key = #key_v1{ast = [
-                                  #hash_fn_v1{mod  = crypto,
-                                              fn   = hash,
-                                              args = [ripemd]},
-                                  ?SQL_PARAM{name = [<<"time">>]}
-                                 ]}}.
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "time    TIMESTAMP NOT NULL, "
+        "user_id VARCHAR NOT NULL, "
+        "PRIMARY KEY ((user_id, quantum(time, 15, 's')), user_id, time))",
+    {ddl, DDL, _} =
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
+    DDL.
 
 %%
 %% test the get_ddl function
@@ -1110,5 +1186,42 @@ make_timeseries_ddl() ->
                 partition_key = PK,
                 local_key     = LK
                }.
+
+build_field_orders_fn_string_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a,b,c))")),
+    ?assertEqual(
+        "field_orders() -> [ascending,ascending,ascending].",
+        build_field_orders_fn_string(DDL )
+    ).
+
+build_field_orders_fn_string_asc_desc_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
+    ?assertEqual(
+        "field_orders() -> [ascending,descending,ascending].",
+        build_field_orders_fn_string(DDL)
+    ).
+
+build_revert_ordering_on_local_key_fn_string_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
+    ?assertEqual(
+        "revert_ordering_on_local_key({A,B,C}) -> [A,riak_ql_ddl:flip_binary(B),C].",
+        build_revert_ordering_on_local_key_fn_string(DDL)
+    ).
+
 
 -endif.
