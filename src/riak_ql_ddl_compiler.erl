@@ -109,14 +109,15 @@ compile({ok, ?DDL{} = DDL}) ->
     %% handle output directly from riak_ql_parser
     compile(DDL);
 compile(?DDL{ table = Table, fields = Fields } = DDL) ->
+    V1Fields = map_riak_fields(Fields),
     {ModName, Attrs, LineNo} = make_attrs(Table, ?LINENOSTART),
-    {VFns,         LineNo2}  = build_validn_fns(map_riak_fields(Fields),    LineNo),
-    {ACFns,        LineNo3}  = build_add_cols_fns(map_riak_fields(Fields),  LineNo2),
-    {ExtractFn,    LineNo4}  = build_extract_fn([map_riak_fields(Fields)],  LineNo3, []),
-    {GetTypeFn,    LineNo5}  = build_get_type_fn([map_riak_fields(Fields)], LineNo4, []),
-    {GetPosnFn,    LineNo6}  = build_get_posn_fn(map_riak_fields(Fields),   LineNo5, []),
-    {GetPosnsFn,   LineNo7}  = build_get_posns_fn(map_riak_fields(Fields),  LineNo6, []),
-    {IsValidFn,    LineNo8}  = build_is_valid_fn(map_riak_fields(Fields),   LineNo7),
+    {VFns,         LineNo2}  = build_validn_fns(V1Fields,    LineNo),
+    {ACFns,        LineNo3}  = build_add_cols_fns(V1Fields,  LineNo2),
+    {ExtractFn,    LineNo4}  = build_extract_fn([V1Fields],  LineNo3, []),
+    {GetTypeFn,    LineNo5}  = build_get_type_fn([V1Fields], LineNo4, []),
+    {GetPosnFn,    LineNo6}  = build_get_posn_fn(V1Fields,   LineNo5, []),
+    {GetPosnsFn,   LineNo7}  = build_get_posns_fn(V1Fields,  LineNo6, []),
+    {IsValidFn,    LineNo8}  = build_is_valid_fn(V1Fields,   LineNo7),
     {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8),
     {GetDDLFn,     LineNo10} = build_get_ddl_fn(DDL, LineNo9, []),
     {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
@@ -558,9 +559,6 @@ make_call(FnName, Args, LineNo) ->
 -spec make_names([#riak_field_v1{}], pos_integer()) -> [expr()].
 make_names(Fields, LineNo) ->
     Make_fn = fun(#riak_field_v1{name     = Name,
-                                 position = NPos}) ->
-                      make_name(Name, LineNo, NPos);
-                 (#riak_field_v2{name     = Name,
                                  position = NPos}) ->
                       make_name(Name, LineNo, NPos)
               end,
