@@ -600,7 +600,7 @@ insert_sql_columns(Mod, Fields, Values) when is_atom(Mod) ->
             FInQuery1 = insert_sql_columns_fields(FInMod, FInQuery0),
             VInQuery1 = [ insert_sql_columns_row_values(FInQuery1, V) ||
                 V <- Values ],
-            
+
             %% rearrange into DDL Module order
             in_ddl_order(FInQuery1, VInQuery1, FInMod, Mod)
     end.
@@ -667,18 +667,24 @@ insert_sql_columns_row_values(FInQuery, Values) ->
         end,
         Values1).
 
-%% Get the type of a field from the DDL datastructure.
+%% Get the type of a field from the DDL datastructure. Use the real
+%% type, not the type alias if any, because the code that invokes this
+%% wants to know about the properties of the type.
 %%
 %% NOTE: If a compiled helper module is a available then use
 %% `Mod:get_field_type/1'.
 -spec get_field_type(?DDL{}, binary()) -> {ok, simple_field_type()} | notfound.
 get_field_type(?DDL{ fields = Fields }, FieldName) when is_binary(FieldName) ->
-    case lists:keyfind(FieldName, #riak_field_v1.name, Fields) of
-      #riak_field_v1{ type = Type } ->
-          {ok, Type};
-      false ->
-            notfound
-    end.
+    find_field_in_list(Fields, FieldName).
+
+find_field_in_list([], _Name) ->
+    notfound;
+find_field_in_list([#riak_field_v1{name=Name, type=Type}|_T], Name) ->
+    {ok, Type};
+find_field_in_list([#riak_field_v2{name=Name, type=Type}|_T], Name) ->
+    {ok, Type};
+find_field_in_list([_|T], Name) ->
+    find_field_in_list(T, Name).
 
 %% Determing the minimum capability value that is required to run operations
 %% on this table.

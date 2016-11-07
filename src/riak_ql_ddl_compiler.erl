@@ -110,13 +110,13 @@ compile({ok, ?DDL{} = DDL}) ->
     compile(DDL);
 compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {ModName, Attrs, LineNo} = make_attrs(Table, ?LINENOSTART),
-    {VFns,         LineNo2}  = build_validn_fns(Fields,    LineNo),
-    {ACFns,        LineNo3}  = build_add_cols_fns(Fields,  LineNo2),
-    {ExtractFn,    LineNo4}  = build_extract_fn([Fields],  LineNo3, []),
-    {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),    
-    {GetPosnFn,    LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
-    {GetPosnsFn,   LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
-    {IsValidFn,    LineNo8}  = build_is_valid_fn(Fields,   LineNo7),
+    {VFns,         LineNo2}  = build_validn_fns(map_riak_fields(Fields),    LineNo),
+    {ACFns,        LineNo3}  = build_add_cols_fns(map_riak_fields(Fields),  LineNo2),
+    {ExtractFn,    LineNo4}  = build_extract_fn([map_riak_fields(Fields)],  LineNo3, []),
+    {GetTypeFn,    LineNo5}  = build_get_type_fn([map_riak_fields(Fields)], LineNo4, []),
+    {GetPosnFn,    LineNo6}  = build_get_posn_fn(map_riak_fields(Fields),   LineNo5, []),
+    {GetPosnsFn,   LineNo7}  = build_get_posns_fn(map_riak_fields(Fields),  LineNo6, []),
+    {IsValidFn,    LineNo8}  = build_is_valid_fn(map_riak_fields(Fields),   LineNo7),
     {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8),
     {GetDDLFn,     LineNo10} = build_get_ddl_fn(DDL, LineNo9, []),
     {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
@@ -236,16 +236,27 @@ make_plain_text(?DDL{table         = Table,
                ++  canonical_key(LK)
               , ": ") ++ ["\""].
 
+%% This could be more general-purpose, will evaluate need
+map_riak_fields(Fields) ->
+    lists:map(fun(#riak_field_v1{}=F) -> F;
+                 (#riak_field_v2{name=N, position=P,
+                                 type=T, optional=O}) ->
+                      #riak_field_v1{name=N, position=P,
+                                     type=T, optional=O}
+              end, Fields).
+
 canonical_fields(Fields) ->
-    F2 = lists:keysort(#riak_field_v1.position, Fields),
+    %% Convert any v2 fields to v1 for this function, dropping the alias
+    ConvertedFields = map_riak_fields(Fields),
+    F2 = lists:keysort(#riak_field_v1.position, ConvertedFields),
     [canonical_field_format(binary_to_list(X#riak_field_v1.name),
                          X#riak_field_v1.type,
                          X#riak_field_v1.optional) || X <- F2].
 
-canonical_field_format(Nm, Ty, true)  -> 
+canonical_field_format(Nm, Ty, true)  ->
     Msg = io_lib:format("~s ~s", [Nm, Ty]),
     lists:flatten(Msg);
-canonical_field_format(Nm, Ty, false) -> 
+canonical_field_format(Nm, Ty, false) ->
     Msg = io_lib:format("~s ~s not null", [Nm, Ty]),
     lists:flatten(Msg).
 
@@ -367,10 +378,8 @@ to_var_name_string(FieldName) when is_binary(FieldName) ->
     [string:to_upper([H]) | Tail].
 
 %%
-field_type(?DDL{ fields = Fields }, FieldName) ->
-    #riak_field_v1{ type = Type } =
-        lists:keyfind(FieldName, #riak_field_v1.name, Fields),
-    Type.
+field_type(DDL, FieldName) ->
+    riak_ql_ddl:get_field_type(DDL, FieldName).
 
 -spec build_is_valid_fn([#riak_field_v1{}], pos_integer()) ->
                                {expr(), pos_integer()}.
@@ -549,6 +558,9 @@ make_call(FnName, Args, LineNo) ->
 -spec make_names([#riak_field_v1{}], pos_integer()) -> [expr()].
 make_names(Fields, LineNo) ->
     Make_fn = fun(#riak_field_v1{name     = Name,
+                                 position = NPos}) ->
+                      make_name(Name, LineNo, NPos);
+                 (#riak_field_v2{name     = Name,
                                  position = NPos}) ->
                       make_name(Name, LineNo, NPos)
               end,
