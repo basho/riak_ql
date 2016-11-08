@@ -347,10 +347,10 @@ build_revert_ordering_on_local_key_fn_string(?DDL{ local_key = #key_v1{ ast = AS
 %%
 revert_ordering_on_local_key_element(DDL, ?SQL_PARAM{ name = N1, ordering = descending }) ->
     N2 = to_var_name_string(N1),
-    case field_type(DDL, hd(N1)) of
+    case riak_ql_ddl:get_storage_type(field_type(DDL, hd(N1))) of
         varchar ->
             "riak_ql_ddl:flip_binary(" ++ N2 ++ ")";
-        Type when Type == timestamp; Type == sint64 ->
+        sint64 ->
             %% in the case of integers we just negate the original negation
             N2 ++ "*-1";
         _ ->
@@ -482,7 +482,8 @@ build_validn_fns(Fields, LineNo) ->
     Names = [escape(Name) || {_, _, Name} <- make_names(Fields, LineNo)],
     Params = [{Rec#riak_field_v1.type, Rec#riak_field_v1.optional} || Rec <- Fields],
     FunCall = io_lib:format(Fn ++ "({" ++ string:join(Names, ", ") ++ "}) when ", []),
-    Guards = [make_guard(Variable, Type, Optional) || {Variable, {Type, Optional}} <- lists:zip(Names, Params)],
+    Guards = [make_guard(Variable, riak_ql_ddl:get_storage_type(Type), Optional)
+              || {Variable, {Type, Optional}} <- lists:zip(Names, Params)],
     Guards2 = [X || X <- Guards, X =/= []],
     Guards3 = string:join(Guards2, ", "),
     SuccessClause = FunCall ++ Guards3 ++ " -> true;",

@@ -31,12 +31,15 @@
          first_version/0,
          flip_binary/1,
          get_field_type/2,
+         get_storage_type/1,
+         get_legacy_type/2,
          get_minimum_capability/1,
          is_version_greater/2,
          make_module_name/1, make_module_name/2
         ]).
 
--type simple_field_type()         :: varchar | sint64 | double | timestamp | boolean.
+-type external_field_type()         :: varchar | sint64 | double | timestamp | boolean | blob.
+-type internal_field_type()         :: varchar | sint64 | double | boolean.
 
 %% Relational operators allowed in a where clause.
 -type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
@@ -74,7 +77,8 @@
               filter/0,
               selection/0,
               selection_function/0,
-              simple_field_type/0
+              external_field_type/0,
+              internal_field_type/0
              ]).
 
 
@@ -99,8 +103,8 @@
 
 -type query_syntax_error() ::
         {bucket_type_mismatch, DDL_bucket::binary(), Query_bucket::binary()} |
-        {incompatible_type, Field::binary(), simple_field_type(), atom()} |
-        {incompatible_operator, Field::binary(), simple_field_type(), relational_op()}  |
+        {incompatible_type, Field::binary(), external_field_type(), atom()} |
+        {incompatible_operator, Field::binary(), external_field_type(), relational_op()}  |
         {unexpected_where_field, Field::binary()} |
         {unexpected_insert_field, Field::binary()} |
         {unexpected_select_field, Field::binary()} |
@@ -429,7 +433,7 @@ is_compatible_type(_, _, _) -> false.
 %% Check that the operation being performed in a where clause, for example
 %% we cannot check if one binary is greated than another one in SQL.
 -spec is_compatible_operator(OP::relational_op(),
-                             ExpectedType::simple_field_type(),
+                             ExpectedType::external_field_type(),
                              RHS_type::atom()) -> boolean().
 is_compatible_operator('=',  varchar, binary) -> true;
 is_compatible_operator('!=', varchar, binary) -> true;
@@ -670,7 +674,7 @@ insert_sql_columns_row_values(FInQuery, Values) ->
 %%
 %% NOTE: If a compiled helper module is a available then use
 %% `Mod:get_field_type/1'.
--spec get_field_type(?DDL{}, binary()) -> {ok, simple_field_type()} | notfound.
+-spec get_field_type(?DDL{}, binary()) -> {ok, external_field_type()} | notfound.
 get_field_type(?DDL{ fields = Fields }, FieldName) when is_binary(FieldName) ->
     case lists:keyfind(FieldName, #riak_field_v1.name, Fields) of
       #riak_field_v1{ type = Type } ->
@@ -678,6 +682,19 @@ get_field_type(?DDL{ fields = Fields }, FieldName) when is_binary(FieldName) ->
       false ->
             notfound
     end.
+
+%% Get the storage data type for a type found in a DDL. Typically
+%% they'll be the same, but `blob' e.g. maps to a `varchar'.
+-spec get_storage_type(external_field_type()) -> internal_field_type().
+get_storage_type(blob) -> varchar;
+get_storage_type(timestamp) -> sint64;
+get_storage_type(Type) -> Type.
+
+%% Get an equivalent data type for a type found in a DDL to allow the
+%% DDL compiler to create a safe module for older versions of TS
+-spec get_legacy_type(external_field_type(), integer()) -> external_field_type().
+get_legacy_type(blob, v1) -> varchar;
+get_legacy_type(Type, _Version) -> Type.
 
 %% Determing the minimum capability value that is required to run operations
 %% on this table.
@@ -742,13 +759,19 @@ downgrade_ddl(v2, v1, DDL1) ->
         v1 ->
             [#ddl_v1{
                             table              = DDL1#ddl_v2.table,
-                            fields             = DDL1#ddl_v2.fields,
+                            fields             = lists:map(
+                                                   fun(F) -> downgrade_field(F, v1) end,
+                                                   DDL1#ddl_v2.fields),
                             partition_key      = downgrade_v2_key(DDL1#ddl_v2.partition_key),
                             local_key          = downgrade_v2_key(DDL1#ddl_v2.local_key)
                         }];
         _ ->
             [{error, {cannot_downgrade, v1}}]
     end.
+
+%% Downgrade fields to legacy types
+downgrade_field(#riak_field_v1{type=Type}=Field, OldVersion) ->
+    Field#riak_field_v1{type=get_legacy_type(Type, OldVersion)}.
 
 %% Downgrade a v2 local key to v1, the key should already be checked that
 %% it is safe to downgrade before it is called.
