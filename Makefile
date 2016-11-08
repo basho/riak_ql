@@ -17,10 +17,10 @@ clean:
 distclean: clean
 	./rebar delete-deps
 
-testclean: clean
-	@rm -rf eunit.log .eunit/*
-
-test: testclean compile
+test:
+	@# delete the lexer and parser beams because the rebar2 will not
+	@# recompile them on changes
+	@rm -f .eunit/riak_ql_parser.beam .eunit/riak_ql_lexer.beam
 	./rebar eunit skip_deps=true
 
 DIALYZER_APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
