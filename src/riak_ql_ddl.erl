@@ -351,7 +351,7 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
     case Mod:is_field_valid([Field]) of
         true  ->
             ExpectedType = Mod:get_field_type([Field]),
-            Acc2 = case is_compatible_type(ExpectedType, RHS_type, normalise(RHS_Val)) of
+            Acc2 = case is_compatible_type(get_storage_type(ExpectedType), RHS_type, normalise(RHS_Val)) of
                 true  -> Acc1;
                 false -> [{incompatible_type, Field, ExpectedType, RHS_type} | Acc1]
             end,
