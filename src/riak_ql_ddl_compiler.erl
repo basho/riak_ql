@@ -893,6 +893,20 @@ simple_invalid_varchar_test() ->
     Result = Module:validate_obj({<<"ewrewr">>, 55}),
     ?assertEqual(?INVALID, Result).
 
+simple_invalid_blob_test() ->
+    DDL = make_ddl(<<"simple_invalid_blob_test">>,
+                   [
+                    #riak_field_v1{name     = <<"yando">>,
+                                   position = 1,
+                                   type     = blob},
+                    #riak_field_v1{name     = <<"erko">>,
+                                   position = 2,
+                                   type     = blob}
+                   ]),
+    {module, Module} = compile_and_load_from_tmp(DDL),
+    Result = Module:validate_obj({<<"ewrewr">>, 55}),
+    ?assertEqual(?INVALID, Result).
+
 simple_invalid_sint64_test() ->
     DDL = make_ddl(<<"simple_invalid_sint64_test">>,
                    [

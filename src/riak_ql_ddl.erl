@@ -39,7 +39,7 @@
         ]).
 
 -type external_field_type()         :: varchar | sint64 | double | timestamp | boolean | blob.
--type internal_field_type()         :: varchar | sint64 | double | boolean.
+-type internal_field_type()         :: varchar | sint64 | double | timestamp | boolean.
 
 %% Relational operators allowed in a where clause.
 -type relational_op() :: '=' | '!=' | '>' | '<' | '<=' | '>='.
@@ -687,7 +687,6 @@ get_field_type(?DDL{ fields = Fields }, FieldName) when is_binary(FieldName) ->
 %% they'll be the same, but `blob' e.g. maps to a `varchar'.
 -spec get_storage_type(external_field_type()) -> internal_field_type().
 get_storage_type(blob) -> varchar;
-get_storage_type(timestamp) -> sint64;
 get_storage_type(Type) -> Type.
 
 %% Get an equivalent data type for a type found in a DDL to allow the
