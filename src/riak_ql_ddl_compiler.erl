@@ -112,7 +112,7 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {ModName, Attrs, LineNo} = make_attrs(Table, ?LINENOSTART),
     {VFns,         LineNo2}  = build_validn_fns(Fields,    LineNo),
     {ACFns,        LineNo3}  = build_add_cols_fns(Fields,  LineNo2),
-    {ExtractFn,    LineNo4}  = build_extract_fn([Fields],  LineNo3, []),
+    {ExtractFn,    LineNo4}  = build_extract_fn(DDL,  LineNo3),
     {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),    
     {GetPosnFn,    LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
     {GetPosnsFn,   LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
@@ -270,32 +270,21 @@ canonical_arg_fmt_v1(?SQL_PARAM{name = [Nm]}) -> binary_to_list(Nm).
 
 %% the funny shape of this function is because it used to handle maps
 %% which needed recursion - not refactoring because it will be merled
--spec build_extract_fn([[#riak_field_v1{}]], pos_integer(), ast()) ->
-                              {expr(), pos_integer()}.
-build_extract_fn([], LineNo, Acc) ->
-    Clauses = lists:flatten(lists:reverse(Acc)),
-    Fn = make_fun(extract, 2, Clauses, LineNo),
-    {Fn, LineNo};
-build_extract_fn([Fields | T], LineNo, Acc) ->
-    {Fns, LineNo2} = make_extract_clauses(Fields, LineNo, ?NOPREFIX, []),
-    build_extract_fn(T, LineNo2, [Fns | Acc]).
+build_extract_fn(DDL, LineNo) ->
+    {?Q(build_extract_fn_source(DDL)), LineNo+1}.
 
-make_extract_clauses([], LineNo, _Prefix, Acc) ->
-    {lists:reverse(Acc), LineNo + 1};
-make_extract_clauses([#riak_field_v1{} = H | T], LineNo, Prefix, Acc) ->
-    NPref  = [H | Prefix],
-    Args   = [make_string(binary_to_list(Nm), LineNo)
-              || #riak_field_v1{name = Nm} <- NPref],
-    Poses  = [make_integer(P,  LineNo) || #riak_field_v1{position = P}  <- NPref],
-    Conses = make_conses(Args, LineNo, {nil, LineNo}),
-    Var    = make_var('Obj', LineNo),
-    %% you need to reverse the lists of the positions to
-    %% get the calls to element to nest correctly
-    Body = make_elem_calls(lists:reverse(Poses), LineNo, Var),
-    Guard = make_call(make_atom(is_tuple, LineNo), [Var], LineNo),
-    Cl = make_clause([Var, Conses], [[Guard]], Body, LineNo),
-    {NewA, NewLineNo} = {[Cl | Acc], LineNo},
-    make_extract_clauses(T, NewLineNo, Prefix, NewA).
+build_extract_fn_source(?DDL{fields = Fields}) ->
+    {Clauses, _} = lists:mapfoldl(
+        fun(Field, IndexAcc) ->
+            Clause = lists:flatten(build_extract_fn_clause_source(Field, IndexAcc)),
+            {Clause, IndexAcc+1}
+        end, 1, Fields),
+    string:join(Clauses, ";\n") ++ ".".
+
+build_extract_fn_clause_source(#riak_field_v1{name = Name}, Index) ->
+    io_lib:format(
+        "extract(Obj, [~p]) when is_tuple(Obj) -> element(~p, Obj)",
+        [Name, Index]).
 
 -spec build_get_ddl_compiler_version_fn(LineNo :: pos_integer()) ->
                                                {expr(), pos_integer()}.
@@ -455,11 +444,6 @@ make_conses([], _LineNo, Conses)  -> Conses;
 make_conses([H | T], LineNo, Acc) -> NewAcc = {cons, LineNo, H, Acc},
                                      make_conses(T, LineNo, NewAcc).
 
-make_elem_calls([], _LineNo, ElemCs)  -> ElemCs;
-make_elem_calls([H | T], LineNo, Acc) -> E = make_atom(element, LineNo),
-                                         NewA = make_call(E, [H, Acc], LineNo),
-                                         make_elem_calls(T, LineNo, NewA).
-
 build_add_cols_fns(Fields, LineNo) ->
     {Args, Success} = make_args_and_fields(Fields, LineNo),
     {ClauseS, LineNo2} = make_success_clause(Args, [], Success, LineNo),
@@ -536,15 +520,8 @@ make_attrs(Bucket, LineNo) when is_binary(Bucket)    ->
 make_fun(FunName, Arity, Clause, LineNo) ->
     {function, LineNo, FunName, Arity, Clause}.
 
--spec make_integer(integer(), pos_integer()) -> expr().
-make_integer(I, LineNo) when is_integer(I) -> {integer, LineNo, I}.
-
 -spec make_atom(atom(), pos_integer()) -> expr().
 make_atom(A, LineNo) when is_atom(A) -> {atom, LineNo, A}.
-
--spec make_call(expr(), ast(), pos_integer()) -> expr().
-make_call(FnName, Args, LineNo) ->
-    {call, LineNo, FnName, Args}.
 
 -spec make_names([#riak_field_v1{}], pos_integer()) -> [expr()].
 make_names(Fields, LineNo) ->
@@ -1221,6 +1198,20 @@ build_revert_ordering_on_local_key_fn_string_test() ->
     ?assertEqual(
         "revert_ordering_on_local_key({A,B,C}) -> [A,riak_ql_ddl:flip_binary(B),C].",
         build_revert_ordering_on_local_key_fn_string(DDL)
+    ).
+
+build_extract_fn_source_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE mytab ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
+    ?assertEqual(
+        "extract(Obj, [<<\"a\">>]) when is_tuple(Obj) -> element(1, Obj);\n"
+        "extract(Obj, [<<\"b\">>]) when is_tuple(Obj) -> element(2, Obj);\n"
+        "extract(Obj, [<<\"c\">>]) when is_tuple(Obj) -> element(3, Obj).",
+        build_extract_fn_source(DDL)
     ).
 
 
