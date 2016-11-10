@@ -268,8 +268,8 @@ canonical_arg_fmt_v1(N) when is_integer(N)   -> integer_to_list(N);
 canonical_arg_fmt_v1(A) when is_atom(A)      -> atom_to_list(A);
 canonical_arg_fmt_v1(?SQL_PARAM{name = [Nm]}) -> binary_to_list(Nm).
 
-%% the funny shape of this function is because it used to handle maps
-%% which needed recursion - not refactoring because it will be merled
+%% Build the table helper function to extract the value of a cell from a row,
+%% using the field name.
 build_extract_fn(DDL, LineNo) ->
     {?Q(build_extract_fn_source(DDL)), LineNo+1}.
 
