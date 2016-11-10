@@ -18,18 +18,22 @@
          get_output_columns/1,
          process/3]).
 
--export([create/1]).
+-export([create/1,
+         create_projection_column_mapping/1]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif. %%TEST
 
-create(ColumnIdentifiers) ->
+-spec create_projection_column_mapping(binary()) -> riak_ql_pfitting:column_mapping().
+create_projection_column_mapping(ColumnIdentifier) ->
+    riak_ql_pfitting:create_column_mapping(ColumnIdentifier,
+                                           ColumnIdentifier,
+                                           unresolved).
+
+-spec create([riak_ql_pfitting:column_mapping()]) -> {ok, pid()}.
+create(ColumnMappings) ->
     Res = {ok, Pid} = start_link(),
-    ColumnMappings = [riak_ql_pfitting:create_column_mapping(ColumnIdentifier,
-                                                             ColumnIdentifier,
-                                                             undefined) ||
-                      ColumnIdentifier <- ColumnIdentifiers],
     define_column_mappings(Pid, ColumnMappings),
     Res.
 
@@ -67,7 +71,7 @@ handle_call({get_output_columns}, _From,
 handle_call({process, Columns, Rows}, _From,
             State = #state{column_mappings = ColumnMappings }) ->
     Res = process_projection(Columns, Rows, ColumnMappings),
-    ResStatus = riak_ql_pfitting:get_process_status(Res),
+    ResStatus = riak_ql_pfitting:get_process_result_status(Res),
     {reply, {ResStatus, Res}, State};
 handle_call(_Req, _From, State) ->
     {noreply, State}.
@@ -117,12 +121,15 @@ process_projection(Columns, Rows, ColumnMappings) ->
                      catch
                          throw:{invalid_column_mapping, ColumnMapping} -> {[], [{invalid_column_mapping, ColumnMapping}]}
                      end,
-    [ProcessColumns, ProcessRows, ProcessErrors].
+    riak_ql_pfitting:create_process_result(ProcessColumns,
+                                           ProcessRows, ProcessErrors).
 
 -ifdef(TEST).
 
 process_setup(ColumnIdentifiers) ->
-    {ok, Pid} = ?MODULE:create(ColumnIdentifiers),
+    ColumnMappings = [create_projection_column_mapping(ColumnIdentifier) ||
+                      ColumnIdentifier <- ColumnIdentifiers],
+    {ok, Pid} = ?MODULE:create(ColumnMappings),
     Columns = [<<"r">>, <<"i">>, <<"a">>, <<"k">>],
     Rows = [[1, <<"one">>, 1000, 1.0],
             [[], <<"two">>, 2000, 2.0],
@@ -137,7 +144,10 @@ process_projection_empty_test() ->
     ExpectedRows = [[] || _Row <- Rows],
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pid, Columns, Rows),
-    ?assertEqual({ok, [ProjectedColumns, ExpectedRows, ExpectedErrors]}, Processed).
+    ?assertEqual({ok, riak_ql_pfitting:create_process_result(ProjectedColumns,
+                                                             ExpectedRows,
+                                                             ExpectedErrors)},
+                 Processed).
 
 process_projection_same_test() ->
     ProjectedColumns = [<<"r">>,<<"i">>,<<"a">>,<<"k">>],
@@ -145,7 +155,10 @@ process_projection_same_test() ->
     ExpectedRows = Rows,
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pid, Columns, Rows),
-    ?assertEqual({ok, [ProjectedColumns, ExpectedRows, ExpectedErrors]}, Processed).
+    ?assertEqual({ok, riak_ql_pfitting:create_process_result(ProjectedColumns,
+                                                             ExpectedRows,
+                                                             ExpectedErrors)},
+                 Processed).
 
 process_projection_rearranged_test() ->
     ProjectedColumns = [<<"i">>,<<"r">>,<<"k">>,<<"a">>],
@@ -154,7 +167,10 @@ process_projection_rearranged_test() ->
                     [V0,V1,V2,V3] <- Rows],
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pid, Columns, Rows),
-    ?assertEqual({ok, [ProjectedColumns, ExpectedRows, ExpectedErrors]}, Processed).
+    ?assertEqual({ok, riak_ql_pfitting:create_process_result(ProjectedColumns,
+                                                             ExpectedRows,
+                                                             ExpectedErrors)},
+                 Processed).
 
 process_projection_reduced_test() ->
     ProjectedColumns = [<<"r">>,<<"a">>,<<"i">>],
@@ -163,7 +179,10 @@ process_projection_reduced_test() ->
                     [V0,V1,V2,_V3] <- Rows],
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pid, Columns, Rows),
-    ?assertEqual({ok, [ProjectedColumns, ExpectedRows, ExpectedErrors]}, Processed).
+    ?assertEqual({ok, riak_ql_pfitting:create_process_result(ProjectedColumns,
+                                                             ExpectedRows,
+                                                             ExpectedErrors)},
+                 Processed).
 
 process_projection_invalid_identifier_test() ->
     ProjectedColumns = [<<"r">>,<<"a">>,<<"i">>,<<"n">>],
@@ -171,6 +190,9 @@ process_projection_invalid_identifier_test() ->
     ExpectedRows = [],
     ExpectedErrors = [{invalid_column_mapping, <<"n">>}],
     Processed = ?MODULE:process(Pid, Columns, Rows),
-    ?assertEqual({error, [ProjectedColumns, ExpectedRows, ExpectedErrors]}, Processed).
+    ?assertEqual({error, riak_ql_pfitting:create_process_result(ProjectedColumns,
+                                                                ExpectedRows,
+                                                                ExpectedErrors)},
+                 Processed).
 
 -endif. %%TEST

@@ -13,7 +13,8 @@
          get_output_columns/1,
          process/3]).
 
--export([create/1]).
+-export([create/1,
+         create_arithmetic_column_mapping/3]).
 
 -record(state, {
           column_mappings :: [riak_ql_pfitting:column_mapping()]
@@ -28,21 +29,22 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif. %%TEST
 
-create(ColumnMappings=[{ArithmeticFunA, _LHS, _RHS}|_T]) when
-                                                 (ArithmeticFunA =:= add orelse
-                                                  ArithmeticFunA =:= subtract orelse
-                                                  ArithmeticFunA =:= multiply orelse
-                                                  ArithmeticFunA =:= divide) ->
-    Res = {ok, Pid} = start_link(),
+-spec create_arithmetic_column_mapping(atom(),
+                                       riak_ql_pfitting:constant_or_identifier(),
+                                       riak_ql_pfitting:constant_or_identifier()) ->
+    riak_ql_pfitting:column_mapping().
+create_arithmetic_column_mapping(ArithmeticFunA, LHS, RHS) ->
+    DisplayText = column_as_arithmetic(ArithmeticFunA, LHS, RHS),
     OutputType = unresolved,
-    ColumnMappings1 = [riak_ql_pfitting:create_column_mapping(
-                         column_as_arithmetic(ArithmeticFunA1, LHS1, RHS1),
-                         column_as_arithmetic(ArithmeticFunA1, LHS1, RHS1),
-                         OutputType,
-                         arithmetic_fun_atom_to_fun(ArithmeticFunA1),
-                         [LHS1, RHS1]) ||
-                       {ArithmeticFunA1, LHS1, RHS1 } <- ColumnMappings],
-    define_column_mappings(Pid, ColumnMappings1),
+    riak_ql_pfitting:create_column_mapping(DisplayText, DisplayText,
+                                           OutputType,
+                                           arithmetic_fun_atom_to_fun(ArithmeticFunA),
+                                           [LHS, RHS]).
+
+-spec create([riak_ql_pfitting:column_mapping()]) -> {ok, pid()}.
+create(ColumnMappings) ->
+    Res = {ok, Pid} = start_link(),
+    define_column_mappings(Pid, ColumnMappings),
     Res.
 
 arithmetic_fun_atom_to_fun(add) ->
@@ -113,7 +115,7 @@ handle_call({get_output_columns}, _From,
 handle_call({process, Columns, Rows}, _From,
             State = #state{column_mappings = ColumnMappings }) ->
     Res = process_arithmetic(Columns, Rows, ColumnMappings),
-    ResStatus = riak_ql_pfitting:get_process_status(Res),
+    ResStatus = riak_ql_pfitting:get_process_result_status(Res),
     {reply, {ResStatus, Res}, State};
 handle_call(_Req, _From, State) ->
     {noreply, State}.
@@ -179,7 +181,8 @@ process_arithmetic(Columns, Rows, ColumnMappings) ->
     catch
         error:Error -> {[], [Error]}
     end,
-    [ArithmeticColumns, ProcessRows, ProcessErrors].
+    riak_ql_pfitting:create_process_result(ArithmeticColumns,
+                                           ProcessRows, ProcessErrors).
 
 -ifdef(TEST).
 column_as_arithmetic_identifiers_test() ->
@@ -206,7 +209,12 @@ column_as_arithmetic_constants_test() ->
                                        {constant, 1000},
                                        {constant, 27.0})).
 
-process_setup(ColumnMappings) ->
+map_simple_arithmetic_column_mappings(SimpleColumnMappings) ->
+    [create_arithmetic_column_mapping(ArithmeticFunA, LHS, RHS) ||
+     {ArithmeticFunA, LHS, RHS} <- SimpleColumnMappings].
+
+process_setup(SimpleColumnMappings) ->
+    ColumnMappings = map_simple_arithmetic_column_mappings(SimpleColumnMappings),
     {ok, Pid} = ?MODULE:create(ColumnMappings),
     Columns = [<<"r">>, <<"i">>, <<"a">>, <<"k">>],
     Rows = [[1, <<"one">>, 1000, 1.0],
@@ -239,7 +247,10 @@ process_add_third_field_and_constant_test() ->
                                                    Constant, Rows),
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pid, Columns, Rows),
-    ?assertEqual({ok, [ExpectedColumns, ExpectedRows, ExpectedErrors]}, Processed).
+    ?assertEqual({ok, riak_ql_pfitting:create_process_result(ExpectedColumns,
+                                                             ExpectedRows,
+                                                             ExpectedErrors)},
+                 Processed).
 
 process_subtract_constant_and_constant_test() ->
     ArithmeticFunA = subtract,
@@ -252,7 +263,10 @@ process_subtract_constant_and_constant_test() ->
     ExpectedRows = [[ConstantL - ConstantR] || _Row <- Rows],
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pid, Columns, Rows),
-    ?assertEqual({ok, [ExpectedColumns, ExpectedRows, ExpectedErrors]}, Processed).
+    ?assertEqual({ok, riak_ql_pfitting:create_process_result(ExpectedColumns,
+                                                             ExpectedRows,
+                                                             ExpectedErrors)},
+                 Processed).
 
 process_divide_two_fields_test() ->
     ArithmeticFunA = divide,
@@ -266,7 +280,10 @@ process_divide_two_fields_test() ->
                                                    Rows),
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pid, Columns, Rows),
-    ?assertEqual({ok, [ExpectedColumns, ExpectedRows, ExpectedErrors]}, Processed).
+    ?assertEqual({ok, riak_ql_pfitting:create_process_result(ExpectedColumns,
+                                                             ExpectedRows,
+                                                             ExpectedErrors)},
+                 Processed).
 
 process_multiply_badarith_test() ->
     ArithmeticFunA = multiply,
@@ -277,6 +294,9 @@ process_multiply_badarith_test() ->
     ExpectedRows = [],
     ExpectedErrors = [badarith],
     Processed = ?MODULE:process(Pid, Columns, Rows),
-    ?assertEqual({error, [ExpectedColumns, ExpectedRows, ExpectedErrors]}, Processed).
+    ?assertEqual({error, riak_ql_pfitting:create_process_result(ExpectedColumns,
+                                                                ExpectedRows,
+                                                                ExpectedErrors)},
+                 Processed).
 
 -endif. %%TEST
