@@ -46,6 +46,7 @@ REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
 IDENTIFIER = ([a-zA-Z][a-zA-Z0-9_\-]*)
 QUOTED_IDENTIFIER = \"(\"\"|[^\"\n])*\"
+COMMENT_MULTILINE = /\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/
 WHITESPACE = ([\000-\s]*)
 
 % characters not in the ascii range
@@ -145,6 +146,7 @@ Rules.
 {COMMA} : {token, {comma, list_to_binary(TokenChars)}}.
 {SEMICOLON} : {token, {semicolon, list_to_binary(TokenChars)}}.
 
+{COMMENT_MULTILINE} : skip_token.
 {WHITESPACE} : skip_token.
 
 \n : {end_token, {'$end'}}.
