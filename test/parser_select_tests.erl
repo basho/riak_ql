@@ -373,3 +373,33 @@ multiple_multiline_comment_in_select_test() ->
             "SELECT * FROM mytab /* oh\n"
             "hai */ /* hi again */ WHERE a = 'val'"))
     ).
+
+single_line_comment_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab WHERE a = 'val' -- a comment"))
+    ).
+
+single_line_comment_in_multiline_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab -- a comment\n"
+            "WHERE a = 'val'"))
+    ).
+
+
+single_line_comment_in_multiline_ctrl_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab -- a comment\r\n"
+            "WHERE a = 'val'"))
+    ).
