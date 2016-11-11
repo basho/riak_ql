@@ -15,16 +15,21 @@ DESCRIBE = (D|d)(E|e)(S|s)(C|c)(R|r)(I|i)(B|b)(E|e)
 DOUBLE = (D|d)(O|o)(U|u)(B|b)(L|l)(E|e)
 EXPLAIN = (E|e)(X|x)(P|p)(L|l)(A|a)(I|i)(N|n)
 FALSE = (F|f)(A|a)(L|l)(S|s)(E|e)
+FIRST = (F|f)(I|i)(R|r)(S|s)(T|t)
 FROM = (F|f)(R|r)(O|o)(M|m)
 GROUP = (G|g)(R|r)(O|o)(U|u)(P|p)
 KEY = (K|k)(E|e)(Y|y)
 INSERT = (I|i)(N|n)(S|s)(E|e)(R|r)(T|t)
 INTO = (I|i)(N|n)(T|t)(O|o)
+LAST = (L|l)(A|a)(S|s)(T|t)
 LIMIT = (L|l)(I|i)(M|m)(I|i)(T|t)
 NOT = (N|n)(O|o)(T|t)
 IS = (I|i)(S|s)
 NULL = (N|n)(U|u)(L|l)(L|l)
+NULLS = (N|n)(U|u)(L|l)(L|l)(S|s)
+OFFSET = (O|o)(F|f)(F|f)(S|s)(E|e)(T|t)
 OR = (O|o)(R|r)
+ORDER = (O|o)(R|r)(D|d)(E|e)(R|r)
 PRIMARY = (P|p)(R|r)(I|i)(M|m)(A|a)(R|r)(Y|y)
 QUANTUM = (Q|q)(U|u)(A|a)(N|n)(T|t)(U|u)(M|m)
 SELECT = (S|s)(E|e)(L|l)(E|e)(C|c)(T|t)
@@ -87,15 +92,20 @@ Rules.
 {DOUBLE} : {token, {double, list_to_binary(TokenChars)}}.
 {EXPLAIN} : {token, {explain, list_to_binary(TokenChars)}}.
 {FALSE} : {token, {false, list_to_binary(TokenChars)}}.
+{FIRST} : {token, {first, list_to_binary(TokenChars)}}.
 {FROM} : {token, {from, list_to_binary(TokenChars)}}.
 {INSERT} : {token, {insert, list_to_binary(TokenChars)}}.
 {INTO} : {token, {into, list_to_binary(TokenChars)}}.
 {GROUP} : {token, {group, list_to_binary(TokenChars)}}.
 {KEY} : {token, {key, list_to_binary(TokenChars)}}.
+{LAST} : {token, {last, list_to_binary(TokenChars)}}.
 {LIMIT} : {token, {limit, list_to_binary(TokenChars)}}.
 {NOT} : {token, {not_, list_to_binary(TokenChars)}}.
 {NULL} : {token, {null, list_to_binary(TokenChars)}}.
+{NULLS} : {token, {nulls, list_to_binary(TokenChars)}}.
+{OFFSET} : {token, {offset, list_to_binary(TokenChars)}}.
 {OR} : {token, {or_, list_to_binary(TokenChars)}}.
+{ORDER} : {token, {order, list_to_binary(TokenChars)}}.
 {PRIMARY} : {token, {primary, list_to_binary(TokenChars)}}.
 {QUANTUM} : {token, {quantum, list_to_binary(TokenChars)}}.
 {SELECT} : {token, {select, list_to_binary(TokenChars)}}.

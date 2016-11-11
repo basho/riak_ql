@@ -5,50 +5,58 @@
 
 Nonterminals
 
-Statement
-StatementWithoutSemicolon
-Query
-Select
-Explain
-Describe
-ShowTables
 Bucket
-Buckets
+CharacterLiteral
+ColumnConstraint
+ColumnDefinition
+Comp
+ComparisonPredicate
+DataType
+Describe
+Explain
 Field
 FieldElem
 Fields
+Funcall
+GroupBy
 Identifier
 Insert
-CharacterLiteral
-Where
-ComparisonPredicate
-NullPredicate
-Comp
-NullComp
-Val
-Vals
-Funcall
-TableDefinition
-TableContentsSource
-TableElementList
-TableElements
-TableElement
-TableProperties
-TablePropertyList
-TableProperty
-TablePropertyValue
-ColumnDefinition
-ColumnConstraint
-KeyDefinition
-DataType
-KeyFieldList
-KeyField
-KeyFieldArgList
-KeyFieldArg
-NotNull
 IsNotNull
 IsNull
-GroupBy
+KeyDefinition
+KeyField
+KeyFieldArg
+KeyFieldArgList
+KeyFieldList
+LimitClause
+NotNull
+NullComp
+NullOrderSpec
+NullPredicate
+OrderingSpec
+Query
+ResultOffsetClause
+Select
+ShowTables
+SortKey
+SortSpecification
+SortSpecificationList
+Statement
+StatementWithoutSemicolon
+TableContentsSource
+TableDefinition
+TableElement
+TableElementList
+TableElements
+TableProperties
+TableProperty
+TablePropertyList
+TablePropertyValue
+Val
+Vals
+Where
+WindowClause
+WindowOrderClause
 
 %% ValueExpression
 %% CommonValueExpression
@@ -80,9 +88,9 @@ FieldValue
 
 Terminals
 
-or_
 and_
 asc
+asterisk
 boolean
 by
 character_literal
@@ -94,6 +102,7 @@ double
 equals_operator
 explain
 false
+first
 float
 from
 greater_than_operator
@@ -103,19 +112,21 @@ insert
 integer
 into
 is_
-is_not_null
-is_null
 group
 key
+last
 limit
 left_paren
 less_than_operator
 lte
-asterisk
 minus_sign
 nomatch
 not_
 null
+nulls
+offset
+or_
+order
 plus_sign
 primary
 quantum
@@ -144,6 +155,32 @@ Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
 GroupBy -> group by Fields: {group_by, '$3'}.
 
+Query -> Select WindowClause : make_window_clause('$1', '$2').
+Query -> Select              : make_window_clause('$1', make_orderby([], undefined, undefined)).
+
+WindowClause -> WindowOrderClause: '$1'.
+WindowOrderClause -> order by SortSpecificationList                                : make_orderby('$3', undefined, undefined).
+WindowOrderClause -> order by SortSpecificationList LimitClause                    : make_orderby('$3', '$4', undefined).
+WindowOrderClause -> order by SortSpecificationList LimitClause ResultOffsetClause : make_orderby('$3', '$4', '$5').
+WindowOrderClause ->                                LimitClause                    : make_orderby([], '$1', undefined).
+WindowOrderClause ->                                LimitClause ResultOffsetClause : make_orderby([], '$1', '$2').
+
+LimitClause -> limit integer         : '$2'.
+ResultOffsetClause -> offset integer : '$2'.
+
+SortSpecificationList -> SortSpecification: ['$1'].
+SortSpecificationList -> SortSpecification comma SortSpecificationList: ['$1' | '$3'].
+SortSpecification -> SortKey                            : make_sort_spec('$1', undefined, undefined).
+SortSpecification -> SortKey OrderingSpec               : make_sort_spec('$1', '$2', undefined).
+SortSpecification -> SortKey              NullOrderSpec : make_sort_spec('$1', undefined, '$2').
+SortSpecification -> SortKey OrderingSpec NullOrderSpec : make_sort_spec('$1', '$2', '$3').
+
+SortKey -> Identifier: '$1'.
+OrderingSpec -> asc : '$1'.
+OrderingSpec -> desc: '$1'.
+NullOrderSpec -> nulls first: {nulls_first, <<"nulls first">>}.  %% combine tokens
+NullOrderSpec -> nulls last : {nulls_last, <<"nulls last">>}.
+
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
@@ -151,10 +188,7 @@ StatementWithoutSemicolon -> Explain : '$1'.
 StatementWithoutSemicolon -> Insert : '$1'.
 StatementWithoutSemicolon -> ShowTables : '$1'.
 
-Query -> Select limit integer : add_limit('$1', '$2', '$3').
-Query -> Select               : '$1'.
-
-Select -> select Fields from Bucket Where GroupBy 
+Select -> select Fields from Bucket Where GroupBy
                                           : make_select('$1', '$2', '$3', '$4', '$5', '$6').
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
@@ -178,9 +212,6 @@ FieldElem -> Val   : '$1'.
 Field -> NumericValueExpression : '$1'.
 %Field -> Identifier    : canonicalise_col('$1').
 Field -> asterisk : make_wildcard('$1').
-
-%% Support early error on multi-table select
-Buckets -> Bucket comma Bucket : make_list('$1', '$3').
 
 Bucket -> Identifier   : '$1'.
 
@@ -426,10 +457,12 @@ Erlang code.
           type :: create | describe | explain | insert | select,
           buckets = [],
           fields  = [],
-          limit   = [],
           where   = [],
           ops     = [],
-          group_by
+          group_by,
+          order_by = [],
+          limit    = [],
+          offset   = []
          }).
 
 -include("riak_ql_ddl.hrl").
@@ -464,27 +497,32 @@ fix_up_keys(?DDL{partition_key = none, local_key = LK} = DDL) ->
 fix_up_keys(A) ->
     A.
 
-convert(#outputs{type    = select,
-                 buckets = B,
-                 fields  = F,
-                 limit   = L,
-                 where   = W,
-                 group_by = G} = Outputs) ->
+convert(#outputs{type     = select,
+                 buckets  = B,
+                 fields   = F,
+                 where    = W,
+                 group_by = G,
+                 limit    = L,
+                 offset   = Of,
+                 order_by = Ob} = Outputs) ->
     ok = validate_select_query(Outputs),
     [
      {type, select},
-     {tables, B},
-     {fields, F},
-     {limit, L},
-     {where, W},
-     {group_by, G}
+     {tables,   B},
+     {fields,   F},
+     {where,    W},
+     {group_by, G},
+     {limit,    L},
+     {offset,   Of},
+     {order_by, Ob}
     ];
 convert(#outputs{type = create} = O) ->
     O.
 
 validate_select_query(Outputs) ->
     ok = assert_group_by_select(Outputs),
-    ok = assert_group_by_is_valid(Outputs).
+    ok = assert_group_by_is_valid(Outputs),
+    ok = assert_group_by_with_order_by(Outputs).
 
 %% If the query uses GROUP BY then check that the identifiers in the select
 %% all exist in the GROUP BY.
@@ -511,6 +549,13 @@ assert_group_by_is_valid(#outputs{ group_by = GroupBy }) ->
         true ->
             return_error_flat("GROUP BY can only contain table columns but '*' was found.")
     end.
+
+assert_group_by_with_order_by(#outputs{group_by = GroupBy, order_by = OrderBy})
+  when (GroupBy /= [] andalso OrderBy /= []) ->
+    return_error_flat("ORDER BY/LIMIT/OFFSET clauses are not supported for GROUP BY queries.");
+assert_group_by_with_order_by(_) ->
+    ok.
+
 
 %%
 is_identifier_in_groups({identifier, [F]}, GroupBy) ->
@@ -601,8 +646,43 @@ make_insert({identifier, Table}, Fields, Values) ->
      {values, Values}
     ].
 
-add_limit(A, _B, {integer, C}) ->
-    A#outputs{limit = C}.
+
+%% per Product Requirements
+%% "If NULLS LAST is specified, null values sort after all non-null
+%%  values; if NULLS FIRST is specified, null values sort before all
+%%  non-null values. If neither is specified, the default behavior is
+%%  NULLS LAST when ASC is specified or implied, and NULLS FIRST when
+%%  DESC is specified (thus, the default is to act as though nulls are
+%%  larger than non-nulls)."
+make_sort_spec(Fld, {asc, _} = OrdSpec, undefined) ->
+    {Fld, OrdSpec, {nulls_last, <<"nulls last">>}};
+make_sort_spec(Fld, {desc, _} = OrdSpec, undefined) ->
+    {Fld, OrdSpec, {nulls_first, <<"nulls first">>}};
+make_sort_spec(Fld, OrdSpec, NullSpec) ->
+    {Fld, make_ord_spec(OrdSpec), make_null_spec(NullSpec)}.
+
+make_ord_spec(undefined) -> {asc, <<"asc">>};
+make_ord_spec(OrdSpec) -> OrdSpec.
+make_null_spec(undefined) -> {nulls_last, <<"nulls last">>};
+make_null_spec(NullSpec) -> NullSpec.
+
+
+make_orderby(OrdBy, Lim, Off) ->
+    {order_by,
+     [{F, OrdSpec, NullSpec} ||
+         {{identifier, F}, {OrdSpec, _OrdSpecToken}, {NullSpec, _NullSpecToken}} <- OrdBy],
+     make_limit(Lim), make_offset(Off)}.
+
+make_limit({integer, A}) -> [A];
+make_limit(undefined)    -> [].
+make_offset({integer, A}) -> [A];
+make_offset(undefined)    -> [].
+
+make_window_clause(QueryExprBody, {order_by, OrderBy, Limit, Offset}) ->
+    QueryExprBody#outputs{order_by = OrderBy,
+                          limit    = Limit,
+                          offset   = Offset}.
+
 
 make_expr({TypeA, A}, {B, _}) ->
     {expr, {B, {TypeA, A}}}.

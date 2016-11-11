@@ -1,8 +1,10 @@
 and
 asc
 boolean
+by
 create
 desc
+describe
 double
 false
 from
@@ -12,10 +14,13 @@ key
 limit
 not
 null
+offset
 or
+order
 primary
 quantum
 select
+show
 sint64
 table
 timestamp
