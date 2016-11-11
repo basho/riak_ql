@@ -156,7 +156,7 @@ Statement -> StatementWithoutSemicolon semicolon : '$1'.
 GroupBy -> group by Fields: {group_by, '$3'}.
 
 Query -> Select WindowClause : make_window_clause('$1', '$2').
-Query -> Select              : '$1'.
+Query -> Select              : make_window_clause('$1', make_orderby([], undefined, undefined)).
 
 WindowClause -> WindowOrderClause: '$1'.
 WindowOrderClause -> order by SortSpecificationList                                : make_orderby('$3', undefined, undefined).
@@ -460,9 +460,9 @@ Erlang code.
           where   = [],
           ops     = [],
           group_by,
-          order_by,
-          limit,
-          offset
+          order_by = [],
+          limit    = [],
+          offset   = []
          }).
 
 -include("riak_ql_ddl.hrl").
@@ -551,7 +551,7 @@ assert_group_by_is_valid(#outputs{ group_by = GroupBy }) ->
     end.
 
 assert_group_by_with_order_by(#outputs{group_by = GroupBy, order_by = OrderBy})
-  when (GroupBy /= [] andalso OrderBy /= undefined) ->
+  when (GroupBy /= [] andalso OrderBy /= []) ->
     return_error_flat("ORDER BY/LIMIT/OFFSET clauses are not supported for GROUP BY queries.");
 assert_group_by_with_order_by(_) ->
     ok.
@@ -671,10 +671,12 @@ make_orderby(OrdBy, Lim, Off) ->
     {order_by,
      [{F, OrdSpec, NullSpec} ||
          {{identifier, F}, {OrdSpec, _OrdSpecToken}, {NullSpec, _NullSpecToken}} <- OrdBy],
-     strip_int(Lim), strip_int(Off)}.
+     make_limit(Lim), make_offset(Off)}.
 
-strip_int({integer, A}) -> A;
-strip_int(undefined)    -> undefined.
+make_limit({integer, A}) -> [A];
+make_limit(undefined)    -> [].
+make_offset({integer, A}) -> [A];
+make_offset(undefined)    -> [].
 
 make_window_clause(QueryExprBody, {order_by, OrderBy, Limit, Offset}) ->
     QueryExprBody#outputs{order_by = OrderBy,
