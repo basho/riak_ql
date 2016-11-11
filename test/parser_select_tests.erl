@@ -419,3 +419,73 @@ select_hex_and_char_literals_parse_the_same_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Hex_sql))
     ).
 
+multiline_comment_on_single_line_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+           "SELECT * FROM mytab /* hi */ "
+           "WHERE a = 'val'"))
+    ).
+
+multiline_comment_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab /* oh\n"
+            "hai */ WHERE a = 'val'"))
+    ).
+
+multiline_comment_with_asterisk_inside_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab /** *\n"
+            " * / / *\n"
+            "hai */ WHERE a = 'val'"))
+    ).
+
+multiple_multiline_comment_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab /* oh\n"
+            "hai */ /* hi again */ WHERE a = 'val'"))
+    ).
+
+single_line_comment_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab WHERE a = 'val' -- a comment"))
+    ).
+
+single_line_comment_in_multiline_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab -- a comment\n"
+            "WHERE a = 'val'"))
+    ).
+
+
+single_line_comment_in_multiline_ctrl_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab -- a comment\r\n"
+            "WHERE a = 'val'"))
+    ).
