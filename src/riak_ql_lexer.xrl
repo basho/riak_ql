@@ -46,7 +46,7 @@ REGEX = (/[^/][a-zA-Z0-9\*\.]+/i?)
 
 IDENTIFIER = ([a-zA-Z][a-zA-Z0-9_\-]*)
 QUOTED_IDENTIFIER = \"(\"\"|[^\"\n])*\"
-COMMENT_MULTILINE = (/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/)||(--.*)
+COMMENT_MULTILINE = (/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/)|(--.*)
 WHITESPACE = ([\000-\s]*)
 
 % characters not in the ascii range
