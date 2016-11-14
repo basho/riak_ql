@@ -284,6 +284,9 @@ syntax_error_to_msg2({unexpected_where_field, Field}) ->
 syntax_error_to_msg2({unexpected_select_field, Field}) ->
     {"unexpected_select_field: unexpected field ~s in select clause.",
      [Field]};
+syntax_error_to_msg2({unexpected_orderby_field, Field}) ->
+    {"unexpected_orderby_field: unknown column ~s in order-by clause.",
+     [Field]};
 syntax_error_to_msg2({unexpected_insert_field, Field}) ->
     {"unexpected_select_field: unexpected field ~s in insert clause.",
      [Field]};
@@ -305,15 +308,16 @@ syntax_error_to_msg2({operator_type_mismatch, Fn, Type1, Type2}) ->
 unquote_fn(Fn) when is_atom(Fn) ->
     string:strip(atom_to_list(Fn), both, $').
 
--spec is_query_valid(module(), ?DDL{}, {term(), term(), term()}) ->
+-spec is_query_valid(module(), ?DDL{}, {term(), term(), term(), term()}) ->
                             true | {false, [query_syntax_error()]}.
 is_query_valid(_, ?DDL{ table = T1 },
-               {T2, _Select, _Where}) when T1 /= T2 ->
+               {T2, _Select, _Where, _OrderBy}) when T1 /= T2 ->
     {false, [{bucket_type_mismatch, {T1, T2}}]};
-is_query_valid(Mod, _, {_Table, Selection, Where}) ->
+is_query_valid(Mod, _, {_Table, Selection, Where, OrderBy}) ->
     ValidSelection = are_selections_valid(Mod, Selection, ?CANTBEBLANK),
-    ValidFilters   = check_filters_valid(Mod, Where),
-    is_query_valid_result(ValidSelection, ValidFilters).
+    ValidOrderBy   = is_orderby_valid(Mod, OrderBy),
+    ValidFilters   = are_filters_valid(Mod, Where),
+    is_query_valid_result([ValidSelection, ValidFilters, ValidOrderBy]).
 
 -spec is_insert_valid(module(), ?DDL{}, {term(), term(), term()}) ->
                       true | {false, [query_syntax_error()]}.
@@ -330,13 +334,21 @@ is_insert_valid(Mod, _DDL, {_Table, Fields, Values}) ->
     end.
 
 %%
-is_query_valid_result(true,        true)        -> true;
-is_query_valid_result(true,        {false, L})  -> {false, L};
-is_query_valid_result({false, L},  true)        -> {false, L};
-is_query_valid_result({false, L1}, {false, L2}) -> {false, L1 ++ L2}.
+is_query_valid_result(Res) ->
+    lists:foldl(
+      fun(true, true) ->
+              true;
+         (true, Acc) ->
+              Acc;
+         ({false, Errs}, true) ->
+              {false, Errs};
+         ({false, Errs1}, {false, Errs2}) ->
+              {false, Errs2 ++ Errs1}
+      end,
+      true, Res).
 
--spec check_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
-check_filters_valid(Mod, Where) ->
+-spec are_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
+are_filters_valid(Mod, Where) ->
     Errors = fold_where_tree(Where, [],
                              fun(Clause, Acc) ->
                                      is_filters_field_valid(Mod, Clause, Acc)
@@ -481,6 +493,28 @@ is_selection_column_valid(_, {Op, _, _}, Acc) when is_atom(Op) ->
     Acc;
 is_selection_column_valid(_, Other, Acc) ->
     [{unknown_column_type, Other} | Acc].
+
+
+is_orderby_valid(_Mod, undefined) ->
+    true;
+is_orderby_valid(Mod, QualifiedFields) ->
+    CheckFn =
+        fun({F, _DirQualifier, _NullsGroupQualifier}, Acc) ->
+                is_orderby_column_valid(Mod, F, Acc)
+        end,
+    case lists:foldl(CheckFn, [], QualifiedFields) of
+        []     -> true;
+        Errors -> {false, lists:reverse(Errors)}
+    end.
+
+is_orderby_column_valid(Mod, X, Acc) ->
+    case Mod:is_field_valid([X]) of
+        true  ->
+            Acc;
+        false ->
+            [{unexpected_orderby_field, X} | Acc]
+    end.
+
 
 %% Fold over the syntax tree for a where clause.
 fold_where_tree([], Acc, _) ->
@@ -1064,9 +1098,9 @@ make_functional_key_test() ->
 %% Validate Query Tests
 %%
 
-partial_wildcard_are_selections_valid_test() ->
+partial_wildcard_check_selections_valid_test() ->
     Selections  = [{identifier, [<<"*">>]}],
-    DDL = make_ddl(<<"partial_wildcard_are_selections_valid_test">>,
+    DDL = make_ddl(<<"partial_wildcard_check_selections_valid_test">>,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
                                    position = 1,
@@ -1082,9 +1116,9 @@ partial_wildcard_are_selections_valid_test() ->
       ).
 
 %% FIXME this cannot happen because SQL without selections cannot be lexed
-partial_are_selections_valid_fail_test() ->
+partial_check_selections_valid_fail_test() ->
     Selections  = [],
-    DDL = make_ddl(<<"partial_are_selections_valid_fail_test">>,
+    DDL = make_ddl(<<"partial_check_selections_valid_fail_test">>,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
                                    position = 1,
@@ -1106,7 +1140,7 @@ partial_are_selections_valid_fail_test() ->
 simple_is_query_valid_test() ->
     Bucket = <<"simple_is_query_valid_test">>,
     Selections  = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
-    Query = {Bucket, Selections, []},
+    Query = {Bucket, Selections, [], undefined},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -1134,7 +1168,7 @@ simple_filter_query_test() ->
               {'<', <<"temperature">>, {integer, 15}}
              }
             ],
-    Query = {Bucket, Selections, Where},
+    Query = {Bucket, Selections, Where, undefined},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -1162,7 +1196,7 @@ full_filter_query_test() ->
                  {'<=', <<"lte field">>,  {integer, 15}},
                  {'>=', <<"gte field">>,  {integer, 15}}}}}}
             ],
-    Query = {Bucket, Selections, Where},
+    Query = {Bucket, Selections, Where, undefined},
     DDL = make_ddl(Bucket,
                    [
                     #riak_field_v1{name     = <<"temperature">>,
@@ -1196,7 +1230,7 @@ timeseries_filter_test() ->
               }
              }
             ],
-    Query = {Bucket, Selections, Where},
+    Query = {Bucket, Selections, Where, undefined},
     Fields = [
               #riak_field_v1{name     = <<"geohash">>,
                              position = 1,
@@ -1242,12 +1276,13 @@ timeseries_filter_test() ->
     Expected = true,
     ?assertEqual(Expected, Res).
 
-%% is_query_valid expects a 3-tuple: table name, fields, where clause
+%% is_query_valid expects a 4-tuple: table name, fields, where, order_by clause
 parsed_sql_to_query(Proplist) ->
     {
       proplists:get_value(tables, Proplist, <<>>),
       proplists:get_value(fields, Proplist, []),
-      proplists:get_value(where, Proplist, [])
+      proplists:get_value(where, Proplist, []),
+      proplists:get_value(order_by, Proplist)
     }.
 
 %% is_query_valid expects a 3-tuple: table name, fields, values
