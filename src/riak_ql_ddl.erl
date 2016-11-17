@@ -367,7 +367,7 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
                 true  -> Acc1;
                 false -> [{incompatible_type, Field, ExpectedType, RHS_type} | Acc1]
             end,
-            case is_compatible_operator(Op, ExpectedType, RHS_type) of
+            case is_compatible_operator(Op, get_storage_type(ExpectedType), RHS_type) of
                 true  -> Acc2;
                 false -> [{incompatible_operator, Field, ExpectedType, Op} | Acc2]
             end;
@@ -445,7 +445,7 @@ is_compatible_type(_, _, _) -> false.
 %% Check that the operation being performed in a where clause, for example
 %% we cannot check if one binary is greated than another one in SQL.
 -spec is_compatible_operator(OP::relational_op(),
-                             ExpectedType::external_field_type(),
+                             ExpectedType::internal_field_type(),
                              RHS_type::atom()) -> boolean().
 is_compatible_operator('=',  varchar, binary) -> true;
 is_compatible_operator('!=', varchar, binary) -> true;
@@ -637,7 +637,7 @@ insert_sql_columns(Mod, Fields, Values) when is_atom(Mod) ->
             FInQuery1 = insert_sql_columns_fields(FInMod, FInQuery0),
             VInQuery1 = [ insert_sql_columns_row_values(FInQuery1, V) ||
                 V <- Values ],
-            
+
             %% rearrange into DDL Module order
             in_ddl_order(FInQuery1, VInQuery1, FInMod, Mod)
     end.
