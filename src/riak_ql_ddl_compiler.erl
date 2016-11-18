@@ -113,7 +113,7 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {VFns,         LineNo2}  = build_validn_fns(Fields,    LineNo),
     {ACFns,        LineNo3}  = build_add_cols_fns(Fields,  LineNo2),
     {ExtractFn,    LineNo4}  = build_extract_fn(DDL,  LineNo3),
-    {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),    
+    {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),
     {GetPosnFn,    LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
     {GetPosnsFn,   LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
     {IsValidFn,    LineNo8}  = build_is_valid_fn(Fields,   LineNo7),
@@ -242,10 +242,10 @@ canonical_fields(Fields) ->
                          X#riak_field_v1.type,
                          X#riak_field_v1.optional) || X <- F2].
 
-canonical_field_format(Nm, Ty, true)  -> 
+canonical_field_format(Nm, Ty, true)  ->
     Msg = io_lib:format("~s ~s", [Nm, Ty]),
     lists:flatten(Msg);
-canonical_field_format(Nm, Ty, false) -> 
+canonical_field_format(Nm, Ty, false) ->
     Msg = io_lib:format("~s ~s not null", [Nm, Ty]),
     lists:flatten(Msg).
 
@@ -501,10 +501,6 @@ make_guard(Variable, boolean, true) ->
     Variable ++ " =:= [] orelse is_boolean(" ++ Variable ++ ")";
 make_guard(Variable, boolean, false) ->
     "is_boolean(" ++ Variable ++ ")";
-make_guard(Variable, set, true) ->
-    Variable ++ " =:= [] orelse is_list(" ++ Variable ++ ")";
-make_guard(Variable, set, false) ->
-    "is_list(" ++ Variable ++ ")";
 make_guard(Variable, timestamp, true) ->
     Variable ++ " =:= [] orelse (is_integer(" ++ Variable ++ ") andalso " ++ Variable ++ " > 0)";
 make_guard(Variable, timestamp, false) ->

@@ -725,7 +725,7 @@ get_storage_type(Type) -> Type.
 
 %% Get an equivalent data type for a type found in a DDL to allow the
 %% DDL compiler to create a safe module for older versions of TS
--spec get_legacy_type(external_field_type(), integer()) -> external_field_type().
+-spec get_legacy_type(external_field_type(), atom()) -> external_field_type().
 get_legacy_type(blob, v1) -> varchar;
 get_legacy_type(Type, _Version) -> Type.
 
