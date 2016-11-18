@@ -776,9 +776,9 @@ make_simple_valid_optional_2_ddl() ->
                              position = 5,
                              type     = boolean,
                              optional = true},
-              #riak_field_v1{name     = <<"epithelion">>,
+              #riak_field_v1{name     = <<"whynot">>,
                              position = 6,
-                             type     = set,
+                             type     = blob,
                              optional = true},
               #riak_field_v1{name     = <<"endofdays">>,
                              position = 7,
@@ -803,26 +803,6 @@ make_simple_valid_optional_3_ddl() ->
                              position = 2,
                              type     = varchar,
                              optional = false}
-             ]).
-
-simple_valid_set_test() ->
-    DDL = make_simple_valid_set_ddl(),
-    {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:validate_obj({<<"ewrewr">>, [a, b, d], 4.4}),
-    ?assertEqual(?VALID, Result).
-
-make_simple_valid_set_ddl() ->
-    make_ddl(<<"simple_valid_set_test">>,
-             [
-              #riak_field_v1{name     = <<"yando">>,
-                             position = 1,
-                             type     = varchar},
-              #riak_field_v1{name     = <<"erko">>,
-                             position = 2,
-                             type     = set},
-              #riak_field_v1{name     = <<"erkle">>,
-                             position = 3,
-                             type     = double}
              ]).
 
 simple_valid_mixed_test() ->
@@ -930,23 +910,6 @@ simple_invalid_boolean_test() ->
     {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({true, false, [a, b, d]}),
     ?assertEqual(?INVALID, Result).
-
-simple_invalid_set_test() ->
-    DDL = make_ddl(<<"simple_invalid_set_test">>,
-                   [
-                    #riak_field_v1{name     = <<"yando">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"erko">>,
-                                   position = 2,
-                                   type     = set},
-                    #riak_field_v1{name     = <<"erkle">>,
-                                   position = 3,
-                                   type     = double}
-                   ]),
-    {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:validate_obj({<<"ewrewr">>, [444.44], 4.4}),
-    ?assertEqual(?VALID, Result).
 
 simple_invalid_timestamp_1_test() ->
     DDL = make_ddl(<<"simple_invalid_timestamp_1_test">>,
@@ -1117,9 +1080,6 @@ simple_valid_optional_2_get_test() ->
 
 simple_valid_optional_3_get_test() ->
     ?ddl_roundtrip_assert(make_simple_valid_optional_3_ddl).
-
-simple_valid_set_get_test() ->
-    ?ddl_roundtrip_assert(make_simple_valid_set_ddl).
 
 simple_valid_mixed_get_test() ->
     ?ddl_roundtrip_assert(make_simple_valid_mixed_ddl).
