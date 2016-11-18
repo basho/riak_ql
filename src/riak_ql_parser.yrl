@@ -74,6 +74,7 @@ TruthValue
 BooleanPrimary
 BooleanPredicand
 
+ShowCreateTable
 CreateTable
 PrimaryKey
 FunArg
@@ -184,6 +185,7 @@ NullOrderSpec -> nulls last : {nulls_last, <<"nulls last">>}.
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
+StatementWithoutSemicolon -> ShowCreateTable : '$1'.
 StatementWithoutSemicolon -> Explain : '$1'.
 StatementWithoutSemicolon -> Insert : '$1'.
 StatementWithoutSemicolon -> ShowTables : '$1'.
@@ -198,6 +200,9 @@ Explain -> explain Query : make_explain('$2').
 
 %% 20.9 DESCRIBE STATEMENT
 Describe -> describe Bucket : make_describe('$2').
+
+%% SHOW CREATE TABLE
+ShowCreateTable -> show create table Bucket : make_show_create_table('$4').
 
 Insert -> insert into Identifier OptFieldList values RowValueList : make_insert('$3', '$4', '$6').
 
@@ -625,6 +630,12 @@ wrap_identifier(Default) -> Default.
 make_describe({identifier, D}) ->
     [
      {type, describe},
+     {identifier, D}
+    ].
+
+make_show_create_table({identifier, D}) ->
+    [
+     {type, show_create_table},
      {identifier, D}
     ].
 
