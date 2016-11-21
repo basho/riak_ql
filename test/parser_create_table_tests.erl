@@ -554,7 +554,7 @@ boolean_cannot_be_desc_test() ->
         "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
     ?assertEqual(
         {error,{0,riak_ql_parser,
-          <<"Elements in the local key marked descending (DESC) must be of an integer or binary type, but was boolean.">>}},
+          <<"Elements in the local key marked descending (DESC) must be of type 'sint64', 'timestamp', 'varchar', or 'blob', but was 'boolean'.">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
     ).
 
@@ -567,7 +567,7 @@ float_cannot_be_desc_test() ->
         "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
     ?assertEqual(
         {error,{0,riak_ql_parser,
-          <<"Elements in the local key marked descending (DESC) must be of an integer or binary type, but was double.">>}},
+          <<"Elements in the local key marked descending (DESC) must be of type 'sint64', 'timestamp', 'varchar', or 'blob', but was 'double'.">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
     ).
 

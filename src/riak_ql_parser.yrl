@@ -394,7 +394,7 @@ KeyFieldList -> KeyField : ['$1'].
 
 KeyField -> quantum left_paren KeyFieldArgList right_paren :
     element(2, make_modfun(quantum, '$3')).
-KeyField -> Identifier OptOrdering  : 
+KeyField -> Identifier OptOrdering  :
     ?SQL_PARAM{name = [element(2, '$1')], ordering = '$2'}.
 
 OptOrdering -> '$empty' : undefined.
@@ -1213,7 +1213,7 @@ assert_desc_key_field_type(DDL, ?SQL_PARAM{ name = [Name] }) ->
         _ ->
             return_error_flat(
                 "Elements in the local key marked descending (DESC) must be of "
-                "an integer or binary type, but was ~p.", [Type])
+                "type 'sint64', 'timestamp', 'varchar', or 'blob', but was '~p'.", [Type])
     end.
 
 %% Check that the field name exists in the list of fields.
