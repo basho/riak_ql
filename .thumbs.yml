@@ -1,9 +1,11 @@
+docker: true
+docker_image: "davidxd/yoko"
 minimum_reviewers: 2
 build_steps:
  - make clean deps compile
  - make test
  - make xref
- - DIALYZER_PLT=.dialyzer_plt_b make dialyzer
+ - make dialyzer
 env:
  DIALYZER_PLT: .dialyzer_plt_a
 merge: true
