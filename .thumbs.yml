@@ -4,6 +4,8 @@ build_steps:
  - make test
  - make xref
  - make dialyzer
+env:
+ DIALYZER_PLT: .dialyzer_plt
 merge: true
 org_mode: true
 timeout: 1790
