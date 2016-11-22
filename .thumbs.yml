@@ -1,13 +1,11 @@
 docker: true
-docker_image: "davidxd/yoko"
+docker_image: "davidxd/yoko1603dash1"
 minimum_reviewers: 2
 build_steps:
  - make clean deps compile
  - make test
  - make xref
  - make dialyzer
-env:
- DIALYZER_PLT: .dialyzer_plt_a
 merge: true
 org_mode: true
 timeout: 1790
