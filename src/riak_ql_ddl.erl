@@ -92,6 +92,7 @@
          insert_sql_columns/3,
          is_insert_valid/3,
          is_query_valid/3,
+         lk_to_pk/2, lk_to_pk/3,
          make_key/3,
          syntax_error_to_msg/1
         ]).
@@ -173,6 +174,26 @@ get_local_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_local_key(DDL, Obj, Mod).
+
+-spec lk_to_pk(tuple(), ?DDL{}) -> tuple().
+lk_to_pk(LKVals, DDL = ?DDL{table = Table}) ->
+    lk_to_pk(LKVals, DDL, make_module_name(Table)).
+
+-spec lk_to_pk(tuple(), ?DDL{}, module()) -> {ok, tuple()} |
+                                             {error, {bad_key_length, integer(), integer()}}.
+lk_to_pk(LKVals, ?DDL{local_key = #key_v1{ast = LKAst} = LK,
+                      partition_key = PK}, Mod) ->
+    KeyFields = [F || ?SQL_PARAM{name = [F]} <- LKAst],
+    case {size(LKVals), length(KeyFields)} of
+        {_N, _N} ->
+            LKPairs = lists:zip(KeyFields, tuple_to_list(LKVals)),
+            UnnegLKVals = [V || {_Type, V} <- make_key(Mod, LK, LKPairs)],
+            UnnegLKPairs = lists:zip(KeyFields, UnnegLKVals),
+            PKVals = [V || {_Type, V} <- make_key(Mod, PK, UnnegLKPairs)],
+            {ok, list_to_tuple(PKVals)};
+        {Got, Need} ->
+            {error, {bad_key_length, Got, Need}}
+    end.
 
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
 make_key(_Mod, none, _Vals) ->
@@ -633,7 +654,7 @@ insert_sql_columns(Mod, Fields, Values) when is_atom(Mod) ->
             FInQuery1 = insert_sql_columns_fields(FInMod, FInQuery0),
             VInQuery1 = [ insert_sql_columns_row_values(FInQuery1, V) ||
                 V <- Values ],
-            
+
             %% rearrange into DDL Module order
             in_ddl_order(FInQuery1, VInQuery1, FInMod, Mod)
     end.
@@ -1071,6 +1092,65 @@ make_functional_key_test() ->
     Got = make_key(Mod, DDL?DDL.local_key, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, 12345}],
     ?assertEqual(Expected, Got).
+
+helper_compile_def_to_module(SQL) ->
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ok, {DDL, _Props}} = riak_ql_parser:parse(Lexed),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
+    {DDL, Mod}.
+
+% basic family/series/timestamp
+make_ts_keys_1_test() ->
+    {DDL, Mod} = helper_compile_def_to_module(
+        "CREATE TABLE table1 ("
+        "a SINT64 NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY((a, b, quantum(c, 15, 's')), a, b, c))"),
+    ?assertEqual(
+        {ok, {1,2,0}},
+        lk_to_pk({1,2,3}, DDL, Mod)
+    ).
+
+% a two element key, still using the table definition field order
+make_ts_keys_2_test() ->
+    {DDL, Mod} = helper_compile_def_to_module(
+        "CREATE TABLE table1 ("
+        "a SINT64 NOT NULL, "
+        "b TIMESTAMP NOT NULL, "
+        "c SINT64 NOT NULL, "
+        "PRIMARY KEY((a, quantum(b, 15, 's')), a, b))"),
+    ?assertEqual(
+        {ok, {1,0}},
+        lk_to_pk({1,2}, DDL, Mod)
+    ).
+
+make_ts_keys_3_test() ->
+    {DDL, Mod} = helper_compile_def_to_module(
+        "CREATE TABLE table2 ("
+        "a SINT64 NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "d SINT64 NOT NULL, "
+        "PRIMARY KEY  ((d,a,quantum(c, 1, 's')), d,a,c))"),
+    ?assertEqual(
+        {ok, {10,20,0}},
+        lk_to_pk({10,20,1}, DDL, Mod)
+    ).
+
+make_ts_keys_4_test() ->
+    {DDL, Mod} = helper_compile_def_to_module(
+        "CREATE TABLE table2 ("
+        "ax SINT64 NOT NULL, "
+        "a SINT64 NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "d SINT64 NOT NULL, "
+        "PRIMARY KEY  ((ax,a,quantum(c, 1, 's')), ax,a,c))"),
+    ?assertEqual(
+        {ok, {10,20,0}},
+        lk_to_pk({10,20,1}, DDL, Mod)
+    ).
 
 %%
 %% Validate Query Tests
