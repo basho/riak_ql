@@ -566,6 +566,8 @@ are_insert_types_valid(Mod, Columns, Values) ->
 -spec is_insert_row_type_valid(module(), [insertion()], [data_value()]) ->
     [] | [false].
 is_insert_row_type_valid(Mod, Columns, RowValues) ->
+    %% INSERT allows equal or less columns to be given if the INSERT statement
+    %% specifies the columns in the value.
     case length(RowValues) > length(Columns) of
         true -> false;
         _ ->
