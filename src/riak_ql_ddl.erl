@@ -587,9 +587,15 @@ are_insert_types_valid(Mod, Columns, Values) ->
 -spec is_insert_row_type_valid(module(), [insertion()], [data_value()]) ->
     [] | [false].
 is_insert_row_type_valid(Mod, Columns, RowValues) ->
-    ColPos = build_insert_col_positions(Mod, Columns, RowValues),
-    DataRow = build_insert_validation_obj(Mod, ColPos),
-    Mod:validate_obj(DataRow).
+    %% INSERT allows equal or less columns to be given if the INSERT statement
+    %% specifies the columns in the value.
+    case length(RowValues) > length(Columns) of
+        true -> false;
+        _ ->
+            ColPos = build_insert_col_positions(Mod, Columns, RowValues),
+            DataRow = build_insert_validation_obj(Mod, ColPos),
+            Mod:validate_obj(DataRow)
+    end.
 
 -spec build_insert_col_positions(module(), [insertion()], [data_value()]) ->
     [{pos_integer(), term()}].
@@ -701,7 +707,7 @@ insert_sql_columns_fields(FInMod, FInQuery0) ->
 
 insert_sql_columns_row_values(FInQuery, Values) ->
     Values1 = case length(Values) =< length(FInQuery) of
-        false -> lists:sublist(Values, length(FInQuery));
+        false -> Values;
         _ ->
             case length(Values) =:= length(FInQuery) of
                 true -> Values;
@@ -1694,12 +1700,13 @@ is_insert_valid_wrong_type_2_test() ->
             "INSERT INTO mytab VALUES"
             "('hazen', 'world', 4.5, 15)")).
 
+
 is_insert_valid_too_many_1_test() ->
     ?assertEqual(
         incompatible_insert_type,
         is_insert_valid_test_helper("mytab", ?LARGE_TABLE_DEF,
             "INSERT INTO mytab VALUES"
-            "('hazen', 'world', 4.5, 15, 'haggis', 'kilt')")).
+            "('hazen', 'world', 45, 'cloudy', 4.5, 'haggis', 'kilt')")).
 
 is_insert_valid_invalid_column_1_test() ->
     ?assertEqual(
