@@ -729,11 +729,19 @@ get_storage_type(Type) -> Type.
 get_legacy_type(blob, v1) -> varchar;
 get_legacy_type(Type, _Version) -> Type.
 
+-define(MIN_CAP_FUNS, [fun get_descending_keys_required_cap/1,
+                       fun get_type_required_cap/1]).
+
 %% Determing the minimum capability value that is required to run operations
 %% on this table.
 -spec get_minimum_capability(?DDL{}) -> ddl_version().
 get_minimum_capability(DDL) ->
-    get_descending_keys_required_cap(DDL).
+    lists:max(lists:map(fun(Fn) -> Fn(DDL) end, ?MIN_CAP_FUNS)).
+
+get_type_required_cap(?DDL{fields=RiakFields}) ->
+    lists:max(lists:map(fun(#riak_field_v1{type=blob}) -> v2;
+                           (_) -> v1
+                        end, RiakFields)).
 
 %%
 get_descending_keys_required_cap(?DDL{ local_key = #key_v1{ ast = AST } }) ->
@@ -788,7 +796,7 @@ ddl_record_version(V) when is_atom(V)
 
 %%
 downgrade_ddl(v2, v1, DDL1) ->
-    case ddl_minimum_capability2(DDL1) of
+    case get_minimum_capability(DDL1) of
         v1 ->
             [#ddl_v1{
                             table              = DDL1#ddl_v2.table,
@@ -860,20 +868,10 @@ upgrade_v1_param(X) ->
 
 %%
 ddl_minimum_capability(DDL, DefaultMin) ->
-    Min = ddl_minimum_capability2(DDL),
+    Min = get_minimum_capability(DDL),
     case is_version_greater(Min, DefaultMin) of
         false -> Min;
         _     -> DefaultMin
-    end.
-
-%%
-ddl_minimum_capability2(#ddl_v1{ }) ->
-    v1;
-ddl_minimum_capability2(#ddl_v2{ local_key = ?DDL_KEY{ ast = AST } }) ->
-    DescParams = [P || #param_v2{ ordering = descending } = P <- AST],
-    case DescParams of
-        [] -> v1;
-        _  -> v2
     end.
 
 %% Return a sublist within a list when only the start and end elements within
