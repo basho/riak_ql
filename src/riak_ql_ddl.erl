@@ -729,22 +729,28 @@ get_storage_type(Type) -> Type.
 get_legacy_type(blob, v1) -> varchar;
 get_legacy_type(Type, _Version) -> Type.
 
+%% Determing the minimum capability value that is required to run
+%% operations on this table. For each function in this list, be
+%% explicit about the DDL record (use `#ddl_v<n>' instead of the
+%% `?DDL' macro). DDL v1 records will never be passed to any of these
+%% functions
 -define(MIN_CAP_FUNS, [fun get_descending_keys_required_cap/1,
                        fun get_type_required_cap/1]).
 
-%% Determing the minimum capability value that is required to run operations
-%% on this table.
--spec get_minimum_capability(?DDL{}) -> ddl_version().
+-spec get_minimum_capability(any_ddl()) -> ddl_version().
+get_minimum_capability(#ddl_v1{}) ->
+    v1;
 get_minimum_capability(DDL) ->
     lists:max(lists:map(fun(Fn) -> Fn(DDL) end, ?MIN_CAP_FUNS)).
 
-get_type_required_cap(?DDL{fields=RiakFields}) ->
+%%
+get_type_required_cap(#ddl_v2{fields=RiakFields}) ->
     lists:max(lists:map(fun(#riak_field_v1{type=blob}) -> v2;
                            (_) -> v1
                         end, RiakFields)).
 
 %%
-get_descending_keys_required_cap(?DDL{ local_key = #key_v1{ ast = AST } }) ->
+get_descending_keys_required_cap(#ddl_v2{ local_key = #key_v1{ ast = AST } }) ->
     lists:foldl(fun get_descending_keys_required_cap_fold/2, v1, AST).
 
 %%
