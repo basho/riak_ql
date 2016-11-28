@@ -334,6 +334,49 @@ ddl_rec_to_string_test() ->
         ddl_rec_to_sql(DDL)
     ).
 
+ddl_rec_with_shorter_pk_to_string_test() ->
+    SQL = "CREATE TABLE Mesa "
+          "(Uno TIMESTAMP NOT NULL, "
+          "Dos TIMESTAMP NOT NULL, "
+          "PRIMARY KEY ((Uno, "
+          "QUANTUM(Dos, 1, 'd')), "
+          "Uno, Dos))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql(DDL)
+    ).
+
+ddl_rec_with_no_quantum_to_string_test() ->
+    SQL = "CREATE TABLE Mesa "
+          "(Uno TIMESTAMP NOT NULL, "
+          "Dos TIMESTAMP NOT NULL, "
+          "Tres TIMESTAMP NOT NULL, "
+          "PRIMARY KEY ((Uno, Dos, Tres), "
+          "Uno, Dos, Tres))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql(DDL)
+    ).
+
+ddl_rec_with_longer_pk_no_quantum_to_string_test() ->
+    SQL = "CREATE TABLE Mesa "
+          "(Uno TIMESTAMP NOT NULL, "
+          "Dos TIMESTAMP NOT NULL, "
+          "Tres TIMESTAMP NOT NULL, "
+          "Quatro TIMESTAMP NOT NULL, "
+          "PRIMARY KEY ((Uno, Dos, Tres, Quatro), "
+          "Uno, Dos, Tres, Quatro))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql(DDL)
+    ).
+
 ddl_rec_to_multiline_string_test() ->
     SQL = "CREATE TABLE Mesa "
     "(Uno TIMESTAMP NOT NULL,\n"
