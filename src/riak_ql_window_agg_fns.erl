@@ -30,8 +30,6 @@
 -export([fn_arity/1]).
 -export([fn_type_signature/2]).
 
--define(SQL_NULL, []).
-
 -type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDDEV' | 'STDDEV_POP' | 'STDDEV_SAMP'.
 
 -include("riak_ql_ddl.hrl").
