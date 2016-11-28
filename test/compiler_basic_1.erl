@@ -166,3 +166,35 @@
 
 ?ddl_roundtrip_assert(double_ddl_test,
                       ?GOOD_DDL_DOUBLE).
+
+%%
+sql_to_module(SQL) ->
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL, _Props} = riak_ql_parser:ql_parse(Lexed),
+    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL).
+
+get_min_required_ddl_cap_v1_test() ->
+    Table =
+        "CREATE TABLE get_min_required_ddl_cap_v1_test ("
+        " a varchar not null,"
+        " b varchar not null,"
+        " c timestamp not null,"
+        " primary key ((a, b, quantum(c, 1, 'm')), a, b, c))",
+    {module, Mod} = sql_to_module(Table),
+    ?assertEqual(
+        v1,
+        Mod:get_min_required_ddl_cap()
+    ).
+
+get_min_required_ddl_cap_desc_key_test() ->
+    Table =
+        "CREATE TABLE get_min_required_ddl_cap_desc_key_test ("
+        " a varchar NOT NULL,"
+        " b varchar NOT NULL,"
+        " c timestamp NOT NULL,"
+        " primary key ((a, b, quantum(c, 1, 'm')), a, b, c DESC))",
+    {module, Mod} = sql_to_module(Table),
+    ?assertEqual(
+        v2,
+        Mod:get_min_required_ddl_cap()
+    ).

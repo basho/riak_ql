@@ -5,51 +5,59 @@
 
 Nonterminals
 
-Statement
-StatementWithoutSemicolon
-Query
-Select
-Explain
-Describe
-Delete
-ShowTables
 Bucket
-Buckets
+CharacterLiteral
+ColumnConstraint
+ColumnDefinition
+Comp
+ComparisonPredicate
+DataType
+Delete
+Describe
+Explain
 Field
 FieldElem
 Fields
+Funcall
+GroupBy
 Identifier
 Insert
-CharacterLiteral
-Where
-ComparisonPredicate
-NullPredicate
-Comp
-NullComp
-Val
-Vals
-Funcall
-TableDefinition
-TableContentsSource
-TableElementList
-TableElements
-TableElement
-TableProperties
-TablePropertyList
-TableProperty
-TablePropertyValue
-ColumnDefinition
-ColumnConstraint
-KeyDefinition
-DataType
-KeyFieldList
-KeyField
-KeyFieldArgList
-KeyFieldArg
-NotNull
 IsNotNull
 IsNull
-GroupBy
+KeyDefinition
+KeyField
+KeyFieldArg
+KeyFieldArgList
+KeyFieldList
+LimitClause
+NotNull
+NullComp
+NullOrderSpec
+NullPredicate
+OrderingSpec
+Query
+ResultOffsetClause
+Select
+ShowTables
+SortKey
+SortSpecification
+SortSpecificationList
+Statement
+StatementWithoutSemicolon
+TableContentsSource
+TableDefinition
+TableElement
+TableElementList
+TableElements
+TableProperties
+TableProperty
+TablePropertyList
+TablePropertyValue
+Val
+Vals
+Where
+WindowClause
+WindowOrderClause
 
 %% ValueExpression
 %% CommonValueExpression
@@ -67,11 +75,12 @@ TruthValue
 BooleanPrimary
 BooleanPredicand
 
+ShowCreateTable
 CreateTable
 PrimaryKey
 FunArg
 FunArgN
-
+OptOrdering
 OptFieldList
 IdentifierList
 RowValueList
@@ -81,19 +90,22 @@ FieldValue
 
 Terminals
 
-or_
 and_
+asc
+asterisk
 boolean
 by
 character_literal
 comma
 create
 delete
+desc
 describe
 double
 equals_operator
 explain
 false
+first
 float
 from
 greater_than_operator
@@ -103,19 +115,21 @@ insert
 integer
 into
 is_
-is_not_null
-is_null
 group
 key
+last
 limit
 left_paren
 less_than_operator
 lte
-asterisk
 minus_sign
 nomatch
 not_
 null
+nulls
+offset
+or_
+order
 plus_sign
 primary
 quantum
@@ -144,18 +158,42 @@ Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
 GroupBy -> group by Fields: {group_by, '$3'}.
 
+Query -> Select WindowClause : make_window_clause('$1', '$2').
+Query -> Select              : make_window_clause('$1', make_orderby([], undefined, undefined)).
+
+WindowClause -> WindowOrderClause: '$1'.
+WindowOrderClause -> order by SortSpecificationList                                : make_orderby('$3', undefined, undefined).
+WindowOrderClause -> order by SortSpecificationList LimitClause                    : make_orderby('$3', '$4', undefined).
+WindowOrderClause -> order by SortSpecificationList LimitClause ResultOffsetClause : make_orderby('$3', '$4', '$5').
+WindowOrderClause ->                                LimitClause                    : make_orderby([], '$1', undefined).
+WindowOrderClause ->                                LimitClause ResultOffsetClause : make_orderby([], '$1', '$2').
+
+LimitClause -> limit integer         : '$2'.
+ResultOffsetClause -> offset integer : '$2'.
+
+SortSpecificationList -> SortSpecification: ['$1'].
+SortSpecificationList -> SortSpecification comma SortSpecificationList: ['$1' | '$3'].
+SortSpecification -> SortKey                            : make_sort_spec('$1', undefined, undefined).
+SortSpecification -> SortKey OrderingSpec               : make_sort_spec('$1', '$2', undefined).
+SortSpecification -> SortKey              NullOrderSpec : make_sort_spec('$1', undefined, '$2').
+SortSpecification -> SortKey OrderingSpec NullOrderSpec : make_sort_spec('$1', '$2', '$3').
+
+SortKey -> Identifier: '$1'.
+OrderingSpec -> asc : '$1'.
+OrderingSpec -> desc: '$1'.
+NullOrderSpec -> nulls first: {nulls_first, <<"nulls first">>}.  %% combine tokens
+NullOrderSpec -> nulls last : {nulls_last, <<"nulls last">>}.
+
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
 StatementWithoutSemicolon -> Describe : '$1'.
+StatementWithoutSemicolon -> ShowCreateTable : '$1'.
 StatementWithoutSemicolon -> Explain : '$1'.
 StatementWithoutSemicolon -> Insert : '$1'.
 StatementWithoutSemicolon -> ShowTables : '$1'.
 StatementWithoutSemicolon -> Delete : convert('$1').
 
-Query -> Select limit integer : add_limit('$1', '$2', '$3').
-Query -> Select               : '$1'.
-
-Select -> select Fields from Bucket Where GroupBy 
+Select -> select Fields from Bucket Where GroupBy
                                           : make_select('$1', '$2', '$3', '$4', '$5', '$6').
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
@@ -171,6 +209,9 @@ Explain -> explain Query : make_explain('$2').
 %% 20.9 DESCRIBE STATEMENT
 Describe -> describe Bucket : make_describe('$2').
 
+%% SHOW CREATE TABLE
+ShowCreateTable -> show create table Bucket : make_show_create_table('$4').
+
 Insert -> insert into Identifier OptFieldList values RowValueList : make_insert('$3', '$4', '$6').
 
 Where -> where BooleanValueExpression : make_where('$1', '$2').
@@ -184,9 +225,6 @@ FieldElem -> Val   : '$1'.
 Field -> NumericValueExpression : '$1'.
 %Field -> Identifier    : canonicalise_col('$1').
 Field -> asterisk : make_wildcard('$1').
-
-%% Support early error on multi-table select
-Buckets -> Bucket comma Bucket : make_list('$1', '$3').
 
 Bucket -> Identifier   : '$1'.
 
@@ -349,16 +387,29 @@ DataType -> boolean   : '$1'.
 
 PrimaryKey -> primary key : primary_key.
 
+%% definition for a primary key without brackets for the local key
+%% CREATE TABLE mytab1 (a varchar not null, ts timestamp not null, primary key (quantum(ts,30,'d')) );
 KeyDefinition ->
-    PrimaryKey left_paren KeyFieldList right_paren : make_local_key('$3').
+    PrimaryKey left_paren KeyFieldList right_paren : return_error_flat("No local key specified.").
+%% definition for a primary key with the local key brackets but no local key or
+%% comma after the partition key
+%% CREATE TABLE rts1130_6 (a varchar not null, ts timestamp not null, primary key ((quantum(ts,30,'d'))) );
+KeyDefinition ->
+    PrimaryKey left_paren left_paren KeyFieldList right_paren right_paren : return_error_flat("No local key specified.").
 KeyDefinition ->
     PrimaryKey left_paren left_paren KeyFieldList right_paren comma KeyFieldList right_paren : make_partition_and_local_keys('$4', '$7').
 
-KeyFieldList -> KeyField comma KeyFieldList : make_list('$3', '$1').
-KeyFieldList -> KeyField : make_list({list, []}, '$1').
+KeyFieldList -> KeyField comma KeyFieldList : ['$1' | '$3'].
+KeyFieldList -> KeyField : ['$1'].
 
-KeyField -> quantum left_paren KeyFieldArgList right_paren : make_modfun(quantum, '$3').
-KeyField -> Identifier : '$1'.
+KeyField -> quantum left_paren KeyFieldArgList right_paren :
+    element(2, make_modfun(quantum, '$3')).
+KeyField -> Identifier OptOrdering  : 
+    ?SQL_PARAM{name = [element(2, '$1')], ordering = '$2'}.
+
+OptOrdering -> '$empty' : undefined.
+OptOrdering -> asc : ascending.
+OptOrdering -> desc : descending.
 
 KeyFieldArgList ->
     KeyFieldArg comma KeyFieldArgList : make_list('$3', '$1').
@@ -384,6 +435,7 @@ RowValueList -> RowValueList comma left_paren RowValue right_paren : '$1' ++ ['$
 RowValue -> RowValue comma FieldValue : '$1' ++ ['$3'].
 RowValue -> FieldValue : ['$1'].
 
+FieldValue -> null : '$1'.
 FieldValue -> integer : '$1'.
 FieldValue -> float : '$1'.
 FieldValue -> TruthValue : '$1'.
@@ -418,10 +470,12 @@ Erlang code.
           type :: create | describe | explain | insert | select | delete,
           buckets = [],
           fields  = [],
-          limit   = [],
           where   = [],
           ops     = [],
-          group_by
+          group_by,
+          order_by = [],
+          limit    = [],
+          offset   = []
          }).
 
 -include("riak_ql_ddl.hrl").
@@ -466,27 +520,32 @@ convert(#outputs{type    = delete,
                 {table, B},
                 {where, W}
                ];
-convert(#outputs{type    = select,
-                 buckets = B,
-                 fields  = F,
-                 limit   = L,
-                 where   = W,
-                 group_by = G} = Outputs) ->
+convert(#outputs{type     = select,
+                 buckets  = B,
+                 fields   = F,
+                 where    = W,
+                 group_by = G,
+                 limit    = L,
+                 offset   = Of,
+                 order_by = Ob} = Outputs) ->
     ok = validate_select_query(Outputs),
     [
      {type, select},
-     {tables, B},
-     {fields, F},
-     {limit, L},
-     {where, W},
-     {group_by, G}
+     {tables,   B},
+     {fields,   F},
+     {where,    W},
+     {group_by, G},
+     {limit,    L},
+     {offset,   Of},
+     {order_by, Ob}
     ];
 convert(#outputs{type = create} = O) ->
     O.
 
 validate_select_query(Outputs) ->
     ok = assert_group_by_select(Outputs),
-    ok = assert_group_by_is_valid(Outputs).
+    ok = assert_group_by_is_valid(Outputs),
+    ok = assert_group_by_with_order_by(Outputs).
 
 %% If the query uses GROUP BY then check that the identifiers in the select
 %% all exist in the GROUP BY.
@@ -513,6 +572,13 @@ assert_group_by_is_valid(#outputs{ group_by = GroupBy }) ->
         true ->
             return_error_flat("GROUP BY can only contain table columns but '*' was found.")
     end.
+
+assert_group_by_with_order_by(#outputs{group_by = GroupBy, order_by = OrderBy})
+  when (GroupBy /= [] andalso OrderBy /= []) ->
+    return_error_flat("ORDER BY/LIMIT/OFFSET clauses are not supported for GROUP BY queries.");
+assert_group_by_with_order_by(_) ->
+    ok.
+
 
 %%
 is_identifier_in_groups({identifier, [F]}, GroupBy) ->
@@ -590,6 +656,12 @@ make_describe({identifier, D}) ->
      {identifier, D}
     ].
 
+make_show_create_table({identifier, D}) ->
+    [
+     {type, show_create_table},
+     {identifier, D}
+    ].
+
 %% For explain just change the output type
 make_explain(#outputs{type = select} = S) ->
     Props = convert(S),
@@ -608,8 +680,43 @@ make_insert({identifier, Table}, Fields, Values) ->
      {values, Values}
     ].
 
-add_limit(A, _B, {integer, C}) ->
-    A#outputs{limit = C}.
+
+%% per Product Requirements
+%% "If NULLS LAST is specified, null values sort after all non-null
+%%  values; if NULLS FIRST is specified, null values sort before all
+%%  non-null values. If neither is specified, the default behavior is
+%%  NULLS LAST when ASC is specified or implied, and NULLS FIRST when
+%%  DESC is specified (thus, the default is to act as though nulls are
+%%  larger than non-nulls)."
+make_sort_spec(Fld, {asc, _} = OrdSpec, undefined) ->
+    {Fld, OrdSpec, {nulls_last, <<"nulls last">>}};
+make_sort_spec(Fld, {desc, _} = OrdSpec, undefined) ->
+    {Fld, OrdSpec, {nulls_first, <<"nulls first">>}};
+make_sort_spec(Fld, OrdSpec, NullSpec) ->
+    {Fld, make_ord_spec(OrdSpec), make_null_spec(NullSpec)}.
+
+make_ord_spec(undefined) -> {asc, <<"asc">>};
+make_ord_spec(OrdSpec) -> OrdSpec.
+make_null_spec(undefined) -> {nulls_last, <<"nulls last">>};
+make_null_spec(NullSpec) -> NullSpec.
+
+
+make_orderby(OrdBy, Lim, Off) ->
+    {order_by,
+     [{F, OrdSpec, NullSpec} ||
+         {{identifier, F}, {OrdSpec, _OrdSpecToken}, {NullSpec, _NullSpecToken}} <- OrdBy],
+     make_limit(Lim), make_offset(Off)}.
+
+make_limit({integer, A}) -> [A];
+make_limit(undefined)    -> [].
+make_offset({integer, A}) -> [A];
+make_offset(undefined)    -> [].
+
+make_window_clause(QueryExprBody, {order_by, OrderBy, Limit, Offset}) ->
+    QueryExprBody#outputs{order_by = OrderBy,
+                          limit    = Limit,
+                          offset   = Offset}.
+
 
 make_expr({TypeA, A}, {B, _}) ->
     {expr, {B, {TypeA, A}}}.
@@ -877,18 +984,7 @@ make_column({identifier, FieldName}, {DataType, _}, not_null) ->
        type     = DataType,
        optional = false}.
 
-%% if only the local key is defined
-%% use it as the partition key as well
-make_local_key(FieldList) ->
-    Key = #key_v1{ast = lists:reverse(extract_key_field_list(FieldList, []))},
-    [
-     {partition_key, Key},
-     {local_key,     Key}
-    ].
-
-make_partition_and_local_keys(PFieldList, LFieldList) ->
-    PFields = lists:reverse(extract_key_field_list(PFieldList, [])),
-    LFields = lists:reverse(extract_key_field_list(LFieldList, [])),
+make_partition_and_local_keys(PFields, LFields) ->
     [
      {partition_key, #key_v1{ast = PFields}},
      {local_key,     #key_v1{ast = LFields}}
@@ -902,25 +998,20 @@ make_table_element_list(A, {table_element_list, B}) ->
 make_table_element_list(A, B) ->
     {table_element_list, lists:flatten([A, B])}.
 
-extract_key_field_list({list, []}, Extracted) ->
-    Extracted;
-extract_key_field_list({list,
-                        [Modfun = #hash_fn_v1{} | Rest]},
-                       Extracted) ->
-    [Modfun | extract_key_field_list({list, Rest}, Extracted)];
-extract_key_field_list({list, [Field | Rest]}, Extracted) ->
-    [?SQL_PARAM{name = [Field]} |
-     extract_key_field_list({list, Rest}, Extracted)].
-
 make_table_definition(TableName, Contents) ->
     make_table_definition(TableName, Contents, []).
+
 make_table_definition({identifier, Table}, Contents, Properties) ->
-    {validate_ddl(
-       ?DDL{table = Table,
-            partition_key = find_partition_key(Contents),
-            local_key = find_local_key(Contents),
-            fields = find_fields(Contents)}),
-     validate_table_properties(Properties)}.
+    DDL1 = ?DDL{
+        table = Table,
+        partition_key = find_partition_key(Contents),
+        local_key = find_local_key(Contents),
+        fields = find_fields(Contents) },
+    %% validate here so code afterwards doesn't require error checks
+    ok = validate_ddl(DDL1),
+    DDL2 = DDL1?DDL{
+        minimum_capability = riak_ql_ddl:get_minimum_capability(DDL1) },
+    {DDL2, validate_table_properties(Properties)}.
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
@@ -991,10 +1082,12 @@ validate_ddl(DDL) ->
     ok = assert_primary_and_local_keys_match(DDL),
     ok = assert_partition_key_fields_exist(DDL),
     ok = assert_primary_key_fields_non_null(DDL),
+    ok = assert_partition_key_fields_not_descending(DDL),
     ok = assert_not_more_than_one_quantum(DDL),
     ok = assert_quantum_fn_args(DDL),
     ok = assert_quantum_is_last_in_partition_key(DDL),
-    DDL.
+    ok = assert_desc_key_types(DDL),
+    ok.
 
 %% @doc Ensure DDL has keys
 assert_keys_present(?DDL{local_key = LK, partition_key = PK})
@@ -1039,6 +1132,18 @@ assert_primary_and_local_keys_match(?DDL{partition_key = #key_v1{ast = Primary},
             return_error_flat("Local key does not match primary key")
     end.
 
+%%
+assert_partition_key_fields_not_descending(?DDL{ partition_key = #key_v1{ ast = PK }}) ->
+    [ordering_in_partition_key_error(N, O)
+        || ?SQL_PARAM{ name = [N], ordering = O } <- PK, O /= undefined],
+    ok.
+
+%%
+-spec ordering_in_partition_key_error(binary(), atom()) -> no_return().
+ordering_in_partition_key_error(N, Ordering) when is_binary(N) ->
+    return_error_flat("Order can only be used in the local key, '~s' set to ~p", [N, Ordering]).
+
+%%
 assert_unique_fields_in_pk(?DDL{local_key = #key_v1{ast = LK}}) ->
     Fields = [N || ?SQL_PARAM{name = [N]} <- LK],
     case length(Fields) == length(lists:usort(Fields)) of
@@ -1067,7 +1172,7 @@ assert_partition_key_fields_exist(?DDL{ fields = Fields,
                               [string:join(MissingFields, ", ")])
     end.
 
-assert_quantum_fn_args(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } } = DDL) ->
+assert_quantum_fn_args(?DDL{ partition_key = #key_v1{ ast = PKAST } } = DDL) ->
     [assert_quantum_fn_args2(DDL, Args) || #hash_fn_v1{ mod = riak_ql_quanta, fn = quantum, args = Args } <- PKAST],
     ok.
 
@@ -1095,7 +1200,7 @@ assert_quantum_fn_args2(DDL, [Param, Unit, Measure]) ->
             return_error_flat("Quantum time unit must be a positive integer.", [])
     end.
 
-assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+assert_not_more_than_one_quantum(?DDL{ partition_key = #key_v1{ ast = PKAST } }) ->
     QuantumFns =
         [Fn || #hash_fn_v1{ } = Fn <- PKAST],
     case length(QuantumFns) =< 1 of
@@ -1106,7 +1211,7 @@ assert_not_more_than_one_quantum(#ddl_v1{ partition_key = #key_v1{ ast = PKAST }
                 "More than one quantum function in the partition key.", [])
     end.
 
-assert_quantum_is_last_in_partition_key(#ddl_v1{ partition_key = #key_v1{ ast = PKAST } }) ->
+assert_quantum_is_last_in_partition_key(?DDL{ partition_key = #key_v1{ ast = PKAST } }) ->
     assert_quantum_is_last_in_partition_key2(PKAST).
 
 %%
@@ -1119,6 +1224,28 @@ assert_quantum_is_last_in_partition_key2([#hash_fn_v1{ }|_]) ->
         "The quantum function must be the last element of the partition key.", []);
 assert_quantum_is_last_in_partition_key2([_|Tail]) ->
     assert_quantum_is_last_in_partition_key2(Tail).
+
+%% Assert that any paramerts in the local key that use the desc keyword are
+%% types that support it.
+assert_desc_key_types(?DDL{ local_key = #key_v1{ ast = LKAST } } = DDL) ->
+    [assert_desc_key_field_type(DDL, P) || ?SQL_PARAM{ ordering = descending } = P <- LKAST],
+    ok.
+
+%%
+assert_desc_key_field_type(DDL, ?SQL_PARAM{ name = [Name] }) ->
+    {ok, Type} = riak_ql_ddl:get_field_type(DDL, Name),
+    case Type of
+        sint64 ->
+            ok;
+        varchar ->
+            ok;
+        timestamp ->
+            ok;
+        _ ->
+            return_error_flat(
+                "Elements in the local key marked descending (DESC) must be of "
+                "type sint64 or varchar, but was ~p.", [Type])
+    end.
 
 %% Check that the field name exists in the list of fields.
 is_field(Field, Fields) ->

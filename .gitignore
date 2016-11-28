@@ -15,3 +15,5 @@ _build
 rebar.lock
 .local_dialyzer_plt
 riak_ql
+dialyzer_unhandled_warnings
+dialyzer_warnings

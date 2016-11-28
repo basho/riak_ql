@@ -36,11 +36,15 @@
          }).
 
 
--define(SQL_PARAM, #param_v1).
--define(SQL_PARAM_RECORD_NAME, param_v1).
--define(SQL_PARAM_RECORD_VERSION, 1).
--record(?SQL_PARAM_RECORD_NAME, {
+-define(SQL_PARAM, #param_v2).
+-define(SQL_PARAM_RECORD_NAME, param_v2).
+-define(SQL_PARAM_RECORD_VERSION, v2).
+-record(param_v1, {
           name = [<<>>] :: [binary()]
+         }).
+-record(?SQL_PARAM_RECORD_NAME, {
+          name = [<<>>] :: [binary()],
+          ordering = undefined :: undefined | ascending | descending
          }).
 
 -record(hash_fn_v1, {
@@ -50,18 +54,30 @@
           type      :: riak_ql_ddl:simple_field_type()
          }).
 
+-define(DDL_KEY, #key_v1).
+-define(DDL_KEY_RECORD_NAME, key_v1).
 -record(key_v1, {
           ast = [] :: [#hash_fn_v1{} | ?SQL_PARAM{}]
          }).
 
+-define(DDL, #ddl_v2).
+-define(DDL_RECORD_NAME, ddl_v2).
+-define(DDL_RECORD_VERSION, v2).
+-type ddl_version() :: v1 | v2.
 -record(ddl_v1, {
           table              :: binary(),
           fields        = [] :: [#riak_field_v1{}],
           partition_key      :: #key_v1{} | none,
           local_key          :: #key_v1{}
          }).
--define(DDL, #ddl_v1).
--define(DDL_RECORD_NAME, ddl_v1).
--define(DDL_RECORD_VERSION, 1).
+-record(?DDL_RECORD_NAME, {
+          table              :: binary(),
+          fields        = [] :: [#riak_field_v1{}],
+          partition_key      :: #key_v1{} | none,
+          local_key          :: #key_v1{},
+          minimum_capability = v1 :: ddl_version()
+         }).
+
+-define(SQL_NULL, []).
 
 -endif.
