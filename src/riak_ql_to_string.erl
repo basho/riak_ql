@@ -134,15 +134,17 @@ make_f2([#riak_field_v1{name    = Nm,
     NewAcc = string:join(Args, " ") ++ "," ++ Join,
     make_f2(T, Join, [NewAcc | Acc]).
 
-pk_to_sql(#key_v1{ast = [Fam, Series, TS]}) ->
-    string:join([binary_to_list(extract(X?SQL_PARAM.name)) || X <- [Fam, Series]] ++ [make_q(TS)], ", ").
+pk_to_sql(#key_v1{ast = AST}) ->
+    string:join(lists:map(fun extract_pk_name/1, AST), ", ").
 
-make_q(#hash_fn_v1{mod  = riak_ql_quanta,
-                   fn   = quantum,
-                   args = Args,
-                   type = timestamp}) ->
-              [?SQL_PARAM{name = [Nm]}, No, Unit] = Args,
-    _Q = "QUANTUM(" ++ string:join([binary_to_list(Nm), integer_to_list(No), "'" ++ atom_to_list(Unit) ++ "'"], ", ") ++ ")".
+extract_pk_name(#hash_fn_v1{mod  = riak_ql_quanta,
+                            fn   = quantum,
+                            args = Args,
+                            type = timestamp}) ->
+    [?SQL_PARAM{name = [Nm]}, No, Unit] = Args,
+    _Q = "QUANTUM(" ++ string:join([binary_to_list(Nm), integer_to_list(No), "'" ++ atom_to_list(Unit) ++ "'"], ", ") ++ ")";
+extract_pk_name(Key) ->
+    binary_to_list(extract(Key?SQL_PARAM.name)).
 
 extract([X]) -> X.
 
