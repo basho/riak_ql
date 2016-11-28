@@ -147,9 +147,11 @@ group_by_one_field_test() ->
         {select, [
                   {tables, <<"mytab">>},
                   {fields, [{identifier, [<<"b">>]}]},
-                  {limit,  []},
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
-                  {group_by, [{identifier, <<"b">>}]}
+                  {group_by, [{identifier, <<"b">>}]},
+                  {limit, []},
+                  {offset, []},
+                  {order_by, []}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
@@ -163,11 +165,95 @@ group_by_two_fields_test() ->
         {select, [
                   {tables, <<"mytab">>},
                   {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
-                  {limit,  []},
                   {where,  [{'=', <<"a">>, {integer, 1}}]},
-                  {group_by, [{identifier, <<"a">>}, {identifier, <<"b">>}]}
+                  {group_by, [{identifier, <<"a">>}, {identifier, <<"b">>}]},
+                  {limit, []},
+                  {offset, []},
+                  {order_by, []}
                  ]},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+order_by_1_test() ->
+    Query_sql =
+        "SELECT a, b FROM mytab "
+        "WHERE a = 1 "
+        "ORDER BY a, b",  %% different default null-specs depending on ordering-spec
+    ?assertEqual(
+        {select, [
+                  {tables, <<"mytab">>},
+                  {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
+                  {where,  [{'=', <<"a">>, {integer, 1}}]},
+                  {group_by, []},
+                  {limit, []},
+                  {offset, []},
+                  {order_by, [{<<"a">>, asc, nulls_last}, {<<"b">>, asc, nulls_last}]}
+                 ]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+order_by_2_test() ->
+    Query_sql =
+        "SELECT a, b FROM mytab "
+        "WHERE a = 1 "
+        "ORDER BY a desc, b asc",  %% different defaults for null-spec #2
+    ?assertEqual(
+        {select, [
+                  {tables, <<"mytab">>},
+                  {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
+                  {where,  [{'=', <<"a">>, {integer, 1}}]},
+                  {group_by, []},
+                  {limit, []},
+                  {offset, []},
+                  {order_by, [{<<"a">>, desc, nulls_first}, {<<"b">>, asc, nulls_last}]}
+                 ]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+order_by_3_test() ->
+    Query_sql =
+        "SELECT a, b FROM mytab "
+        "WHERE a = 1 "
+        "ORDER BY a, b LIMIT 11 OFFSET 22",
+    ?assertEqual(
+        {select, [
+                  {tables, <<"mytab">>},
+                  {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
+                  {where,  [{'=', <<"a">>, {integer, 1}}]},
+                  {group_by, []},
+                  {limit, [11]},
+                  {offset, [22]},
+                  {order_by, [{<<"a">>, asc, nulls_last}, {<<"b">>, asc, nulls_last}]}
+                 ]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+order_by_4_test() ->
+    Query_sql =
+        "SELECT a, b FROM mytab "
+        "WHERE a = 1 "
+        "LIMIT 11",  %% implied, empty ORDER BY
+    ?assertEqual(
+        {select, [
+                  {tables, <<"mytab">>},
+                  {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
+                  {where,  [{'=', <<"a">>, {integer, 1}}]},
+                  {group_by, []},
+                  {limit, [11]},
+                  {offset, []},
+                  {order_by, []}
+                 ]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+order_by_with_group_by_test() ->
+    Query_sql =
+        "SELECT a, b FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY a, b ORDER BY a",
+    ?assertEqual(
+       {error, {0, riak_ql_parser, <<"ORDER BY/LIMIT/OFFSET clauses are not supported for GROUP BY queries.">>}},
+       riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
 selection_fields_must_be_in_group_by_1_test() ->
@@ -333,3 +419,73 @@ select_hex_and_char_literals_parse_the_same_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Hex_sql))
     ).
 
+multiline_comment_on_single_line_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+           "SELECT * FROM mytab /* hi */ "
+           "WHERE a = 'val'"))
+    ).
+
+multiline_comment_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab /* oh\n"
+            "hai */ WHERE a = 'val'"))
+    ).
+
+multiline_comment_with_asterisk_inside_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab /** *\n"
+            " * / / *\n"
+            "hai */ WHERE a = 'val'"))
+    ).
+
+multiple_multiline_comment_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab /* oh\n"
+            "hai */ /* hi again */ WHERE a = 'val'"))
+    ).
+
+single_line_comment_in_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab WHERE a = 'val' -- a comment"))
+    ).
+
+single_line_comment_in_multiline_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab -- a comment\n"
+            "WHERE a = 'val'"))
+    ).
+
+
+single_line_comment_in_multiline_ctrl_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab -- a comment\r\n"
+            "WHERE a = 'val'"))
+    ).

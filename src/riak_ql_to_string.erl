@@ -27,7 +27,10 @@
 
 -export([
          col_names_from_select/1,
-         ddl_rec_to_sql/1
+         ddl_rec_to_sql/1,
+         ddl_rec_to_sql/2,
+         ddl_rec_to_sql_with_props/2,
+         ddl_rec_to_sql_multiline/2
         ]).
 
 -include("riak_ql_ddl.hrl").
@@ -84,53 +87,107 @@ select_col_to_string({Op, Arg1, Arg2}) when is_atom(Op) ->
       "(~s~s~s)",
       [select_col_to_string(Arg1), op_to_string(Op), select_col_to_string(Arg2)]).
 
-op_to_string(and_) -> "and";
-op_to_string(or_) -> "or";
+op_to_string(and_) -> "AND";
+op_to_string(or_) -> "OR";
 op_to_string(Op) ->
     atom_to_list(Op).
 
 flat_format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
 
--spec ddl_rec_to_sql(#ddl_v1{}) -> string().
-ddl_rec_to_sql(#ddl_v1{table         = Tb,
-                       fields        = Fs,
-                       partition_key = PK,
-                       local_key     = LK}) ->
-    "CREATE TABLE " ++ binary_to_list(Tb) ++ " (" ++ make_fields(Fs) ++ "PRIMARY KEY ((" ++ pk_to_sql(PK) ++ "), " ++ lk_to_sql(LK) ++ "))".
+-spec ddl_rec_to_sql(?DDL{}) -> string().
+ddl_rec_to_sql(DDL) ->
+    ddl_rec_to_sql(DDL, " ").
 
-make_fields(Fs) ->
-    make_f2(Fs, []).
+-spec ddl_rec_to_sql(?DDL{}, string()) -> string().
+ddl_rec_to_sql(?DDL{table         = Tb,
+                    fields        = Fs,
+                    partition_key = PK,
+                    local_key     = LK},
+               Join) ->
+    "CREATE TABLE " ++ binary_to_list(Tb) ++ " (" ++ make_fields(Fs, Join) ++ "PRIMARY KEY ((" ++ pk_to_sql(PK) ++ ")," ++ Join ++ lk_to_sql(LK) ++ "))".
 
-make_f2([], Acc) ->
+-spec ddl_rec_to_sql_with_props(?DDL{}, [tuple()]) -> string().
+ddl_rec_to_sql_with_props(DDL, Props) ->
+    ddl_rec_to_sql(DDL) ++ make_props(Props).
+
+-spec ddl_rec_to_sql_multiline(?DDL{}, [tuple()]) -> string().
+ddl_rec_to_sql_multiline(DDL, Props) ->
+    Join = "\n",
+    ddl_rec_to_sql(DDL, Join) ++ make_props(Props, Join).
+
+make_fields(Fs, Join) ->
+    make_f2(Fs, Join, []).
+
+make_f2([], _Join, Acc) ->
     lists:flatten(lists:reverse(Acc));
 make_f2([#riak_field_v1{name    = Nm,
                        type     = Ty,
-                       optional = IsOpt} | T], Acc) ->
+                       optional = IsOpt} | T], Join, Acc) ->
     Args = [
             binary_to_list(Nm),
-            atom_to_list(Ty)
+            string:to_upper(atom_to_list(Ty))
            ] ++ case IsOpt of
                     true  -> [];
-                    false -> ["not null"]
+                    false -> ["NOT NULL"]
                 end,
-    NewAcc = string:join(Args, " ") ++ ", ",
-    make_f2(T, [NewAcc | Acc]).
+    NewAcc = string:join(Args, " ") ++ "," ++ Join,
+    make_f2(T, Join, [NewAcc | Acc]).
 
-pk_to_sql(#key_v1{ast = [Fam, Series, TS]}) ->
-    string:join([binary_to_list(extract(X?SQL_PARAM.name)) || X <- [Fam, Series]] ++ [make_q(TS)], ", ").
+pk_to_sql(#key_v1{ast = AST}) ->
+    string:join(lists:map(fun extract_pk_name/1, AST), ", ").
 
-make_q(#hash_fn_v1{mod  = riak_ql_quanta,
-                   fn   = quantum,
-                   args = Args,
-                   type = timestamp}) ->
-              [?SQL_PARAM{name = [Nm]}, No, Unit] = Args,
-    _Q = "quantum(" ++ string:join([binary_to_list(Nm), integer_to_list(No), "'" ++ atom_to_list(Unit) ++ "'"], ", ") ++ ")".
+extract_pk_name(#hash_fn_v1{mod  = riak_ql_quanta,
+                            fn   = quantum,
+                            args = Args,
+                            type = timestamp}) ->
+    [?SQL_PARAM{name = [Nm]}, No, Unit] = Args,
+    _Q = "QUANTUM(" ++ string:join([binary_to_list(Nm), integer_to_list(No), "'" ++ atom_to_list(Unit) ++ "'"], ", ") ++ ")";
+extract_pk_name(Key) ->
+    binary_to_list(extract(Key?SQL_PARAM.name)).
 
 extract([X]) -> X.
 
 lk_to_sql(LK) ->
-    string:join([binary_to_list(extract(X?SQL_PARAM.name)) || X <- LK#key_v1.ast], ", ").
+    string:join([param_to_string(P) || P <- LK#key_v1.ast], ", ").
+
+param_to_string(?SQL_PARAM{name = [Name], ordering = Order}) ->
+    case Order of
+        descending ->
+            binary_to_list(Name) ++ " DESC";
+        _ ->
+            binary_to_list(Name)
+    end.
+
+%% Default join character is a space
+make_props(Props) ->
+    make_props(Props, " ").
+make_props([], _Join) ->
+    "";
+make_props(Props, Join) ->
+    PropList = [flat_format("~s = ~s", [prop_to_string(K), prop_to_quoted_string(V)]) || {K, V} <- Props],
+    Join ++ "WITH (" ++ string:join(PropList, "," ++ Join) ++ ")".
+
+prop_to_string(V) when is_integer(V) ->
+    integer_to_list(V);
+prop_to_string(V) when is_boolean(V) ->
+    atom_to_list(V);
+prop_to_string(V) when is_float(V) ->
+    mochinum:digits(V);
+prop_to_string(V) when is_binary(V) ->
+    binary_to_list(V);
+prop_to_string(V) when is_atom(V) ->
+    atom_to_list(V);
+prop_to_string(V) ->
+    flat_format("~p", [V]).
+
+prop_to_quoted_string(V) when is_binary(V) ->
+    flat_format("'~s'", [V]);
+prop_to_quoted_string(V) when is_list(V) ->
+    flat_format("'~s'", [V]);
+prop_to_quoted_string(V) ->
+    prop_to_string(V).
+
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -264,14 +321,104 @@ select_col_to_string_negated_parens_test() ->
 
 ddl_rec_to_string_test() ->
     SQL = "CREATE TABLE Mesa "
-          "(Uno timestamp not null, "
-          "Dos timestamp not null, "
-          "Tres timestamp not null, "
+          "(Uno TIMESTAMP NOT NULL, "
+          "Dos TIMESTAMP NOT NULL, "
+          "Tres TIMESTAMP NOT NULL, "
           "PRIMARY KEY ((Uno, Dos, "
-          "quantum(Tres, 1, 'd')), "
+          "QUANTUM(Tres, 1, 'd')), "
           "Uno, Dos, Tres))",
     Lexed = riak_ql_lexer:get_tokens(SQL),
-    {ddl, DDL = #ddl_v1{}, _} = riak_ql_parser:ql_parse(Lexed),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql(DDL)
+    ).
+
+ddl_rec_with_shorter_pk_to_string_test() ->
+    SQL = "CREATE TABLE Mesa "
+          "(Uno TIMESTAMP NOT NULL, "
+          "Dos TIMESTAMP NOT NULL, "
+          "PRIMARY KEY ((Uno, "
+          "QUANTUM(Dos, 1, 'd')), "
+          "Uno, Dos))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql(DDL)
+    ).
+
+ddl_rec_with_no_quantum_to_string_test() ->
+    SQL = "CREATE TABLE Mesa "
+          "(Uno TIMESTAMP NOT NULL, "
+          "Dos TIMESTAMP NOT NULL, "
+          "Tres TIMESTAMP NOT NULL, "
+          "PRIMARY KEY ((Uno, Dos, Tres), "
+          "Uno, Dos, Tres))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql(DDL)
+    ).
+
+ddl_rec_with_longer_pk_no_quantum_to_string_test() ->
+    SQL = "CREATE TABLE Mesa "
+          "(Uno TIMESTAMP NOT NULL, "
+          "Dos TIMESTAMP NOT NULL, "
+          "Tres TIMESTAMP NOT NULL, "
+          "Quatro TIMESTAMP NOT NULL, "
+          "PRIMARY KEY ((Uno, Dos, Tres, Quatro), "
+          "Uno, Dos, Tres, Quatro))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql(DDL)
+    ).
+
+ddl_rec_to_multiline_string_test() ->
+    SQL = "CREATE TABLE Mesa "
+    "(Uno TIMESTAMP NOT NULL,\n"
+    "Dos TIMESTAMP NOT NULL,\n"
+    "Tres TIMESTAMP NOT NULL,\n"
+    "PRIMARY KEY ((Uno, Dos, "
+    "QUANTUM(Tres, 1, 'd')),\n"
+    "Uno, Dos, Tres))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql_multiline(DDL, [])
+    ).
+
+ddl_rec_with_props_to_string_test() ->
+    SQL = "CREATE TABLE Mesa "
+    "(Uno TIMESTAMP NOT NULL,\n"
+    "Dos TIMESTAMP NOT NULL,\n"
+    "Tres TIMESTAMP NOT NULL,\n"
+    "PRIMARY KEY ((Uno, Dos, "
+    "QUANTUM(Tres, 1, 'd')),\n"
+    "Uno, Dos, Tres))\n"
+    "WITH (a = 1,\n"
+    "b = true,\n"
+    "c = 'hola')",
+    Props = [{a, 1}, {b, true}, {c, "hola"}],
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
+    ?assertEqual(
+        SQL,
+        ddl_rec_to_sql_multiline(DDL, Props)
+    ).
+
+ddl_rec_to_string_desc_keys_test() ->
+    SQL = "CREATE TABLE mytab ("
+          "a TIMESTAMP NOT NULL, "
+          "b TIMESTAMP NOT NULL, "
+          "c TIMESTAMP NOT NULL, "
+          "PRIMARY KEY ((a, b, QUANTUM(c, 1, 'd')), a, b, c DESC))",
+    Lexed = riak_ql_lexer:get_tokens(SQL),
+    {ddl, DDL = ?DDL{}, _} = riak_ql_parser:ql_parse(Lexed),
     ?assertEqual(
         SQL,
         ddl_rec_to_sql(DDL)
