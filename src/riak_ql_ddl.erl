@@ -1083,36 +1083,6 @@ make_plain_key_test() ->
     ?assertEqual(Expected, Got).
 
 make_functional_key_test() ->
-<<<<<<< HEAD
-    PKey = #key_v1{ast = [
-                          ?SQL_PARAM{name = [<<"user">>]},
-                          #hash_fn_v1{mod  = ?MODULE,
-                                      fn   = mock_partition_fn,
-                                      args = [
-                                              ?SQL_PARAM{name = [<<"time">>]},
-                                              15,
-                                              m
-                                            ],
-                                      type = timestamp
-                                     }
-                         ]},
-    LKey = #key_v1{ast = [
-                          ?SQL_PARAM{name = [<<"user">>]},
-                          ?SQL_PARAM{name = [<<"time">>]}
-                         ]},
-    DDL = make_ddl(<<"make_plain_key_test">>,
-                   [
-                    #riak_field_v1{name     = <<"user">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"time">>,
-                                   position = 2,
-                                   type     = timestamp}
-                   ],
-                   PKey,
-                   LKey),
-    Time = 12345,
-=======
     Table_def =
         "CREATE TABLE make_plain_key_test ("
         "user VARCHAR NOT NULL, "
@@ -1120,19 +1090,13 @@ make_functional_key_test() ->
         "PRIMARY KEY ((user, quantum(time, 15, 'm')), user, time))",
     {ddl, DDL, _} =
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
->>>>>>> origin/develop
     Vals = [
             {<<"user">>, <<"user_1">>},
             {<<"time">>, 12345}
            ],
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-<<<<<<< HEAD
-    Got = make_key(Mod, PKey, Vals),
-    Expected = [{varchar, <<"user_1">>}, {timestamp, mock_result}],
-=======
     Got = make_key(Mod, DDL?DDL.local_key, Vals),
     Expected = [{varchar, <<"user_1">>}, {timestamp, 12345}],
->>>>>>> origin/develop
     ?assertEqual(Expected, Got).
 
 helper_compile_def_to_module(SQL) ->

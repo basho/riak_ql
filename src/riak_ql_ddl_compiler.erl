@@ -301,8 +301,6 @@ build_get_ddl_fn(DDL, LineNo, []) ->
     Fn = flat_format("get_ddl() -> ~p.", [DDL]),
     {?Q(Fn), LineNo + 1}.
 
--spec build_delete_key_fn(?DDL{}, pos_integer, ast()) ->
-                              {expr(), pos_integer()}.
 build_delete_key_fn(DDL, LineNo, []) ->
     Fn = flat_format("get_delete_key(W) ->"
                      "LocalKey = ~p, "
