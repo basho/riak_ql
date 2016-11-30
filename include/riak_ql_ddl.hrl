@@ -31,7 +31,7 @@
 -record(riak_field_v1, {
           name     = <<>>  :: binary(),
           position         :: undefined | pos_integer(),
-          type             :: undefined | riak_ql_ddl:simple_field_type(),
+          type             :: undefined | riak_ql_ddl:external_field_type(),
           optional = false :: boolean()
          }).
 
@@ -51,7 +51,7 @@
           mod       :: atom(),
           fn        :: atom(),
           args = [] :: [?SQL_PARAM{} | any()],
-          type      :: riak_ql_ddl:simple_field_type()
+          type      :: riak_ql_ddl:external_field_type()
          }).
 
 -define(DDL_KEY, #key_v1).

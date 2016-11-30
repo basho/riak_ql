@@ -28,7 +28,7 @@
 
 %%
 -spec describe(?DDL{}) -> {ok, {ColNames::[binary()],
-                                ColTypes::[riak_ql_ddl:simple_field_type()],
+                                ColTypes::[riak_ql_ddl:external_field_type()],
                                 Rows::[[any()]]}}.
 describe(?DDL{fields = FieldSpecs,
               partition_key = #key_v1{ast = PKSpec},
