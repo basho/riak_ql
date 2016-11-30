@@ -203,7 +203,8 @@ create_all_types_sql_test() ->
                                 ?SQL_PARAM{name = [<<"user">>]},
                                 ?SQL_PARAM{name = [<<"geohash">>]},
                                 ?SQL_PARAM{name = [<<"time">>]}
-                               ]}
+                               ]},
+                  minimum_capability = v2 %% v2 because blob is used
                  },
     ?assertEqual(Expected, Got).
 

@@ -729,19 +729,17 @@ get_storage_type(Type) -> Type.
 get_legacy_type(blob, v1) -> varchar;
 get_legacy_type(Type, _Version) -> Type.
 
-%% Determing the minimum capability value that is required to run
-%% operations on this table. For each function in this list, be
-%% explicit about the DDL record (use `#ddl_v<n>' instead of the
-%% `?DDL' macro). DDL v1 records will never be passed to any of these
-%% functions
--define(MIN_CAP_FUNS, [fun get_descending_keys_required_cap/1,
-                       fun get_type_required_cap/1]).
-
 -spec get_minimum_capability(any_ddl()) -> ddl_version().
 get_minimum_capability(#ddl_v1{}) ->
     v1;
 get_minimum_capability(DDL) ->
-    lists:max(lists:map(fun(Fn) -> Fn(DDL) end, ?MIN_CAP_FUNS)).
+    %% Determing the minimum capability value that is required to run
+    %% operations on this table. For each function in this list, be
+    %% explicit about the DDL record (use `#ddl_v<n>' instead of the
+    %% `?DDL' macro). DDL v1 records will never be passed to any of these
+    %% functions
+    lists:max([Fn(DDL) || Fn <- [fun get_descending_keys_required_cap/1,
+                                 fun get_type_required_cap/1]]).
 
 %%
 get_type_required_cap(#ddl_v2{fields=RiakFields}) ->
@@ -1743,6 +1741,7 @@ upgrade_ddl_with_hash_fn_test() ->
                     type = timestamp},
     DDL_v1 = #ddl_v1{
         table = <<"tab">>,
+        fields = [#riak_field_v1{}],
         local_key = #key_v1{ ast = [HashFn] },
         partition_key = #key_v1{ ast = [] }
     },
@@ -1750,6 +1749,7 @@ upgrade_ddl_with_hash_fn_test() ->
         [DDL_v1,
          #ddl_v2{
             table = <<"tab">>,
+            fields = [#riak_field_v1{}],
             local_key = #key_v1{ ast = [HashFn#hash_fn_v1{ args = [#param_v2{name = [<<"a">>], ordering = ascending}, 15, m] }] },
             partition_key = #key_v1{ ast = [] }
          }],
@@ -1759,6 +1759,7 @@ upgrade_ddl_with_hash_fn_test() ->
 upgrade_ddl_v1_test() ->
     DDL_v1 = #ddl_v1{
         table = <<"tab">>,
+        fields = [#riak_field_v1{}],
         local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] },
         partition_key = #key_v1{ ast = [] }
 
@@ -1767,6 +1768,7 @@ upgrade_ddl_v1_test() ->
         [DDL_v1,
          #ddl_v2{
             table = <<"tab">>,
+            fields = [#riak_field_v1{}],
             local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] },
             partition_key = #key_v1{ ast = [] }
          }],
@@ -1776,26 +1778,40 @@ upgrade_ddl_v1_test() ->
 downgrade_ddl_v2_test() ->
     DDL_v2 = #ddl_v2{
         table = <<"tab">>,
+        fields = [#riak_field_v1{}],
         local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = ascending }] },
         partition_key = #key_v1{ ast = [] }
     },
     ?assertEqual(
         [#ddl_v1{
-                    table = <<"tab">>,
-                    local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] },
-                    partition_key = #key_v1{ ast = [] }
-                }],
+            table = <<"tab">>,
+            fields = [#riak_field_v1{}],
+            local_key = #key_v1{ ast = [#param_v1{ name = [<<"a">>] }] },
+            partition_key = #key_v1{ ast = [] }
+        }],
         convert(v1, DDL_v2)
     ).
 
 downgrade_ddl_v2_with_desc_test() ->
     DDL_v2 = #ddl_v2{
         table = <<"tab">>,
+        fields = [#riak_field_v1{}],
         local_key = #key_v1{ ast = [#param_v2{ name = [<<"a">>], ordering = descending }] }
     },
     ?assertEqual(
         [{error, {cannot_downgrade, v1}}],
         convert(v1, DDL_v2)
+    ).
+
+get_minimum_capability_blob_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE mytab1 ("
+        "a BLOB NOT NULL, "
+        "ts timestamp NOT NULL, "
+        "PRIMARY KEY((quantum(ts,30,'d')), ts));")),
+    ?assertEqual(
+        v2,
+        get_minimum_capability(DDL)
     ).
 
 -endif.
