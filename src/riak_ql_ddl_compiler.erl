@@ -109,26 +109,28 @@ compile({ok, ?DDL{} = DDL}) ->
     %% handle output directly from riak_ql_parser
     compile(DDL);
 compile(?DDL{ table = Table, fields = Fields } = DDL) ->
-    {ModName, Attrs, LineNo} = make_attrs(Table, ?LINENOSTART),
-    {VFns,         LineNo2}  = build_validn_fns(Fields,    LineNo),
-    {ACFns,        LineNo3}  = build_add_cols_fns(Fields,  LineNo2),
-    {ExtractFn,    LineNo4}  = build_extract_fn(DDL,  LineNo3),
-    {GetTypeFn,    LineNo5}  = build_get_type_fn([Fields], LineNo4, []),
-    {GetPosnFn,    LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
-    {GetPosnsFn,   LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
-    {IsValidFn,    LineNo8}  = build_is_valid_fn(Fields,   LineNo7),
-    {DDLVersionFn, LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8),
-    {GetDDLFn,     LineNo10} = build_get_ddl_fn(DDL, LineNo9, []),
-    {HashFns,      LineNo11} = build_identity_hash_fns(DDL, LineNo10),
-    {FieldOrdersFn, LineNo10} = build_field_orders_fn(DDL, LineNo9),
-    {RevertOrderingFn, LineNo11} = build_revert_ordering_on_local_key_fn(DDL, LineNo10),
-    {MinDDLCapFn, LineNo12} = build_min_ddl_version_fn(DDL, LineNo11),
+    {ModName, Attrs,   LineNo} = make_attrs(Table, ?LINENOSTART),
+    {VFns,             LineNo2}  = build_validn_fns(Fields,    LineNo),
+    {ACFns,            LineNo3}  = build_add_cols_fns(Fields,  LineNo2),
+    {ExtractFn,        LineNo4}  = build_extract_fn(DDL,       LineNo3),
+    {GetTypeFn,        LineNo5}  = build_get_type_fn([Fields], LineNo4, []),
+    {GetPosnFn,        LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
+    {GetPosnsFn,       LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
+    {IsValidFn,        LineNo8}  = build_is_valid_fn(Fields,   LineNo7),
+    {DDLVersionFn,     LineNo9}  = build_get_ddl_compiler_version_fn(LineNo8),
+    {GetDDLFn,         LineNo10} = build_get_ddl_fn(DDL,        LineNo9, []),
+    {HashFns,          LineNo11} = build_identity_hash_fns(DDL, LineNo10),
+    {FieldOrdersFn,    LineNo12} = build_field_orders_fn(DDL,   LineNo11),
+    {RevertOrderingFn, LineNo13} = build_revert_ordering_on_local_key_fn(DDL, LineNo12),
+    {MinDDLCapFn,      LineNo14} = build_min_ddl_version_fn(DDL, LineNo13),
+    {DeleteKeyFn,      LineNo15} = build_delete_key_fn(DDL, LineNo14, []),
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn, GetDDLFn, FieldOrdersFn, RevertOrderingFn, MinDDLCapFn]
+        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn,
+            GetDDLFn, FieldOrdersFn, RevertOrderingFn, MinDDLCapFn, DeleteKeyFn]
         ++ HashFns
-        ++ [{eof, LineNo12}],
+        ++ [{eof, LineNo15}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
@@ -297,6 +299,16 @@ build_get_ddl_compiler_version_fn(LineNo) ->
                               {expr(), pos_integer()}.
 build_get_ddl_fn(DDL, LineNo, []) ->
     Fn = flat_format("get_ddl() -> ~p.", [DDL]),
+    {?Q(Fn), LineNo + 1}.
+
+build_delete_key_fn(DDL, LineNo, []) ->
+    Fn = flat_format("get_delete_key(W) ->"
+                     "LocalKey = ~p, "
+                     "case riak_ql_ddl_util:is_valid_delete_where_clause(W) of "
+                     "true -> riak_ql_ddl_util:make_delete_key(LocalKey, W); "
+                     "{error, Errors} -> {error, Errors} "
+                     "end.",
+                     [DDL?DDL.local_key]),
     {?Q(Fn), LineNo + 1}.
 
 %% Build the AST for a function returning a list of the order
@@ -582,9 +594,9 @@ make_export_attr(LineNo) ->
                                   {is_field_valid,               1},
                                   {revert_ordering_on_local_key, 1},
                                   {validate_obj,                 1},
-                                  {get_min_required_ddl_cap,     0}
+                                  {get_min_required_ddl_cap,     0},
+                                  {get_delete_key,               1}
                                  ]}, LineNo + 1}.
-
 
 %% supporting functions
 
@@ -1034,14 +1046,15 @@ simple_valid_extract_test() ->
 complex_ddl_test() ->
     DDL = make_complex_ddl_ddl(),
     {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:validate_obj({12345, <<"beeees">>}),
+    Result = Module:validate_obj({12345, <<"beeees">>, <<"yardle">>}),
     ?assertEqual(?VALID, Result).
 
 make_complex_ddl_ddl() ->
     Table_def =
         "CREATE TABLE temperatures ("
-        "time    TIMESTAMP NOT NULL, "
-        "user_id VARCHAR NOT NULL, "
+        "time        TIMESTAMP NOT NULL, "
+        "user_id     VARCHAR NOT NULL, "
+        "nonkeyfield VARCHAR NOT NULL, "
         "PRIMARY KEY ((user_id, quantum(time, 15, 's')), user_id, time))",
     {ddl, DDL, _} =
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def)),
@@ -1200,5 +1213,73 @@ build_extract_fn_source_test() ->
         build_extract_fn_source(DDL)
     ).
 
+%%
+%% Delete tests
+%%
+simple_delete_pass_test() ->
+    DDL = make_complex_ddl_ddl(),
+    {module, Module} = compile_and_load_from_tmp(DDL),
+    DeleteSQL = "delete from temperatures where time = 1 and user_id = 'bob';",
+    Toks = riak_ql_lexer:get_tokens(DeleteSQL),
+    {delete, Clauses} = riak_ql_parser:ql_parse(Toks),
+    {where, W} = lists:keyfind(where, 1, Clauses),
+    {ok, Got} = Module:get_delete_key(W),
+    Expected = [<<"bob">>, 1],
+    ?assertEqual(Expected, Got).
+
+simple_delete_fail_1_test() ->
+    DDL = make_complex_ddl_ddl(),
+    {module, Module} = compile_and_load_from_tmp(DDL),
+    DeleteSQL = "delete from temperatures where time = 1 and not_a_field = 'bob';",
+    Toks = riak_ql_lexer:get_tokens(DeleteSQL),
+    {delete, Clauses} = riak_ql_parser:ql_parse(Toks),
+    {where, W} = lists:keyfind(where, 1, Clauses),
+    {error, Got} = Module:get_delete_key(W),
+    Expected = ["invalid key"],
+    ?assertEqual(Expected, Got).
+
+simple_delete_fail_2_test() ->
+    DDL = make_complex_ddl_ddl(),
+    {module, Module} = compile_and_load_from_tmp(DDL),
+    DeleteSQL = "delete from temperatures where time = 1;",
+    Toks = riak_ql_lexer:get_tokens(DeleteSQL),
+    {delete, Clauses} = riak_ql_parser:ql_parse(Toks),
+    {where, W} = lists:keyfind(where, 1, Clauses),
+    {error, Got} = Module:get_delete_key(W),
+    Expected = ["invalid key"],
+    ?assertEqual(Expected, Got).
+
+simple_delete_fail_3_test() ->
+    DDL = make_complex_ddl_ddl(),
+    {module, Module} = compile_and_load_from_tmp(DDL),
+    DeleteSQL = "delete from temperatures where time = 1 and nonkeyfield = 'yadno';",
+    Toks = riak_ql_lexer:get_tokens(DeleteSQL),
+    {delete, Clauses} = riak_ql_parser:ql_parse(Toks),
+    {where, W} = lists:keyfind(where, 1, Clauses),
+    {error, Got} = Module:get_delete_key(W),
+    Expected = ["invalid key"],
+    ?assertEqual(Expected, Got).
+
+simple_delete_key_too_long_fail_1_test() ->
+    DDL = make_complex_ddl_ddl(),
+    {module, Module} = compile_and_load_from_tmp(DDL),
+    DeleteSQL = "delete from temperatures where time = 1 and user_id = 'bob' and nonkeyfield = 'yadno';",
+    Toks = riak_ql_lexer:get_tokens(DeleteSQL),
+    {delete, Clauses} = riak_ql_parser:ql_parse(Toks),
+    {where, W} = lists:keyfind(where, 1, Clauses),
+    {error, Got} = Module:get_delete_key(W),
+    Expected = ["invalid key"],
+    ?assertEqual(Expected, Got).
+
+simple_delete_key_too_long_fail_2_test() ->
+    DDL = make_complex_ddl_ddl(),
+    {module, Module} = compile_and_load_from_tmp(DDL),
+    DeleteSQL = "delete from temperatures where time = 1 and user_id = 'bob' and notavalidfield = 'yadno';",
+    Toks = riak_ql_lexer:get_tokens(DeleteSQL),
+    {delete, Clauses} = riak_ql_parser:ql_parse(Toks),
+    {where, W} = lists:keyfind(where, 1, Clauses),
+    {error, Got} = Module:get_delete_key(W),
+    Expected = ["invalid key"],
+    ?assertEqual(Expected, Got).
 
 -endif.

@@ -11,6 +11,7 @@ BLOB = (B|b)(L|l)(O|o)(B|b)
 BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
 BY = (B|b)(Y|y)
 CREATE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)
+DELETE = (D|d)(E|e)(L|l)(E|e)(T|t)(E|e)
 DESC = (D|d)(E|e)(S|s)(C|c)
 DESCRIBE = (D|d)(E|e)(S|s)(C|c)(R|r)(I|i)(B|b)(E|e)
 DOUBLE = (D|d)(O|o)(U|u)(B|b)(L|l)(E|e)
@@ -90,6 +91,7 @@ Rules.
 {BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
 {BY} : {token, {by, list_to_binary(TokenChars)}}.
 {CREATE} : {token, {create, list_to_binary(TokenChars)}}.
+{DELETE} : {token, {delete, list_to_binary(TokenChars)}}.
 {DESC} : {token, {desc, list_to_binary(TokenChars)}}.
 {DESCRIBE} : {token, {describe, list_to_binary(TokenChars)}}.
 {DOUBLE} : {token, {double, list_to_binary(TokenChars)}}.
