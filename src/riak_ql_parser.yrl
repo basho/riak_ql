@@ -93,6 +93,7 @@ Terminals
 and_
 asc
 asterisk
+blob
 boolean
 by
 character_literal
@@ -254,6 +255,7 @@ Vals -> NumericValueExpression : '$1'.
 Vals -> regex            : '$1'.
 Vals -> Val              : '$1'.
 
+Val -> blob               : '$1'.
 Val -> varchar            : '$1'.
 Val -> CharacterLiteral   : '$1'.
 Val -> TruthValue         : '$1'.
@@ -382,6 +384,7 @@ ColumnConstraint -> NotNull : not_null.
 DataType -> double    : '$1'.
 DataType -> sint64    : '$1'.
 DataType -> timestamp : '$1'.
+DataType -> blob      : '$1'.
 DataType -> varchar   : '$1'.
 DataType -> boolean   : '$1'.
 
@@ -404,7 +407,7 @@ KeyFieldList -> KeyField : ['$1'].
 
 KeyField -> quantum left_paren KeyFieldArgList right_paren :
     element(2, make_modfun(quantum, '$3')).
-KeyField -> Identifier OptOrdering  : 
+KeyField -> Identifier OptOrdering  :
     ?SQL_PARAM{name = [element(2, '$1')], ordering = '$2'}.
 
 OptOrdering -> '$empty' : undefined.
@@ -1234,7 +1237,7 @@ assert_desc_key_types(?DDL{ local_key = #key_v1{ ast = LKAST } } = DDL) ->
 %%
 assert_desc_key_field_type(DDL, ?SQL_PARAM{ name = [Name] }) ->
     {ok, Type} = riak_ql_ddl:get_field_type(DDL, Name),
-    case Type of
+    case riak_ql_ddl:get_storage_type(Type) of
         sint64 ->
             ok;
         varchar ->
@@ -1244,7 +1247,7 @@ assert_desc_key_field_type(DDL, ?SQL_PARAM{ name = [Name] }) ->
         _ ->
             return_error_flat(
                 "Elements in the local key marked descending (DESC) must be of "
-                "type sint64 or varchar, but was ~p.", [Type])
+                "type 'sint64', 'timestamp', 'varchar', or 'blob', but was '~p'.", [Type])
     end.
 
 %% Check that the field name exists in the list of fields.

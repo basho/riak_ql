@@ -244,10 +244,10 @@ canonical_fields(Fields) ->
                          X#riak_field_v1.type,
                          X#riak_field_v1.optional) || X <- F2].
 
-canonical_field_format(Nm, Ty, true)  -> 
+canonical_field_format(Nm, Ty, true)  ->
     Msg = io_lib:format("~s ~s", [Nm, Ty]),
     lists:flatten(Msg);
-canonical_field_format(Nm, Ty, false) -> 
+canonical_field_format(Nm, Ty, false) ->
     Msg = io_lib:format("~s ~s not null", [Nm, Ty]),
     lists:flatten(Msg).
 
@@ -348,10 +348,10 @@ build_revert_ordering_on_local_key_fn_string(?DDL{ local_key = #key_v1{ ast = AS
 %%
 revert_ordering_on_local_key_element(DDL, ?SQL_PARAM{ name = N1, ordering = descending }) ->
     N2 = to_var_name_string(N1),
-    case field_type(DDL, hd(N1)) of
+    case riak_ql_ddl:get_storage_type(field_type(DDL, hd(N1))) of
         varchar ->
             "riak_ql_ddl:flip_binary(" ++ N2 ++ ")";
-        Type when Type == timestamp; Type == sint64 ->
+        sint64 ->
             %% in the case of integers we just negate the original negation
             N2 ++ "*-1";
         _ ->
@@ -478,7 +478,8 @@ build_validn_fns(Fields, LineNo) ->
     Names = [escape(Name) || {_, _, Name} <- make_names(Fields, LineNo)],
     Params = [{Rec#riak_field_v1.type, Rec#riak_field_v1.optional} || Rec <- Fields],
     FunCall = io_lib:format(Fn ++ "({" ++ string:join(Names, ", ") ++ "}) when ", []),
-    Guards = [make_guard(Variable, Type, Optional) || {Variable, {Type, Optional}} <- lists:zip(Names, Params)],
+    Guards = [make_guard(Variable, riak_ql_ddl:get_storage_type(Type), Optional)
+              || {Variable, {Type, Optional}} <- lists:zip(Names, Params)],
     Guards2 = [X || X <- Guards, X =/= []],
     Guards3 = string:join(Guards2, ", "),
     SuccessClause = FunCall ++ Guards3 ++ " -> true;",
@@ -512,10 +513,6 @@ make_guard(Variable, boolean, true) ->
     Variable ++ " =:= [] orelse is_boolean(" ++ Variable ++ ")";
 make_guard(Variable, boolean, false) ->
     "is_boolean(" ++ Variable ++ ")";
-make_guard(Variable, set, true) ->
-    Variable ++ " =:= [] orelse is_list(" ++ Variable ++ ")";
-make_guard(Variable, set, false) ->
-    "is_list(" ++ Variable ++ ")";
 make_guard(Variable, timestamp, true) ->
     Variable ++ " =:= [] orelse (is_integer(" ++ Variable ++ ") andalso " ++ Variable ++ " > 0)";
 make_guard(Variable, timestamp, false) ->
@@ -791,9 +788,9 @@ make_simple_valid_optional_2_ddl() ->
                              position = 5,
                              type     = boolean,
                              optional = true},
-              #riak_field_v1{name     = <<"epithelion">>,
+              #riak_field_v1{name     = <<"whynot">>,
                              position = 6,
-                             type     = set,
+                             type     = blob,
                              optional = true},
               #riak_field_v1{name     = <<"endofdays">>,
                              position = 7,
@@ -818,26 +815,6 @@ make_simple_valid_optional_3_ddl() ->
                              position = 2,
                              type     = varchar,
                              optional = false}
-             ]).
-
-simple_valid_set_test() ->
-    DDL = make_simple_valid_set_ddl(),
-    {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:validate_obj({<<"ewrewr">>, [a, b, d], 4.4}),
-    ?assertEqual(?VALID, Result).
-
-make_simple_valid_set_ddl() ->
-    make_ddl(<<"simple_valid_set_test">>,
-             [
-              #riak_field_v1{name     = <<"yando">>,
-                             position = 1,
-                             type     = varchar},
-              #riak_field_v1{name     = <<"erko">>,
-                             position = 2,
-                             type     = set},
-              #riak_field_v1{name     = <<"erkle">>,
-                             position = 3,
-                             type     = double}
              ]).
 
 simple_valid_mixed_test() ->
@@ -876,6 +853,20 @@ simple_invalid_varchar_test() ->
                     #riak_field_v1{name     = <<"erko">>,
                                    position = 2,
                                    type     = varchar}
+                   ]),
+    {module, Module} = compile_and_load_from_tmp(DDL),
+    Result = Module:validate_obj({<<"ewrewr">>, 55}),
+    ?assertEqual(?INVALID, Result).
+
+simple_invalid_blob_test() ->
+    DDL = make_ddl(<<"simple_invalid_blob_test">>,
+                   [
+                    #riak_field_v1{name     = <<"yando">>,
+                                   position = 1,
+                                   type     = blob},
+                    #riak_field_v1{name     = <<"erko">>,
+                                   position = 2,
+                                   type     = blob}
                    ]),
     {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({<<"ewrewr">>, 55}),
@@ -931,23 +922,6 @@ simple_invalid_boolean_test() ->
     {module, Module} = compile_and_load_from_tmp(DDL),
     Result = Module:validate_obj({true, false, [a, b, d]}),
     ?assertEqual(?INVALID, Result).
-
-simple_invalid_set_test() ->
-    DDL = make_ddl(<<"simple_invalid_set_test">>,
-                   [
-                    #riak_field_v1{name     = <<"yando">>,
-                                   position = 1,
-                                   type     = varchar},
-                    #riak_field_v1{name     = <<"erko">>,
-                                   position = 2,
-                                   type     = set},
-                    #riak_field_v1{name     = <<"erkle">>,
-                                   position = 3,
-                                   type     = double}
-                   ]),
-    {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:validate_obj({<<"ewrewr">>, [444.44], 4.4}),
-    ?assertEqual(?VALID, Result).
 
 simple_invalid_timestamp_1_test() ->
     DDL = make_ddl(<<"simple_invalid_timestamp_1_test">>,
@@ -1119,9 +1093,6 @@ simple_valid_optional_2_get_test() ->
 
 simple_valid_optional_3_get_test() ->
     ?ddl_roundtrip_assert(make_simple_valid_optional_3_ddl).
-
-simple_valid_set_get_test() ->
-    ?ddl_roundtrip_assert(make_simple_valid_set_ddl).
 
 simple_valid_mixed_get_test() ->
     ?ddl_roundtrip_assert(make_simple_valid_mixed_ddl).

@@ -110,6 +110,7 @@ create_all_types_sql_test() ->
         " time2 timestamp,"
         " isweather2 boolean,"
         " temp2 double,"
+        " slimer blob,"
         " mysint642 sint64,"
         " PRIMARY KEY ((user, geohash, quantum(time, 15, 'm')),"
         " user, geohash, time))",
@@ -174,8 +175,13 @@ create_all_types_sql_test() ->
                                type = double,
                                optional = true},
                             #riak_field_v1{
-                               name = <<"mysint642">>,
+                               name = <<"slimer">>,
                                position = 11,
+                               type = blob,
+                               optional = true},
+                            #riak_field_v1{
+                               name = <<"mysint642">>,
+                               position = 12,
                                type = sint64,
                                optional = true}
                            ],
@@ -197,7 +203,8 @@ create_all_types_sql_test() ->
                                 ?SQL_PARAM{name = [<<"user">>]},
                                 ?SQL_PARAM{name = [<<"geohash">>]},
                                 ?SQL_PARAM{name = [<<"time">>]}
-                               ]}
+                               ]},
+                  minimum_capability = v2 %% v2 because blob is used
                  },
     ?assertEqual(Expected, Got).
 
@@ -548,7 +555,7 @@ boolean_cannot_be_desc_test() ->
         "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
     ?assertEqual(
         {error,{0,riak_ql_parser,
-          <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was boolean.">>}},
+          <<"Elements in the local key marked descending (DESC) must be of type 'sint64', 'timestamp', 'varchar', or 'blob', but was 'boolean'.">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
     ).
 
@@ -561,7 +568,7 @@ float_cannot_be_desc_test() ->
         "PRIMARY KEY ((a,b,quantum(c, 15, s)), a,b DESC,c))",
     ?assertEqual(
         {error,{0,riak_ql_parser,
-          <<"Elements in the local key marked descending (DESC) must be of type sint64 or varchar, but was double.">>}},
+          <<"Elements in the local key marked descending (DESC) must be of type 'sint64', 'timestamp', 'varchar', or 'blob', but was 'double'.">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Table_def))
     ).
 

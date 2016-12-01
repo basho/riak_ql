@@ -7,6 +7,7 @@ Definitions.
 
 AND = (A|a)(N|n)(D|d)
 ASC = (A|a)(S|s)(C|c)
+BLOB = (B|b)(L|l)(O|o)(B|b)
 BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
 BY = (B|b)(Y|y)
 CREATE = (C|c)(R|r)(E|e)(A|a)(T|t)(E|e)
@@ -86,6 +87,7 @@ Rules.
 
 {AND} : {token, {and_, list_to_binary(TokenChars)}}.
 {ASC} : {token, {asc, list_to_binary(TokenChars)}}.
+{BLOB} : {token, {blob, list_to_binary(TokenChars)}}.
 {BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
 {BY} : {token, {by, list_to_binary(TokenChars)}}.
 {CREATE} : {token, {create, list_to_binary(TokenChars)}}.
