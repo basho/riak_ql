@@ -113,7 +113,7 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {VFns,             LineNo2}  = build_validn_fns(Fields,    LineNo),
     {ACFns,            LineNo3}  = build_add_cols_fns(Fields,  LineNo2),
     {ExtractFn,        LineNo4}  = build_extract_fn(DDL,       LineNo3),
-    {GetTypeFn,        LineNo5}  = build_get_type_fn([Fields], LineNo4, []),    
+    {GetTypeFn,        LineNo5}  = build_get_type_fn([Fields], LineNo4, []),
     {GetPosnFn,        LineNo6}  = build_get_posn_fn(Fields,   LineNo5, []),
     {GetPosnsFn,       LineNo7}  = build_get_posns_fn(Fields,  LineNo6, []),
     {IsValidFn,        LineNo8}  = build_is_valid_fn(Fields,   LineNo7),
@@ -127,7 +127,7 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     AST = Attrs
         ++ VFns
         ++ ACFns
-        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn, 
+        ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn,
             GetDDLFn, FieldOrdersFn, RevertOrderingFn, MinDDLCapFn, DeleteKeyFn]
         ++ HashFns
         ++ [{eof, LineNo15}],
@@ -309,7 +309,7 @@ build_delete_key_fn(DDL, LineNo, []) ->
                      "{error, Errors} -> {error, Errors} "
                      "end.",
                      [DDL?DDL.local_key]),
-    {?Q(Fn), LineNo + 1}.               
+    {?Q(Fn), LineNo + 1}.
 
 %% Build the AST for a function returning a list of the order
 %% of the table field orders

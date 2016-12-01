@@ -129,6 +129,6 @@ make_key_test() ->
                         ]},
     {ok, Got} = make_delete_key(Key, W),
     Expected = [<<"aaa">>, <<"bbb">>, 11],
-    ?assertEqual( Expected, Got).                        
+    ?assertEqual( Expected, Got).
 
 -endif.
