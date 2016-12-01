@@ -342,6 +342,9 @@ revert_ordering_on_local_key_element(DDL, ?SQL_PARAM{ name = N1, ordering = desc
         sint64 ->
             %% in the case of integers we just negate the original negation
             N2 ++ "*-1";
+        timestamp ->
+            %% in the case of integers we just negate the original negation
+            N2 ++ "*-1";
         _ ->
             N2
     end;
@@ -1168,6 +1171,18 @@ build_revert_ordering_on_local_key_fn_string_test() ->
         "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
     ?assertEqual(
         "revert_ordering_on_local_key({A,B,C}) -> [A,riak_ql_ddl:flip_binary(B),C].",
+        build_revert_ordering_on_local_key_fn_string(DDL)
+    ).
+
+build_revert_ordering_on_local_key_fn_string_timestamp_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE temperatures ("
+        "a VARCHAR NOT NULL, "
+        "b TIMESTAMP NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 's')), a ASC,b DESC,c ASC))")),
+    ?assertEqual(
+        "revert_ordering_on_local_key({A,B,C}) -> [A,B*-1,C].",
         build_revert_ordering_on_local_key_fn_string(DDL)
     ).
 

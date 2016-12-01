@@ -30,7 +30,7 @@
 
 %%
 -spec show_create_table(?DDL{}, [tuple()]) -> {ok, {ColNames::[binary()],
-                                               ColTypes::[riak_ql_ddl:simple_field_type()],
+                                               ColTypes::[riak_ql_ddl:external_field_type()],
                                                Rows::[[any()]]}}.
 
 show_create_table(DDL, Props) ->
