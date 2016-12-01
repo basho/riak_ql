@@ -35,7 +35,19 @@
 make_delete_key(#key_v1{ast = AST}, Where) ->
     KVs = make_KV(Where, ?EMPTY_KVs),
     Key = [proplists:get_value(K, KVs) || ?SQL_PARAM{name = [K]} <- AST],
-    {ok, Key}.
+    Stripped = [X || X <- Key, X =/= undefined],
+    %% all fields in the WHERE clause must be in the AST
+    %% therefore all three lengths must be the same
+    ASTLen = length(AST),
+    KVLen = length(KVs),
+    StrippedLen = length(Stripped),
+    case KVLen of
+        ASTLen -> case ASTLen of
+                      StrippedLen -> {ok, Key};
+                      _              -> {error, ["invalid key"]}
+                  end;
+        _ -> {error, ["invalid key"]}
+    end.
 
 is_valid_delete_where_clause(Where) ->
     case is_valid2(Where, ?EMPTY_ERRORS) of
