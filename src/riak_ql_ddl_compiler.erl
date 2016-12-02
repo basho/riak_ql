@@ -124,13 +124,15 @@ compile(?DDL{ table = Table, fields = Fields } = DDL) ->
     {RevertOrderingFn, LineNo13} = build_revert_ordering_on_local_key_fn(DDL, LineNo12),
     {MinDDLCapFn,      LineNo14} = build_min_ddl_version_fn(DDL, LineNo13),
     {DeleteKeyFn,      LineNo15} = build_delete_key_fn(DDL, LineNo14, []),
+    {AdditionalLocalKeyFn, LineNo16} = build_additional_local_key_fields_fn(DDL, LineNo15),
     AST = Attrs
         ++ VFns
         ++ ACFns
         ++ [ExtractFn, GetTypeFn, GetPosnFn, GetPosnsFn, IsValidFn, DDLVersionFn,
-            GetDDLFn, FieldOrdersFn, RevertOrderingFn, MinDDLCapFn, DeleteKeyFn]
+            GetDDLFn, FieldOrdersFn, RevertOrderingFn, MinDDLCapFn, DeleteKeyFn,
+            AdditionalLocalKeyFn]
         ++ HashFns
-        ++ [{eof, LineNo15}],
+        ++ [{eof, LineNo16}],
     case erl_lint:module(AST) of
         {ok, []} ->
             {ModName, AST};
@@ -145,6 +147,19 @@ build_min_ddl_version_fn(DDL, LineNo) ->
         "get_min_required_ddl_cap() -> " ++ atom_to_list(MinDDLVersion) ++ ".",
     {?Q(Source), LineNo+1}.
 
+build_additional_local_key_fields_fn(DDL, LineNo) ->
+    {?Q(build_additional_local_key_fields_source(DDL)), LineNo+1}.
+
+build_additional_local_key_fields_source(DDL) ->
+    AdditionalFields = additional_local_key_fields(DDL),
+    lists:flatten(
+        io_lib:format("additional_local_key_fields() -> ~p.",
+                      [AdditionalFields])
+    ).
+
+additional_local_key_fields(?DDL{partition_key = #key_v1{ast = PK},
+                                 local_key = #key_v1{ast = LK}}) ->
+    [N || ?SQL_PARAM{name = [N]} <- lists:nthtail(length(PK), LK)].
 
 %% Compile the module, write it to /tmp then load it into the VM.
 -spec compile_and_load_from_tmp(?DDL{}) ->
@@ -595,7 +610,8 @@ make_export_attr(LineNo) ->
                                   {revert_ordering_on_local_key, 1},
                                   {validate_obj,                 1},
                                   {get_min_required_ddl_cap,     0},
-                                  {get_delete_key,               1}
+                                  {get_delete_key,               1},
+                                  {additional_local_key_fields,  0}
                                  ]}, LineNo + 1}.
 
 %% supporting functions
@@ -1107,49 +1123,15 @@ timeseries_ddl_get_test() ->
     ?ddl_roundtrip_assert(make_timeseries_ddl).
 
 make_timeseries_ddl() ->
-    Fields = [
-              #riak_field_v1{name     = <<"geohash">>,
-                             position = 1,
-                             type     = varchar,
-                             optional = false},
-              #riak_field_v1{name     = <<"user">>,
-                             position = 2,
-                             type     = varchar,
-                             optional = false},
-              #riak_field_v1{name     = <<"time">>,
-                             position = 3,
-                             type     = timestamp,
-                             optional = false},
-              #riak_field_v1{name     = <<"weather">>,
-                             position = 4,
-                             type     = varchar,
-                             optional = false},
-              #riak_field_v1{name     = <<"temperature">>,
-                             position = 5,
-                             type     = varchar,
-                             optional = true}
-             ],
-    PK = #key_v1{ ast = [
-                        ?SQL_PARAM{name = [<<"time">>]},
-                        ?SQL_PARAM{name = [<<"user">>]},
-                        #hash_fn_v1{mod  = riak_ql_quanta,
-                                     fn   = quantum,
-                                     args = [
-                                             ?SQL_PARAM{name = [<<"time">>]},
-                                             15,
-                                             s
-                                            ],
-                                   type = timestamp}
-                        ]},
-    LK = #key_v1{ast = [
-                        ?SQL_PARAM{name = [<<"time">>]},
-                        ?SQL_PARAM{name = [<<"user">>]}]
-                },
-    _DDL = ?DDL{table         = <<"timeseries_filter_test">>,
-                fields        = Fields,
-                partition_key = PK,
-                local_key     = LK
-               }.
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE timeseries_filter_test ("
+        "geohash VARCHAR NOT NULL, "
+        "user VARCHAR NOT NULL, "
+        "time TIMESTAMP NOT NULL, "
+        "weather VARCHAR NOT NULL, "
+        "temperature VARCHAR, "
+        "PRIMARY KEY ((user, quantum(time,15,'s')), user,time))")),
+    DDL.
 
 build_field_orders_fn_string_test() ->
     {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
@@ -1281,5 +1263,29 @@ simple_delete_key_too_long_fail_2_test() ->
     {error, Got} = Module:get_delete_key(W),
     Expected = ["invalid key"],
     ?assertEqual(Expected, Got).
+
+build_additional_local_key_fields_source_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE mytab ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a), a, b, c))")),
+    ?assertEqual(
+        "additional_local_key_fields() -> [<<\"b\">>,<<\"c\">>].",
+        build_additional_local_key_fields_source(DDL)
+    ).
+
+build_additional_local_key_fields_source_no_additional_fields_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE mytab ("
+        "a VARCHAR NOT NULL, "
+        "b VARCHAR NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a, b, c), a, b, c))")),
+    ?assertEqual(
+        "additional_local_key_fields() -> [].",
+        build_additional_local_key_fields_source(DDL)
+    ).
 
 -endif.

@@ -489,3 +489,17 @@ single_line_comment_in_multiline_ctrl_select_test() ->
             "SELECT * FROM mytab -- a comment\r\n"
             "WHERE a = 'val'"))
     ).
+
+single_line_comment_single_line_in_multiline_comment_select_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'val'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "/*\n"
+            "Some text -- */\n"
+            "*/\n"
+            "WHERE a = 'val'"))
+    ).
+

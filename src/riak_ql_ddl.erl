@@ -30,6 +30,7 @@
          ddl_record_version/1,
          first_version/0,
          flip_binary/1,
+         fold_where_tree/3,
          get_field_type/2,
          get_storage_type/1,
          get_legacy_type/2,
@@ -370,10 +371,9 @@ is_query_valid_result(Res) ->
 
 -spec are_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
 are_filters_valid(Mod, Where) ->
-    Errors = fold_where_tree(Where, [],
-                             fun(Clause, Acc) ->
+    Errors = fold_where_tree(fun(_, Clause, Acc) ->
                                      is_filters_field_valid(Mod, Clause, Acc)
-                             end),
+                             end, [], Where),
     case Errors of
         [] -> true;
         _  -> {false, Errors}
@@ -538,15 +538,18 @@ is_orderby_column_valid(Mod, X, Acc) ->
 
 
 %% Fold over the syntax tree for a where clause.
-fold_where_tree([], Acc, _) ->
+fold_where_tree(Fn, Acc, Where) when is_function(Fn) ->
+    fold_where_tree2(root, Fn, Acc, Where).
+
+fold_where_tree2(_, _, Acc, []) ->
     Acc;
-fold_where_tree([Where], Acc1, Fn) ->
-    fold_where_tree(Where, Acc1, Fn);
-fold_where_tree({Op, LHS, RHS}, Acc1, Fn) when Op == and_; Op == or_ ->
-    Acc2 = fold_where_tree(LHS, Acc1, Fn),
-    fold_where_tree(RHS, Acc2, Fn);
-fold_where_tree(Clause, Acc, Fn) ->
-    Fn(Clause, Acc).
+fold_where_tree2(Conditional, Fn, Acc1, [Where]) ->
+    fold_where_tree2(Conditional, Fn, Acc1, Where);
+fold_where_tree2(_, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op == or_ ->
+    Acc2 = fold_where_tree2(Op, Fn, Acc1, LHS),
+    fold_where_tree2(Op, Fn, Acc2, RHS);
+fold_where_tree2(Conditional, Fn, Acc, Clause) ->
+    Fn(Conditional, Clause, Acc).
 
 -spec are_insert_columns_valid(module(), [insertion()], boolean()) ->
     true | {false, [query_syntax_error()]}.
@@ -956,14 +959,7 @@ make_module_name_3_test() ->
 
 mock_partition_fn(_A, _B, _C) -> mock_result.
 
-make_ddl(Table, Fields) when is_binary(Table) ->
-    make_ddl(Table, Fields, #key_v1{}, #key_v1{}).
-
-make_ddl(Table, Fields, PK) when is_binary(Table) ->
-    make_ddl(Table, Fields, PK, #key_v1{}).
-
-make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
-  when is_binary(Table) ->
+make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK) when is_binary(Table) ->
     ?DDL{table         = Table,
          fields        = Fields,
          partition_key = PK,
@@ -975,16 +971,15 @@ make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
 
 simplest_partition_key_test() ->
     Name = <<"yando">>,
-    PK = #key_v1{ast = [
-                        ?SQL_PARAM{name = [Name]}
-                       ]},
+    Key = #key_v1{ast = [?SQL_PARAM{name = [Name]}]},
     DDL = make_ddl(<<"simplest_partition_key_test">>,
                    [
                     #riak_field_v1{name     = Name,
                                    position = 1,
                                    type     = varchar}
                    ],
-                   PK),
+                   Key,
+                   Key),
     {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {Name},
     Result = (catch get_partition_key(DDL, Obj)),
@@ -1759,8 +1754,8 @@ fold_where_tree_test() ->
     Where = proplists:get_value(where, Parsed),
     ?assertEqual(
        [<<"myseries">>, <<"myfamily">>, <<"time">>, <<"time">>],
-       lists:reverse(fold_where_tree(Where, [],
-                                     fun({_, Field, _}, Acc) -> [Field | Acc] end))
+       lists:reverse(fold_where_tree(
+                                     fun(_, {_, Field, _}, Acc) -> [Field | Acc] end, [], Where))
       ).
 
 %%
