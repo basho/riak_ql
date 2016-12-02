@@ -118,8 +118,6 @@
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-%% for debugging only
--export([make_ddl/2]).
 %% for other testing modules
 -export([parsed_sql_to_query/1]).
 -endif.
@@ -988,7 +986,7 @@ simplest_partition_key_test() ->
 simple_partition_key_test() ->
     Name1 = <<"yando">>,
     Name2 = <<"buckle">>,
-    PK = #key_v1{ast = [
+    Key = #key_v1{ast = [
                         ?SQL_PARAM{name = [Name1]},
                         ?SQL_PARAM{name = [Name2]}
                        ]},
@@ -1004,47 +1002,12 @@ simple_partition_key_test() ->
                                    position = 3,
                                    type     = varchar}
                    ],
-                   PK),
+                   Key,
+                   Key),
     {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {<<"one">>, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
     ?assertEqual([{varchar, <<"three">>}, {varchar, <<"one">>}], Result).
-
-function_partition_key_test() ->
-    Name1 = <<"yando">>,
-    Name2 = <<"buckle">>,
-    PK = #key_v1{ast = [
-                        ?SQL_PARAM{name = [Name1]},
-                        #hash_fn_v1{mod  = ?MODULE,
-                                    fn   = mock_partition_fn,
-                                    args = [
-                                            ?SQL_PARAM{name = [Name2]},
-                                            15,
-                                            m
-                                           ],
-                                    type = timestamp
-                                   }
-                       ]},
-    DDL = make_ddl(<<"function_partition_key_test">>,
-                   [
-                    #riak_field_v1{name     = Name2,
-                                   position = 1,
-                                   type     = timestamp},
-                    #riak_field_v1{name     = <<"sherk">>,
-                                   position = 2,
-                                   type     = varchar},
-                    #riak_field_v1{name     = Name1,
-                                   position = 3,
-                                   type     = varchar}
-                   ],
-                   PK),
-    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Obj = {1234567890, <<"two">>, <<"three">>},
-    Result = (catch get_partition_key(DDL, Obj)),
-    %% Yes the mock partition function is actually computed
-    %% read the actual code, lol
-    Expected = [{varchar, <<"three">>}, {timestamp, mock_result}],
-    ?assertEqual(Expected, Result).
 
 %%
 %% get local_key tests
@@ -1182,58 +1145,33 @@ make_ts_keys_4_test() ->
 %%
 
 partial_wildcard_check_selections_valid_test() ->
-    Selections  = [{identifier, [<<"*">>]}],
-    DDL = make_ddl(<<"partial_wildcard_check_selections_valid_test">>,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"geohash">>,
-                                   position = 2,
-                                   type     = sint64}
-                   ]),
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE partial_wildcard_check_selections_valid_test("
+        "temperature SINT64 NOT NULL, "
+        "geohash SINT64 NOT NULL, "
+        "PRIMARY KEY ((temperature, geohash), temperature, geohash))"
+    )),
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
-       true,
-       are_selections_valid(Mod, Selections, ?CANTBEBLANK)
-      ).
-
-%% FIXME this cannot happen because SQL without selections cannot be lexed
-partial_check_selections_valid_fail_test() ->
-    Selections  = [],
-    DDL = make_ddl(<<"partial_check_selections_valid_fail_test">>,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"geohash">>,
-                                   position = 2,
-                                   type     = sint64}
-                   ]),
-    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    ?assertEqual(
-       {false, [{selections_cant_be_blank, []}]},
-       are_selections_valid(Mod, Selections, ?CANTBEBLANK)
-      ).
+         true,
+         are_selections_valid(Mod, [{identifier, [<<"*">>]}], ?CANTBEBLANK)
+    ).
 
 %%
 %% Query Validation tests
 %%
 
 simple_is_query_valid_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE simple_is_query_valid_test("
+        "temperature SINT64 NOT NULL, "
+        "geohash SINT64 NOT NULL, "
+        "PRIMARY KEY ((temperature, geohash), temperature, geohash))"
+    )),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Bucket = <<"simple_is_query_valid_test">>,
     Selections  = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
     Query = {Bucket, Selections, [], undefined},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"geohash">>,
-                                   position = 2,
-                                   type     = sint64}
-                   ]),
-    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
        true,
        riak_ql_ddl:is_query_valid(Mod, DDL, Query)
@@ -1242,6 +1180,7 @@ simple_is_query_valid_test() ->
 %%
 %% Tests for queries with non-null filters
 %%
+
 simple_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
     Selections = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
@@ -1252,18 +1191,14 @@ simple_filter_query_test() ->
              }
             ],
     Query = {Bucket, Selections, Where, undefined},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"geohash">>,
-                                   position = 2,
-                                   type     = sint64}
-                   ]),
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE simple_filter_query_test("
+        "temperature SINT64 NOT NULL, "
+        "geohash SINT64 NOT NULL, "
+        "PRIMARY KEY ((temperature, geohash), temperature, geohash))"
+    )),
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
-    ?assertEqual(true, Res).
+    ?assertEqual(true, riak_ql_ddl:is_query_valid(Mod, DDL, Query)).
 
 full_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
@@ -1280,24 +1215,17 @@ full_filter_query_test() ->
                  {'>=', <<"gte field">>,  {integer, 15}}}}}}
             ],
     Query = {Bucket, Selections, Where, undefined},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"ne field">>,
-                                   position = 2,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"lte field">>,
-                                   position = 3,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"gte field">>,
-                                   position = 4,
-                                   type     = sint64}
-                   ]),
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE simple_filter_query_test("
+        "temperature SINT64 NOT NULL, "
+        "geohash SINT64 NOT NULL, "
+        "\"ne field\" SINT64 NOT NULL, "
+        "\"lte field\" SINT64 NOT NULL, "
+        "\"gte field\" SINT64 NOT NULL, "
+        "PRIMARY KEY ((temperature, geohash), temperature, geohash))"
+    )),
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
-    ?assertEqual(true, Res).
+    ?assertEqual(true, riak_ql_ddl:is_query_valid(Mod, DDL, Query)).
 
 
 timeseries_filter_test() ->
