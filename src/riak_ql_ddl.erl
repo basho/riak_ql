@@ -27,6 +27,7 @@
          apply_ordering/2,
          convert/2,
          current_version/0,
+         desc_adjusted_key/3,
          ddl_record_version/1,
          first_version/0,
          flip_binary/1,
@@ -179,24 +180,46 @@ get_local_key(?DDL{table = T}=DDL, Obj)
     Mod = make_module_name(T),
     get_local_key(DDL, Obj, Mod).
 
+-spec desc_adjusted_key([any()], module(), ?DDL{}) ->
+                               {ok, tuple()} | {error, {bad_key_length, integer(), integer()}}.
+%% @doc Given a list of Key values, negate values of fields declared
+%%      in the DDL as DESC, thus making the result match the key in
+%%      the backend.  Used in KeyConvFn for folding over keys (via
+%%      @see lk_to_pk/3), and independently in riak_kv_ts_api:get_data and
+%%      :delete_data.
+desc_adjusted_key(KeyVals, Mod, ?DDL{local_key = #key_v1{ast = LKAst} = LK})
+  when is_list(KeyVals) ->
+    KeyFields = [F || ?SQL_PARAM{name = [F]} <- LKAst],
+    case {length(KeyVals), length(KeyFields)} of
+        {_N, _N} ->
+            LKPairs = lists:zip(KeyFields, KeyVals),
+            {_Types, Vals} =
+                lists:unzip(
+                  riak_ql_ddl:make_key(Mod, LK, LKPairs)),
+            {ok, Vals};
+        {Got, Need} ->
+            {error, {bad_key_length, Got, Need}}
+    end.
+
 -spec lk_to_pk(tuple(), ?DDL{}) -> tuple().
 lk_to_pk(LKVals, DDL = ?DDL{table = Table}) ->
     lk_to_pk(LKVals, DDL, make_module_name(Table)).
 
 -spec lk_to_pk(tuple(), ?DDL{}, module()) -> {ok, tuple()} |
                                              {error, {bad_key_length, integer(), integer()}}.
-lk_to_pk(LKVals, ?DDL{local_key = #key_v1{ast = LKAst} = LK,
-                      partition_key = PK}, Mod) ->
+%% @doc Determine the partition key of the quantum where given local
+%%      key resides, observing DESC qualifiers where appropriate.
+%%      Also see @see desc_adjusted_key/3.
+lk_to_pk(LKVals, ?DDL{local_key = #key_v1{ast = LKAst},
+                      partition_key = PK} = DDL, Mod) ->
     KeyFields = [F || ?SQL_PARAM{name = [F]} <- LKAst],
-    case {size(LKVals), length(KeyFields)} of
-        {_N, _N} ->
-            LKPairs = lists:zip(KeyFields, tuple_to_list(LKVals)),
-            UnnegLKVals = [V || {_Type, V} <- make_key(Mod, LK, LKPairs)],
-            UnnegLKPairs = lists:zip(KeyFields, UnnegLKVals),
-            PKVals = [V || {_Type, V} <- make_key(Mod, PK, UnnegLKPairs)],
+    case desc_adjusted_key(tuple_to_list(LKVals), Mod, DDL) of
+        {ok, LKAdjustedVals} ->
+            LKAdjustedPairs = lists:zip(KeyFields, LKAdjustedVals),
+            PKVals = [V || {_Type, V} <- make_key(Mod, PK, LKAdjustedPairs)],
             {ok, list_to_tuple(PKVals)};
-        {Got, Need} ->
-            {error, {bad_key_length, Got, Need}}
+        ErrorReason ->
+            ErrorReason
     end.
 
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
