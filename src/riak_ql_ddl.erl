@@ -550,11 +550,13 @@ fold_where_tree2(_, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op == or_ ->
 fold_where_tree2(Conditional, Fn, Acc, Clause) ->
     Fn(Conditional, Clause, Acc).
 
-mapfold_where_tree(Fn, Acc, Where) when is_function(Fn) ->
-    case mapfold_where_tree2(root, Fn, Acc, Where) of
-        {eliminate, Acc} ->
-            {[], Acc};
-        Return ->
+mapfold_where_tree(_, Acc1, []) ->
+    {[], Acc1};
+mapfold_where_tree(Fn, Acc1, Where) when is_function(Fn) ->
+    case mapfold_where_tree2(root, Fn, Acc1, Where) of
+        {eliminate, Acc2} ->
+            {[], Acc2};
+        {_,_} = Return ->
             Return
     end.
 
