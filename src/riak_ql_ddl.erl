@@ -181,7 +181,7 @@ get_local_key(?DDL{table = T}=DDL, Obj)
     get_local_key(DDL, Obj, Mod).
 
 -spec desc_adjusted_key([any()], module(), ?DDL{}) ->
-                               {ok, tuple()} | {error, {bad_key_length, integer(), integer()}}.
+                               {ok, [any()]} | {error, {bad_key_length, integer(), integer()}}.
 %% @doc Given a list of Key values, negate values of fields declared
 %%      in the DDL as DESC, thus making the result match the key in
 %%      the backend.  Used in KeyConvFn for folding over keys (via
@@ -205,21 +205,21 @@ desc_adjusted_key(KeyVals, Mod, ?DDL{local_key = #key_v1{ast = LKAst} = LK})
 lk_to_pk(LKVals, DDL = ?DDL{table = Table}) ->
     lk_to_pk(LKVals, DDL, make_module_name(Table)).
 
--spec lk_to_pk(tuple(), ?DDL{}, module()) -> {ok, tuple()} |
+-spec lk_to_pk([any()], ?DDL{}, module()) -> {ok, [any()]} |
                                              {error, {bad_key_length, integer(), integer()}}.
 %% @doc Determine the partition key of the quantum where given local
 %%      key resides, observing DESC qualifiers where appropriate.
 %%      Also see @see desc_adjusted_key/3.
 lk_to_pk(LKVals, ?DDL{local_key = #key_v1{ast = LKAst},
-                      partition_key = PK} = DDL, Mod) ->
+                      partition_key = PK}, Mod) ->
     KeyFields = [F || ?SQL_PARAM{name = [F]} <- LKAst],
-    case desc_adjusted_key(tuple_to_list(LKVals), Mod, DDL) of
-        {ok, LKAdjustedVals} ->
-            LKAdjustedPairs = lists:zip(KeyFields, LKAdjustedVals),
-            PKVals = [V || {_Type, V} <- make_key(Mod, PK, LKAdjustedPairs)],
-            {ok, list_to_tuple(PKVals)};
-        ErrorReason ->
-            ErrorReason
+    case {length(LKVals), length(KeyFields)} of
+        {_N, _N} ->
+            LKPairs = lists:zip(KeyFields, LKVals),
+            PKVals = [V || {_Type, V} <- make_key(Mod, PK, LKPairs)],
+            {ok, PKVals};
+        {Got, Need} ->
+            {error, {bad_key_length, Got, Need}}
     end.
 
 -spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
