@@ -36,7 +36,8 @@
          get_legacy_type/2,
          get_minimum_capability/1,
          is_version_greater/2,
-         make_module_name/1, make_module_name/2
+         make_module_name/1, make_module_name/2,
+         mapfold_where_tree/3
         ]).
 
 -type external_field_type()         :: varchar | sint64 | double | timestamp | boolean | blob.
@@ -547,6 +548,39 @@ fold_where_tree2(_, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op == or_ ->
     Acc2 = fold_where_tree2(Op, Fn, Acc1, LHS),
     fold_where_tree2(Op, Fn, Acc2, RHS);
 fold_where_tree2(Conditional, Fn, Acc, Clause) ->
+    Fn(Conditional, Clause, Acc).
+
+mapfold_where_tree(Fn, Acc, Where) when is_function(Fn) ->
+    case mapfold_where_tree2(root, Fn, Acc, Where) of
+        {eliminate, Acc} ->
+            {[], Acc};
+        Return ->
+            Return
+    end.
+
+mapfold_where_tree2(_, _, Acc, []) ->
+    Acc;
+mapfold_where_tree2(Conditional, Fn, Acc1, [Where]) ->
+    mapfold_where_tree2(Conditional, Fn, Acc1, Where);
+mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op == or_ ->
+    case Fn(Conditional, Op, Acc1) of
+        {ok, Acc2} ->
+            {LHS_result, Acc3} = mapfold_where_tree2(Op, Fn, Acc2, LHS),
+            {RHS_result, Acc4} = mapfold_where_tree2(Op, Fn, Acc3, RHS),
+            case {LHS_result, RHS_result} of
+                {eliminate, eliminate} ->
+                    {eliminate, Acc4};
+                {eliminate, _} ->
+                    {RHS_result, Acc4};
+                {_, eliminate} ->
+                    {LHS_result, Acc4};
+                {_, _} ->
+                    {{Op, LHS_result, RHS_result}, Acc4}
+            end;
+        {skip, Acc2} ->
+            {{Op, LHS, RHS}, Acc2}
+    end;
+mapfold_where_tree2(Conditional, Fn, Acc, Clause) ->
     Fn(Conditional, Clause, Acc).
 
 -spec are_insert_columns_valid(module(), [insertion()], boolean()) ->
@@ -1822,6 +1856,40 @@ get_minimum_capability_blob_test() ->
     ?assertEqual(
         v2,
         get_minimum_capability(DDL)
+    ).
+
+mapfold_where_tree_test() ->
+    ?assertEqual(
+        {{and_, a, b}, acc},
+        mapfold_where_tree(
+            fun(_, and_, Acc) -> {ok, Acc};
+               (_, F, Acc)    -> {F, Acc} end,
+            acc,
+            {and_, a, b})
+    ).
+
+mapfold_where_tree_eliminate_leaf_test() ->
+    ?assertEqual(
+        {a, acc},
+        mapfold_where_tree(
+            fun(_, and_, Acc) -> {ok, Acc};
+               (_, b, Acc)    -> {eliminate, Acc};
+               (_, F, Acc)    -> {F, Acc} end,
+            acc,
+            {and_, a, b})
+    ).
+
+mapfold_where_tree_skip_branch_test() ->
+    ?assertEqual(
+        {{and_, {or_, a, c}, b}, acc},
+        mapfold_where_tree(
+            %% or_ is skipped os function clause if a or c is process because it
+            %% should be skipped.
+            fun(_, and_, Acc) -> {ok, Acc};
+               (_, or_, Acc)  -> {skip, Acc};
+               (_, b, Acc)    -> {b, Acc} end,
+            acc,
+            {and_, {or_, a, c}, b})
     ).
 
 -endif.
