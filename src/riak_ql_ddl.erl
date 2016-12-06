@@ -202,11 +202,12 @@ negate_if_desc(KeyVals, Mod, ?DDL{local_key = #key_v1{ast = LKAst} = LK})
             {error, {bad_key_length, Got, Need}}
     end.
 
--spec lk_to_pk(tuple(), ?DDL{}) -> tuple().
+-spec lk_to_pk([bare_data_value()], ?DDL{}) -> {ok, [bare_data_value()]} |
+                                   {error, {bad_key_length, integer(), integer()}}.
 lk_to_pk(LKVals, DDL = ?DDL{table = Table}) ->
     lk_to_pk(LKVals, make_module_name(Table), DDL).
 
--spec lk_to_pk([any()], module(), ?DDL{}) -> {ok, [any()]} |
+-spec lk_to_pk([bare_data_value()], module(), ?DDL{}) -> {ok, [bare_data_value()]} |
                                              {error, {bad_key_length, integer(), integer()}}.
 %% @doc Determine the partition key of the quantum where given local
 %%      key resides, observing DESC qualifiers where appropriate.
@@ -1162,8 +1163,8 @@ make_ts_keys_1_test() ->
         "c TIMESTAMP NOT NULL, "
         "PRIMARY KEY((a, b, quantum(c, 15, 's')), a, b, c))"),
     ?assertEqual(
-        {ok, {1,2,0}},
-        lk_to_pk({1,2,3}, DDL, Mod)
+        {ok, [1,2,0]},
+        lk_to_pk([1,2,3], Mod, DDL)
     ).
 
 % a two element key, still using the table definition field order
@@ -1175,8 +1176,8 @@ make_ts_keys_2_test() ->
         "c SINT64 NOT NULL, "
         "PRIMARY KEY((a, quantum(b, 15, 's')), a, b))"),
     ?assertEqual(
-        {ok, {1,0}},
-        lk_to_pk({1,2}, DDL, Mod)
+        {ok, [1,0]},
+        lk_to_pk([1,2], Mod, DDL)
     ).
 
 make_ts_keys_3_test() ->
@@ -1188,8 +1189,8 @@ make_ts_keys_3_test() ->
         "d SINT64 NOT NULL, "
         "PRIMARY KEY  ((d,a,quantum(c, 1, 's')), d,a,c))"),
     ?assertEqual(
-        {ok, {10,20,0}},
-        lk_to_pk({10,20,1}, DDL, Mod)
+        {ok, [10,20,0]},
+        lk_to_pk([10,20,1], Mod, DDL)
     ).
 
 make_ts_keys_4_test() ->
@@ -1202,8 +1203,8 @@ make_ts_keys_4_test() ->
         "d SINT64 NOT NULL, "
         "PRIMARY KEY  ((ax,a,quantum(c, 1, 's')), ax,a,c))"),
     ?assertEqual(
-        {ok, {10,20,0}},
-        lk_to_pk({10,20,1}, DDL, Mod)
+        {ok, [10,20,0]},
+        lk_to_pk([10,20,1], Mod, DDL)
     ).
 
 %%
