@@ -27,7 +27,6 @@
          apply_ordering/2,
          convert/2,
          current_version/0,
-         negate_if_desc/3,
          ddl_record_version/1,
          first_version/0,
          flip_binary/1,
@@ -186,28 +185,6 @@ get_local_key(?DDL{table = T}=DDL, Obj)
     Mod = make_module_name(T),
     get_local_key(DDL, Obj, Mod).
 
--spec negate_if_desc([bare_data_value()], module(), ?DDL{}) ->
-                               {ok, [bare_data_value()]} | {error, {bad_key_length, integer(), integer()}}.
-%% @doc Given a list of Key values, negate values of fields declared
-%%      in the DDL as DESC, thus making the result match the key in
-%%      the backend.  Used in KeyConvFn for folding over keys (in
-%%      riak_kv_qry_worker:make_key_conversion_fun and
-%%      riak_kv_ts_svc:sub_tslistkeysreq), and in
-%%      riak_kv_ts_api:get_data and :delete_data.
-negate_if_desc(KeyVals, Mod, ?DDL{local_key = #key_v1{ast = LKAst} = LK})
-  when is_list(KeyVals) ->
-    KeyFields = [F || ?SQL_PARAM{name = [F]} <- LKAst],
-    case {length(KeyVals), length(KeyFields)} of
-        {_N, _N} ->
-            LKPairs = lists:zip(KeyFields, KeyVals),
-            {_Types, Vals} =
-                lists:unzip(
-                  riak_ql_ddl:make_key(Mod, LK, LKPairs)),
-            {ok, Vals};
-        {Got, Need} ->
-            {error, {bad_key_length, Got, Need}}
-    end.
-
 -spec lk_to_pk([bare_data_value()], ?DDL{}) -> {ok, [bare_data_value()]} |
                                    {error, {bad_key_length, integer(), integer()}}.
 lk_to_pk(LKVals, DDL = ?DDL{table = Table}) ->
@@ -217,7 +194,6 @@ lk_to_pk(LKVals, DDL = ?DDL{table = Table}) ->
                                              {error, {bad_key_length, integer(), integer()}}.
 %% @doc Determine the partition key of the quantum where given local
 %%      key resides, observing DESC qualifiers where appropriate.
-%%      Also see @see negate_if_desc/3.
 lk_to_pk(LKVals, Mod, ?DDL{local_key = #key_v1{ast = LKAst},
                            partition_key = PK}) ->
     KeyFields = [F || ?SQL_PARAM{name = [F]} <- LKAst],
