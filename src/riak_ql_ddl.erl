@@ -49,10 +49,13 @@
 -type null_comparator() :: is_null | is_not_null.
 
 -type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
+%% lexer-emitted data types
 -type data_value()       :: {integer, integer()}
                           | {float, float()}
                           | {boolean, boolean()}
-                          | {binary, binary()}.
+                          | {binary, binary()}
+                          | {blob, binary()}
+                          | {null, []}.
 -type field_identifier() :: {identifier, [binary()]}.
 -type selection()  :: field_identifier()
                     | data_value()
@@ -81,6 +84,9 @@
               internal_field_type/0
              ]).
 
+%% this type is a synonym of riak_pb_ts_codec:ldbvalue(), but it's
+%% defined locally here in order to avoid depending on riak_pb.
+-type bare_data_value() :: integer() | float() | boolean() | binary() | [].
 
 %% a helper function for destructuring data objects
 %% and testing the validity of field names
@@ -151,55 +157,57 @@ maybe_mangle_char(C) when (C >= $a andalso C =< $z);
 maybe_mangle_char(C) ->
     <<$%, (list_to_binary(integer_to_list(C)))/binary>>.
 
--spec get_table(?DDL{}) -> term().
+-spec get_table(?DDL{}) -> binary().
 get_table(?DDL{table = T}) ->
     T.
 
--spec get_partition_key(?DDL{}, tuple(), module()) -> term().
+-spec get_partition_key(?DDL{}, tuple(data_value()), module()) -> [data_value()].
 get_partition_key(?DDL{partition_key = PK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = PK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_partition_key(?DDL{}, tuple()) -> term().
+-spec get_partition_key(?DDL{}, tuple(data_value())) -> [data_value()].
 get_partition_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_partition_key(DDL, Obj, Mod).
 
--spec get_local_key(?DDL{}, tuple(), module()) -> term().
+-spec get_local_key(?DDL{}, tuple(data_value()), module()) -> [data_value()].
 get_local_key(?DDL{local_key = LK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_local_key(?DDL{}, tuple()) -> term().
+-spec get_local_key(?DDL{}, tuple(data_value())) -> [data_value()].
 get_local_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_local_key(DDL, Obj, Mod).
 
--spec lk_to_pk(tuple(), ?DDL{}) -> tuple().
+-spec lk_to_pk([bare_data_value()], ?DDL{}) -> {ok, [bare_data_value()]} |
+                                   {error, {bad_key_length, integer(), integer()}}.
 lk_to_pk(LKVals, DDL = ?DDL{table = Table}) ->
-    lk_to_pk(LKVals, DDL, make_module_name(Table)).
+    lk_to_pk(LKVals, make_module_name(Table), DDL).
 
--spec lk_to_pk(tuple(), ?DDL{}, module()) -> {ok, tuple()} |
+-spec lk_to_pk([bare_data_value()], module(), ?DDL{}) -> {ok, [bare_data_value()]} |
                                              {error, {bad_key_length, integer(), integer()}}.
-lk_to_pk(LKVals, ?DDL{local_key = #key_v1{ast = LKAst} = LK,
-                      partition_key = PK}, Mod) ->
+%% @doc Determine the partition key of the quantum where given local
+%%      key resides, observing DESC qualifiers where appropriate.
+lk_to_pk(LKVals, Mod, ?DDL{local_key = #key_v1{ast = LKAst},
+                           partition_key = PK}) ->
     KeyFields = [F || ?SQL_PARAM{name = [F]} <- LKAst],
-    case {size(LKVals), length(KeyFields)} of
+    case {length(LKVals), length(KeyFields)} of
         {_N, _N} ->
-            LKPairs = lists:zip(KeyFields, tuple_to_list(LKVals)),
-            UnnegLKVals = [V || {_Type, V} <- make_key(Mod, LK, LKPairs)],
-            UnnegLKPairs = lists:zip(KeyFields, UnnegLKVals),
-            PKVals = [V || {_Type, V} <- make_key(Mod, PK, UnnegLKPairs)],
-            {ok, list_to_tuple(PKVals)};
+            LKPairs = lists:zip(KeyFields, LKVals),
+            PKVals = [V || {_Type, V} <- make_key(Mod, PK, LKPairs)],
+            {ok, PKVals};
         {Got, Need} ->
             {error, {bad_key_length, Got, Need}}
     end.
 
--spec make_key(atom(), #key_v1{} | none, list()) -> [{atom(), any()}].
+-spec make_key(atom(), #key_v1{} | none, [{binary(), bare_data_value()}]) ->
+                      [{external_field_type(), bare_data_value()}].
 make_key(_Mod, none, _Vals) ->
     [];
 make_key(Mod, #key_v1{ast = AST}, Vals) when is_atom(Mod)  andalso
@@ -226,7 +234,7 @@ mk_k([?SQL_PARAM{name = [Nm], ordering = Ordering} | T1], Vals, Mod, Acc) ->
             {error, {missing_value, Nm, Vals}}
     end.
 
--spec extract(list(), [{any(), any()}], [any()]) -> any().
+-spec extract(list(), [data_value()], [bare_data_value()]) -> bare_data_value().
 extract([], _Vals, Acc) ->
     lists:reverse(Acc);
 extract([?SQL_PARAM{name = [Nm], ordering = Ordering} | T], Vals, Acc) ->
@@ -235,7 +243,7 @@ extract([?SQL_PARAM{name = [Nm], ordering = Ordering} | T], Vals, Acc) ->
 extract([Constant | T], Vals, Acc) ->
     extract(T, Vals, [Constant | Acc]).
 
--spec build([?SQL_PARAM{}], tuple(), atom(), any()) -> list().
+-spec build([?SQL_PARAM{}], tuple(data_value()), module(), [data_value()]) -> [data_value()].
 build([], _Obj, _Mod, A) ->
     lists:reverse(A);
 build([?SQL_PARAM{name = Nm, ordering = Ordering} | T], Obj, Mod, A) ->
@@ -250,7 +258,7 @@ build([#hash_fn_v1{mod  = Md,
     Val = erlang:apply(Md, Fn, A2),
     build(T, Obj, Mod, [{Ty, Val} | A]).
 
--spec convert([?SQL_PARAM{}], tuple(), atom(), [any()]) -> any().
+-spec convert([?SQL_PARAM{}], tuple(), atom(), [bare_data_value()]) -> bare_data_value().
 convert([], _Obj, _Mod, Acc) ->
     lists:reverse(Acc);
 convert([?SQL_PARAM{name = Nm} | T], Obj, Mod, Acc) ->
@@ -259,6 +267,7 @@ convert([?SQL_PARAM{name = Nm} | T], Obj, Mod, Acc) ->
 convert([Constant | T], Obj, Mod, Acc) ->
     convert(T, Obj, Mod, [Constant | Acc]).
 
+-spec apply_ordering(bare_data_value(), ascending|descending) -> bare_data_value().
 apply_ordering(Val, descending) when is_integer(Val) ->
     -Val;
 apply_ordering(Val, descending) when is_binary(Val) ->
@@ -453,7 +462,7 @@ normalise(X) -> X.
 
 %% Check if the column type and the value being compared
 %% are comparable.
--spec is_compatible_type(ColType::atom(), WhereType::atom(), any()) ->
+-spec is_compatible_type(ColType::atom(), WhereType::atom(), bare_data_value()) ->
                                 boolean().
 is_compatible_type(timestamp, integer, _)       -> true;
 is_compatible_type(boolean,   boolean,  true)   -> true;
@@ -1138,8 +1147,8 @@ make_ts_keys_1_test() ->
         "c TIMESTAMP NOT NULL, "
         "PRIMARY KEY((a, b, quantum(c, 15, 's')), a, b, c))"),
     ?assertEqual(
-        {ok, {1,2,0}},
-        lk_to_pk({1,2,3}, DDL, Mod)
+        {ok, [1,2,0]},
+        lk_to_pk([1,2,3], Mod, DDL)
     ).
 
 % a two element key, still using the table definition field order
@@ -1151,8 +1160,8 @@ make_ts_keys_2_test() ->
         "c SINT64 NOT NULL, "
         "PRIMARY KEY((a, quantum(b, 15, 's')), a, b))"),
     ?assertEqual(
-        {ok, {1,0}},
-        lk_to_pk({1,2}, DDL, Mod)
+        {ok, [1,0]},
+        lk_to_pk([1,2], Mod, DDL)
     ).
 
 make_ts_keys_3_test() ->
@@ -1164,8 +1173,8 @@ make_ts_keys_3_test() ->
         "d SINT64 NOT NULL, "
         "PRIMARY KEY  ((d,a,quantum(c, 1, 's')), d,a,c))"),
     ?assertEqual(
-        {ok, {10,20,0}},
-        lk_to_pk({10,20,1}, DDL, Mod)
+        {ok, [10,20,0]},
+        lk_to_pk([10,20,1], Mod, DDL)
     ).
 
 make_ts_keys_4_test() ->
@@ -1178,8 +1187,8 @@ make_ts_keys_4_test() ->
         "d SINT64 NOT NULL, "
         "PRIMARY KEY  ((ax,a,quantum(c, 1, 's')), ax,a,c))"),
     ?assertEqual(
-        {ok, {10,20,0}},
-        lk_to_pk({10,20,1}, DDL, Mod)
+        {ok, [10,20,0]},
+        lk_to_pk([10,20,1], Mod, DDL)
     ).
 
 %%
