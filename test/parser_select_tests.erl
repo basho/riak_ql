@@ -479,7 +479,6 @@ single_line_comment_in_multiline_select_test() ->
             "WHERE a = 'val'"))
     ).
 
-
 single_line_comment_in_multiline_ctrl_select_test() ->
     ?assertEqual(
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
@@ -488,4 +487,22 @@ single_line_comment_in_multiline_ctrl_select_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
             "SELECT * FROM mytab -- a comment\r\n"
             "WHERE a = 'val'"))
+    ).
+
+in_predicate_single_value_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE a = 'oi'")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab WHERE a IN ('oi')"))
+    ).
+
+in_predicate_two_values_test() ->
+    ?assertEqual(
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab "
+            "WHERE (a = 'oi' OR a = 'lol')")),
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+            "SELECT * FROM mytab WHERE a IN ('oi', 'lol')"))
     ).

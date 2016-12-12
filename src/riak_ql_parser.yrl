@@ -21,6 +21,7 @@ Fields
 Funcall
 GroupBy
 Identifier
+InPredicate
 Insert
 IsNotNull
 IsNull
@@ -116,6 +117,7 @@ insert
 integer
 into
 is_
+in
 group
 key
 last
@@ -245,6 +247,7 @@ Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1',
 Funcall -> Identifier left_paren asterisk       right_paren : make_funcall('$1', ['$3']).
 Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3'] ++ '$4').
 
+InPredicate -> Identifier in RowValueList : make_in_predicate('$1', lists:reverse(hd('$3'))).
 %% NullComp is termed NullPredicatePart2 in the SQL spec, however it is more
 %% clearly a NullComparator, so termed NullComp here.
 NullPredicate -> Vals NullComp : make_expr('$1', '$2').
@@ -348,6 +351,8 @@ TruthValue -> false : {boolean, false}.
 
 BooleanPrimary -> BooleanPredicand : '$1'.
 
+BooleanPredicand ->
+    InPredicate : '$1'.
 BooleanPredicand ->
     NullPredicate : '$1'.
 BooleanPredicand ->
@@ -683,6 +688,10 @@ make_insert({identifier, Table}, Fields, Values) ->
      {values, Values}
     ].
 
+make_in_predicate(Identifier, [Val]) ->
+    {expr, {'=', Identifier, Val}};
+make_in_predicate(Identifier, [Val|Tail]) ->
+    {expr, {or_, {expr, {'=', Identifier, Val}}, make_in_predicate(Identifier, Tail)}}.
 
 %% per Product Requirements
 %% "If NULLS LAST is specified, null values sort after all non-null
