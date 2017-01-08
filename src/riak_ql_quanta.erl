@@ -102,7 +102,8 @@ gen_quanta(N, Start, Slice, Acc) when is_integer(N) andalso N > 1 ->
 quantum(Time, QuantaSize, Unit) when Unit == d;
                                      Unit == h;
                                      Unit == m;
-                                     Unit == s ->
+                                     Unit == s;
+                                     Unit == ms ->
     Ms = unit_to_ms(Unit),
     Diff = Time rem (QuantaSize*Ms),
     Time - Diff;
@@ -112,6 +113,7 @@ quantum(_, _, Unit) ->
 %% Convert an integer and a time unit in binary to millis, assumed from the unix
 %% epoch.
 -spec unit_to_millis(Value::integer(), Unit::binary() | time_unit()) -> integer() | error.
+unit_to_millis(V, U) when U == ms; U == <<"ms">> -> V;
 unit_to_millis(V, U) when U == s; U == <<"s">> -> V*1000;
 unit_to_millis(V, U) when U == m; U == <<"m">> -> V*1000*60;
 unit_to_millis(V, U) when U == h; U == <<"h">> -> V*1000*60*60;
@@ -131,6 +133,8 @@ ms_to_timestamp(Time) ->
     {0, Seconds, MicroSeconds}.
 
 -spec unit_to_ms(s | m | h | d) -> time_ms().
+unit_to_ms(ms) ->
+    1;
 unit_to_ms(s) ->
     1000;
 unit_to_ms(m) ->

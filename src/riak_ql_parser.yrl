@@ -20,6 +20,7 @@ FieldElem
 Fields
 Funcall
 GroupBy
+GroupByClause
 Identifier
 Insert
 IsNotNull
@@ -53,6 +54,7 @@ TableProperties
 TableProperty
 TablePropertyList
 TablePropertyValue
+TimeFunc
 Val
 Vals
 Where
@@ -143,6 +145,7 @@ sint64
 solidus
 table
 tables
+group_time
 timestamp
 true
 values
@@ -157,7 +160,14 @@ Endsymbol '$end'.
 Statement -> StatementWithoutSemicolon : '$1'.
 Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
-GroupBy -> group by Fields: {group_by, '$3'}.
+GroupBy -> group by GroupByClause: {group_by, '$3'}.
+
+GroupByClause -> TimeFunc comma GroupByClause : lists:append(['$1'], '$3').
+GroupByClause -> Identifier comma GroupByClause : lists:append(['$1'], '$3').
+GroupByClause -> TimeFunc : ['$1'].
+GroupByClause -> Identifier : ['$1'].
+
+TimeFunc -> group_time left_paren Identifier comma integer right_paren : {time_fn, '$3', '$5'} .
 
 Query -> Select WindowClause : make_window_clause('$1', '$2').
 Query -> Select              : make_window_clause('$1', make_orderby([], undefined, undefined)).
@@ -622,6 +632,7 @@ make_select(A, B, C, D) ->
     make_select(A, B, C, D, {where, []}).
 
 make_select(A, B, C, D, E) -> make_select(A, B, C, D, E, {group_by, []}).
+-include_lib("eunit/include/eunit.hrl").
 
 make_select({select, _SelectBytes},
             Select,
@@ -640,6 +651,7 @@ make_select({select, _SelectBytes},
                    end,
     FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
     FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
+    % ?debugFmt("GROUP BY FIELDS ~p",[GroupFields]),
     #outputs{type    = select,
              fields  = FieldsWrappedIdentifiers,
              buckets = Bucket,
