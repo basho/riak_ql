@@ -41,6 +41,7 @@ SINT64 = (S|s)(I|i)(N|n)(T|t)64
 TABLE = (T|t)(A|a)(B|b)(L|l)(E|e)
 TABLES = (T|t)(A|a)(B|b)(L|l)(E|e)(S|s)
 TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
+GROUP_TIME = group_time
 TRUE = (T|t)(R|r)(U|u)(E|e)
 VALUES = (V|v)(A|a)(L|l)(U|u)(E|e)(S|s)
 VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
@@ -104,6 +105,7 @@ Rules.
 {INSERT} : {token, {insert, list_to_binary(TokenChars)}}.
 {INTO} : {token, {into, list_to_binary(TokenChars)}}.
 {GROUP} : {token, {group, list_to_binary(TokenChars)}}.
+{GROUP_TIME} : {token, {group_time, list_to_binary(TokenChars)}}.
 {KEY} : {token, {key, list_to_binary(TokenChars)}}.
 {LAST} : {token, {last, list_to_binary(TokenChars)}}.
 {LIMIT} : {token, {limit, list_to_binary(TokenChars)}}.

@@ -156,6 +156,24 @@ group_by_one_field_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
+group_by_quantum_test() ->
+    Query_sql =
+        "SELECT COUNT(*) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY group_time(a,1);",
+    ?assertEqual(
+        {select, [
+                  {tables, <<"mytab">>},
+                  {fields, [{identifier, [<<"b">>]}]},
+                  {where,  [{'=', <<"a">>, {integer, 1}}]},
+                  {group_by, [{identifier, <<"b">>}]},
+                  {limit, []},
+                  {offset, []},
+                  {order_by, []}
+                 ]},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
 group_by_two_fields_test() ->
     Query_sql =
         "SELECT a, b FROM mytab "
