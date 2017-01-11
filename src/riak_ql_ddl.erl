@@ -550,6 +550,15 @@ fold_where_tree2(_, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op == or_ ->
 fold_where_tree2(Conditional, Fn, Acc, Clause) ->
     Fn(Conditional, Clause, Acc).
 
+%% Like lists:mapfoldl but specifically for where clause AST. The fun will be
+%% called on each filter e.g. `Fun(Conditional, Filter, Acc)`. 
+%% * Conditional is either `_and`, `_or` or `root`.
+%% * Filter AST tuple
+%% * Acc is the provided accumulator
+%%
+%% The fun should return a tuple like `{MappedFilter,Acc2}`. Special returns for
+%% `MappedValue are `eliminate` which removes the filter and skip which skips
+%% this filter and any more in the same branch. 
 mapfold_where_tree(_, Acc1, []) ->
     {[], Acc1};
 mapfold_where_tree(Fn, Acc1, Where) when is_function(Fn) ->
