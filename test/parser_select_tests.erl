@@ -138,21 +138,25 @@ select_quoted_escape_sql_test() ->
                 ]}
        ]).
 
+%% custom assert to match one or more properties in the expected argument in
+%% the actual argument, which should be the result of riak_ql_parser:ql_parse/1.
+%%
+%% ?assertSelectPropsEqual(
+%%     Expected::[proplists:property()],
+%%     Actual::{select,[proplists:property()]}).
+-define(
+    assertSelectPropsEqual(Expected,Actual),
+    ?assertMatch({select,_}, Actual),
+    [?assertEqual(X,proplists:lookup(K,element(2,Actual))) || {K,_} = X <- Expected]
+).
+
 group_by_one_field_test() ->
     Query_sql =
         "SELECT b FROM mytab "
         "WHERE a = 1 "
         "GROUP BY b",
-    ?assertEqual(
-        {select, [
-                  {tables, <<"mytab">>},
-                  {fields, [{identifier, [<<"b">>]}]},
-                  {where,  [{'=', <<"a">>, {integer, 1}}]},
-                  {group_by, [{identifier, <<"b">>}]},
-                  {limit, []},
-                  {offset, []},
-                  {order_by, []}
-                 ]},
+    ?assertSelectPropsEqual(
+        [{group_by, [{identifier, <<"b">>}]}],
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
@@ -160,17 +164,39 @@ group_by_quantum_test() ->
     Query_sql =
         "SELECT COUNT(*) FROM mytab "
         "WHERE a = 1 "
-        "GROUP BY group_time(a,1);",
-    ?assertEqual(
-        {select, [
-                  {tables, <<"mytab">>},
-                  {fields, [{identifier, [<<"b">>]}]},
-                  {where,  [{'=', <<"a">>, {integer, 1}}]},
-                  {group_by, [{identifier, <<"b">>}]},
-                  {limit, []},
-                  {offset, []},
-                  {order_by, []}
-                 ]},
+        "GROUP BY time(a,1);",
+    ?assertSelectPropsEqual(
+        [{group_by, [{time_fn, {identifier, <<"a">>}, {integer, 1}}]}],
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+group_by_quantum_with_measure_test() ->
+    Query_sql =
+        "SELECT COUNT(*) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY time(a,1m);",
+    ?assertSelectPropsEqual(
+        [{group_by, [{time_fn, {identifier, <<"a">>}, {integer, 60000}}]}],
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+group_by_quantum_with_args_backwards_test() ->
+    Query_sql =
+        "SELECT COUNT(*) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY time(1m,a);",
+    ?assertMatch(
+        {error,{0,riak_ql_parser, <<"Arguments for GROUP BY time(..) were the wrong way round.",_/binary>>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+group_by_quantum_unknown_function_test() ->
+    Query_sql =
+        "SELECT COUNT(*) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY derp(1m,a,r,p);",
+    ?assertMatch(
+        {error,{0,riak_ql_parser, <<"Unknown GROUP BY function derp/4",_/binary>>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
@@ -179,16 +205,8 @@ group_by_two_fields_test() ->
         "SELECT a, b FROM mytab "
         "WHERE a = 1 "
         "GROUP BY a, b",
-    ?assertEqual(
-        {select, [
-                  {tables, <<"mytab">>},
-                  {fields, [{identifier, [<<"a">>]}, {identifier, [<<"b">>]}]},
-                  {where,  [{'=', <<"a">>, {integer, 1}}]},
-                  {group_by, [{identifier, <<"a">>}, {identifier, <<"b">>}]},
-                  {limit, []},
-                  {offset, []},
-                  {order_by, []}
-                 ]},
+    ?assertSelectPropsEqual(
+        [{group_by, [{identifier, <<"a">>}, {identifier, <<"b">>}]}],
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
@@ -350,7 +368,17 @@ select_all_not_allowed_in_group_by_test() ->
         "WHERE a = 1 "
         "GROUP BY *, b",
     ?assertEqual(
-        {error,{0,riak_ql_parser,<<"GROUP BY can only contain table columns but '*' was found.">>}},
+        {error,{0,riak_ql_parser,<<"GROUP BY can only contain table columns and the time/2 function but '*' was found.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+select_all_not_allowed_in_group_by_last_test() ->
+    Query_sql =
+        "SELECT AVG(x) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY b, *",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"GROUP BY can only contain table columns and the time/2 function but '*' was found.">>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
