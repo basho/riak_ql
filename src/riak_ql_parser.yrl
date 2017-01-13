@@ -148,7 +148,6 @@ sint64
 solidus
 table
 tables
-group_time
 timestamp
 true
 values
@@ -165,12 +164,14 @@ Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
 GroupBy -> group by GroupByClause: {group_by, '$3'}.
 
-GroupByClause -> TimeFunc comma GroupByClause : lists:append(['$1'], '$3').
-GroupByClause -> Identifier comma GroupByClause : lists:append(['$1'], '$3').
-GroupByClause -> TimeFunc : ['$1'].
+GroupByClause -> TimeFunc comma GroupByClause   : ['$1']++'$3'.
+GroupByClause -> Identifier comma GroupByClause : ['$1']++'$3'.
+GroupByClause -> asterisk   : return_error_flat("GROUP BY can only contain table columns and the time/2 function but '*' was found.").
+GroupByClause -> TimeFunc   : ['$1'].
 GroupByClause -> Identifier : ['$1'].
 
-TimeFunc -> group_time left_paren Identifier comma integer right_paren : {time_fn, '$3', '$5'} .
+TimeFunc -> Identifier left_paren FunArg right_paren         : make_group_by_hash_fn('$1', lists:flatten(['$3'])).
+TimeFunc -> Identifier left_paren FunArg FunArgN right_paren : make_group_by_hash_fn('$1', lists:flatten(['$3']++'$4')).
 
 Query -> Select WindowClause : make_window_clause('$1', '$2').
 Query -> Select              : make_window_clause('$1', make_orderby([], undefined, undefined)).
@@ -571,7 +572,6 @@ convert(#outputs{type = create} = O) ->
 
 validate_select_query(Outputs) ->
     ok = assert_group_by_select(Outputs),
-    ok = assert_group_by_is_valid(Outputs),
     ok = assert_group_by_with_order_by(Outputs).
 
 %% If the query uses GROUP BY then check that the identifiers in the select
@@ -590,15 +590,6 @@ assert_group_by_select(#outputs{ fields = Fields, group_by = GroupBy }) ->
             return_error_flat("Field(s) " ++ string:join(IllegalIdentifiers,", ") ++ " are specified in the select statement but not the GROUP BY.")
     end.
 
-
-%%
-assert_group_by_is_valid(#outputs{ group_by = GroupBy }) ->
-    case lists:member({identifier, [<<"*">>]}, GroupBy) of
-        false ->
-            ok;
-        true ->
-            return_error_flat("GROUP BY can only contain table columns but '*' was found.")
-    end.
 
 assert_group_by_with_order_by(#outputs{group_by = GroupBy, order_by = OrderBy})
   when (GroupBy /= [] andalso OrderBy /= []) ->
@@ -646,7 +637,6 @@ make_select(A, B, C, D) ->
     make_select(A, B, C, D, {where, []}).
 
 make_select(A, B, C, D, E) -> make_select(A, B, C, D, E, {group_by, []}).
--include_lib("eunit/include/eunit.hrl").
 
 make_select({select, _SelectBytes},
             Select,
@@ -709,6 +699,18 @@ make_insert({identifier, Table}, Fields, Values) ->
      {values, Values}
     ].
 
+make_group_by_hash_fn({identifier,<<"time">>}, [{identifier,_} = Col, {integer,_} = Quantum]) ->
+    {time_fn, Col, Quantum};
+make_group_by_hash_fn({identifier,<<"time">>}, [{integer,_}, {identifier,_}]) ->
+    return_error_flat(
+        "Arguments for GROUP BY time(..) were the wrong way round. Function signature is\n"
+        "  GROUP BY time(<column>, <milliseconds>)\n"
+        "Example:\n"
+        "  GROUP BY time(mycolumn, 10m)");
+make_group_by_hash_fn({identifier,FnName}, Args) ->
+    return_error_flat(
+        "Unknown GROUP BY function ~ts/~p, the only supported GROUP BY function is time(<column>, <milliseconds>).",
+        [FnName, length(Args)]).
 
 %% per Product Requirements
 %% "If NULLS LAST is specified, null values sort after all non-null
@@ -1312,6 +1314,7 @@ query_field_name(?SQL_PARAM{name = Field}) ->
 -spec return_error_flat(string()) -> no_return().
 return_error_flat(F) ->
     return_error_flat(F, []).
+
 -spec return_error_flat(string(), [term()]) -> no_return().
 return_error_flat(F, A) ->
     return_error(

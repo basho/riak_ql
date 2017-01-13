@@ -41,7 +41,6 @@ SINT64 = (S|s)(I|i)(N|n)(T|t)64
 TABLE = (T|t)(A|a)(B|b)(L|l)(E|e)
 TABLES = (T|t)(A|a)(B|b)(L|l)(E|e)(S|s)
 TIMESTAMP = (T|t)(I|i)(M|m)(E|e)(S|s)(T|t)(A|a)(M|m)(P|p)
-GROUP_TIME = group_time
 TRUE = (T|t)(R|r)(U|u)(E|e)
 VALUES = (V|v)(A|a)(L|l)(U|u)(E|e)(S|s)
 VARCHAR = (V|v)(A|a)(R|r)(C|c)(H|h)(A|a)(R|r)
