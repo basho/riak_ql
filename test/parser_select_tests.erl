@@ -504,3 +504,12 @@ single_line_comment_in_multiline_ctrl_select_test() ->
 %             "WHERE a = 'val'"))
 %     ).
 
+select_with_arithmetic_in_where_clause_test() ->
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a = 10 + 1",
+    {select, Parsed_query} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql)),
+    ?assertEqual(
+        {where, [{'=', <<"a">>, {integer, 11}}]},
+        proplists:lookup(where, Parsed_query)
+    ).
