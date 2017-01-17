@@ -43,7 +43,7 @@
 -type time_ms() :: non_neg_integer().
 %% A timestamp in millisconds representing number of millisconds from Unix epoch
 
--type time_unit() :: d | h | m | s.
+-type time_unit() :: d | h | m | s | ms.
 %%  The units of quantization available to quantum/3
 
 -type err() :: {error, term()}.
@@ -132,7 +132,7 @@ ms_to_timestamp(Time) ->
     MicroSeconds = (Time rem 1000) * 1000,
     {0, Seconds, MicroSeconds}.
 
--spec unit_to_ms(s | m | h | d) -> time_ms().
+-spec unit_to_ms(time_unit()) -> time_ms().
 unit_to_ms(ms) ->
     1;
 unit_to_ms(s) ->
