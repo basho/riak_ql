@@ -87,6 +87,7 @@ Rules.
 {AND} : {token, {and_, list_to_binary(TokenChars)}}.
 {ASC} : {token, {asc, list_to_binary(TokenChars)}}.
 {AS} : {token, {as_, list_to_binary(TokenChars)}}.
+{BLOB} : {token, {blob, list_to_binary(TokenChars)}}.
 {BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
 {BY} : {token, {by, list_to_binary(TokenChars)}}.
 {CREATE} : {token, {create, list_to_binary(TokenChars)}}.
