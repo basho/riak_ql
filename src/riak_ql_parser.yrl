@@ -12,6 +12,7 @@ ColumnDefinition
 Comp
 ComparisonPredicate
 DataType
+Delete
 Describe
 Explain
 Field
@@ -93,11 +94,13 @@ as_
 and_
 asc
 asterisk
+blob
 boolean
 by
 character_literal
 comma
 create
+delete
 desc
 describe
 double
@@ -190,11 +193,17 @@ StatementWithoutSemicolon -> ShowCreateTable : '$1'.
 StatementWithoutSemicolon -> Explain : '$1'.
 StatementWithoutSemicolon -> Insert : '$1'.
 StatementWithoutSemicolon -> ShowTables : '$1'.
+StatementWithoutSemicolon -> Delete : convert('$1').
 
 Select -> select Fields from Bucket Where GroupBy
                                           : make_select('$1', '$2', '$3', '$4', '$5', '$6').
 Select -> select Fields from Bucket Where : make_select('$1', '$2', '$3', '$4', '$5').
 Select -> select Fields from Bucket       : make_select('$1', '$2', '$3', '$4').
+
+%% DELETE
+%% Section 14.9 of the SQL Foundation Document
+%% We only implement <delete statement: searched>
+Delete -> delete from Bucket Where : make_delete('$3', '$4').
 
 %% EXPLAIN STATEMENT
 Explain -> explain Query : make_explain('$2').
@@ -249,6 +258,7 @@ Vals -> NumericValueExpression : '$1'.
 Vals -> regex            : '$1'.
 Vals -> Val              : '$1'.
 
+Val -> blob               : '$1'.
 Val -> varchar            : '$1'.
 Val -> CharacterLiteral   : '$1'.
 Val -> TruthValue         : '$1'.
@@ -377,6 +387,7 @@ ColumnConstraint -> NotNull : not_null.
 DataType -> double    : '$1'.
 DataType -> sint64    : '$1'.
 DataType -> timestamp : '$1'.
+DataType -> blob      : '$1'.
 DataType -> varchar   : '$1'.
 DataType -> boolean   : '$1'.
 
@@ -399,7 +410,7 @@ KeyFieldList -> KeyField : ['$1'].
 
 KeyField -> quantum left_paren KeyFieldArgList right_paren :
     element(2, make_modfun(quantum, '$3')).
-KeyField -> Identifier OptOrdering  : 
+KeyField -> Identifier OptOrdering  :
     ?SQL_PARAM{name = [element(2, '$1')], ordering = '$2'}.
 
 OptOrdering -> '$empty' : undefined.
@@ -462,7 +473,7 @@ Erlang code.
 
 -record(outputs,
         {
-          type :: create | describe | explain | insert | select,
+          type :: create | describe | explain | insert | select | delete,
           buckets = [],
           fields  = [],
           where   = [],
@@ -505,6 +516,16 @@ fix_up_keys(?DDL{partition_key = none, local_key = LK} = DDL) ->
 fix_up_keys(A) ->
     A.
 
+convert(#outputs{type    = delete,
+                 buckets = B,
+                 where   = W}) ->
+               %% the parser itself validates this query completely
+               %% in the absence of information about the table
+               [
+                {type,  delete},
+                {table, B},
+                {where, W}
+               ];
 convert(#outputs{type     = select,
                  buckets  = B,
                  fields   = F,
@@ -592,6 +613,11 @@ find_group_identifiers({{window_agg_fn, _}, _}, Acc) ->
     Acc;
 find_group_identifiers({_, _}, Acc) ->
     Acc.
+
+make_delete({identifier, Bucket}, {_Where, W}) ->
+   #outputs{type    = delete,
+            buckets = Bucket,
+            where   = W}.
 
 make_select({select, multi_table_error}, _B, _C, _D) ->
     return_error(0, <<"Must provide exactly one table name">>);
@@ -1219,7 +1245,7 @@ assert_desc_key_types(?DDL{ local_key = #key_v1{ ast = LKAST } } = DDL) ->
 %%
 assert_desc_key_field_type(DDL, ?SQL_PARAM{ name = [Name] }) ->
     {ok, Type} = riak_ql_ddl:get_field_type(DDL, Name),
-    case Type of
+    case riak_ql_ddl:get_storage_type(Type) of
         sint64 ->
             ok;
         varchar ->
@@ -1229,7 +1255,7 @@ assert_desc_key_field_type(DDL, ?SQL_PARAM{ name = [Name] }) ->
         _ ->
             return_error_flat(
                 "Elements in the local key marked descending (DESC) must be of "
-                "type sint64 or varchar, but was ~p.", [Type])
+                "type 'sint64', 'timestamp', 'varchar', or 'blob', but was '~p'.", [Type])
     end.
 
 %% Check that the field name exists in the list of fields.
