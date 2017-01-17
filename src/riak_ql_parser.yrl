@@ -89,6 +89,7 @@ FieldValue
 
 Terminals
 
+as_
 and_
 asc
 asterisk
@@ -211,6 +212,8 @@ Where -> where BooleanValueExpression : make_where('$1', '$2').
 Fields -> Fields     comma   FieldElem   : concat_select('$1', '$3').
 Fields -> FieldElem                      : '$1'.
 
+FieldElem -> Field as_ Identifier : make_as('$1', '$3').
+FieldElem -> Field as_ Val : make_as('$1', '$3').
 FieldElem -> Field : '$1'.
 FieldElem -> Val   : '$1'.
 
@@ -643,6 +646,11 @@ make_show_create_table({identifier, D}) ->
 make_explain(#outputs{type = select} = S) ->
     Props = convert(S),
     lists:keyreplace(type, 1, Props, {type, explain}).
+
+make_as(Expr, {identifier, Alias}) ->
+    {alias, Alias, Expr};
+make_as(Expr, {binary, Alias}) ->
+    {alias, Alias, Expr}.
 
 make_insert({identifier, Table}, Fields, Values) ->
     FieldsAsList = case is_list(Fields) of

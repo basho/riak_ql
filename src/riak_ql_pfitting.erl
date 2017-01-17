@@ -47,21 +47,44 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_pfitting).
 
+-define(QLCMMod, riak_ql_pfitting_column_mapping).
+-define(QLPRMod, riak_ql_pfitting_process_result).
+
 -record(pfitting, {
-          column_mappings :: [riak_ql_pfitting_column_mapping:column_mapping()]
+          module :: module(),
+          column_mappings :: [?QLCMMod:column_mapping()]
          }).
 -opaque pfitting() :: #pfitting{}.
 -export_type([pfitting/0]).
 
--export([create/1,
-         get_column_mappings/1]).
+-export([create/2,
+         get_module/1,
+         get_column_mappings/1,
+         process/2]).
 
 -callback process(pfitting(), [binary()], [[term()]]) ->
-    {ok|error, riak_ql_pfitting_process_result:process_result()}.
+    {ok|error, ?QLPRMod:process_result()}.
 
--spec create([riak_ql_pfitting_column_mapping:column_mapping()]) -> pfitting().
-create(ColumnMappings) ->
-    #pfitting{column_mappings = ColumnMappings}.
+-spec create(module(), [?QLCMMod:column_mapping()]) -> pfitting().
+create(Module, ColumnMappings) ->
+    #pfitting{module = Module,
+              column_mappings = ColumnMappings}.
 
--spec get_column_mappings(pfitting()) -> [iriak_ql_pfitting_column_mapping:column_mapping()].
+-spec get_module(pfitting()) -> module().
+get_module(#pfitting{module = Module}) -> Module.
+
+-spec get_column_mappings(pfitting()) -> [?QLCMMod:column_mapping()].
 get_column_mappings(#pfitting{column_mappings = ColumnMappings}) -> ColumnMappings.
+
+-spec process(pfitting(), ?QLPRMod:process_result()) -> ?QLPRMod:process_result().
+process(Pfitting, Res) ->
+    Errors = ?QLPRMod:get_errors(Res),
+    process1(Pfitting, Res, Errors).
+
+process1(Pfitting, Res, _Errors = []) ->
+    Module = get_module(Pfitting),
+    Columns = ?QLPRMod:get_columns(Res),
+    Rows = ?QLPRMod:get_rows(Res),
+    Module:process(Pfitting, Columns, Rows);
+process1(_Module, Res, _Errors) ->
+    Res.

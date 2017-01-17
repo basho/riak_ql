@@ -5,6 +5,7 @@
 
 Definitions.
 
+AS = (A|a)(S|s)
 AND = (A|a)(N|n)(D|d)
 ASC = (A|a)(S|s)(C|c)
 BOOLEAN = (B|b)(O|o)(O|o)(L|l)(E|e)(A|a)(N|n)
@@ -85,6 +86,7 @@ Rules.
 
 {AND} : {token, {and_, list_to_binary(TokenChars)}}.
 {ASC} : {token, {asc, list_to_binary(TokenChars)}}.
+{AS} : {token, {as_, list_to_binary(TokenChars)}}.
 {BOOLEAN} : {token, {boolean, list_to_binary(TokenChars)}}.
 {BY} : {token, {by, list_to_binary(TokenChars)}}.
 {CREATE} : {token, {create, list_to_binary(TokenChars)}}.
