@@ -560,7 +560,9 @@ mapfold_where_tree(Fn, Acc1, Where) when is_function(Fn) ->
         {_,_} = Return ->
             Return
     end.
+-include_lib("eunit/include/eunit.hrl").
 
+% {'=',<<"b">>,{'+',{'+',{integer,4000},{float,2.4}},{integer,7}}}
 mapfold_where_tree2(_, _, Acc, []) ->
     Acc;
 mapfold_where_tree2(Conditional, Fn, Acc1, [Where]) ->
@@ -583,8 +585,17 @@ mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op =
         {skip, Acc2} ->
             {{Op, LHS, RHS}, Acc2}
     end;
-mapfold_where_tree2(Conditional, Fn, Acc, Clause) ->
-    Fn(Conditional, Clause, Acc).
+mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == '='; Op == '+'; Op == '-' ->
+    {LHS_result, Acc2} = mapfold_where_tree2(Conditional, Fn, Acc1, LHS),
+    {RHS_result, Acc3} = mapfold_where_tree2(Conditional, Fn, Acc2, RHS),
+    Fn(Conditional, {Op,LHS_result,RHS_result}, Acc3);
+mapfold_where_tree2(Conditional, Fn, Acc, {_,_,_} = Clause) ->
+    Fn(Conditional, Clause, Acc);
+mapfold_where_tree2(_, _, Acc, Clause) ->
+    %% if the clause is a minor AST like a binary for a field name, or an
+    %% identifer then do not fold it, this function is just for folding
+    %% branching AST
+    {Clause, Acc}.
 
 -spec are_insert_columns_valid(module(), [insertion()], boolean()) ->
     true | {false, [query_syntax_error()]}.
