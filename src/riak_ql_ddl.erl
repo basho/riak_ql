@@ -111,6 +111,7 @@
 %%-export([get_return_types_and_col_names/2]).
 
 -type query_syntax_error() ::
+        {arithmetic_on_identifier, FieldName::binary()} |
         {bucket_type_mismatch, DDL_bucket::binary(), Query_bucket::binary()} |
         {incompatible_type, Field::binary(), external_field_type(), atom()} |
         {incompatible_operator, Field::binary(), external_field_type(), relational_op()}  |
@@ -331,7 +332,9 @@ syntax_error_to_msg2({invalid_field_operation}) ->
 syntax_error_to_msg2({argument_type_mismatch, Fn, Args}) ->
     {"Function '~s' called with arguments of the wrong type ~p.", [Fn, Args]};
 syntax_error_to_msg2({operator_type_mismatch, Fn, Type1, Type2}) ->
-    {"Operator '~s' called with mismatched types [~p vs ~p].", [Fn, Type1, Type2]}.
+    {"Operator '~s' called with mismatched types [~p vs ~p].", [Fn, Type1, Type2]};
+syntax_error_to_msg2({arithmetic_on_identifier, FieldName}) ->
+    {"Arithmetic performed on column ~ts, arithmetic on columns is not supported", [FieldName]}.
 
 %% An atom with upper case chars gets printed as 'COUNT' so remove the
 %% quotes to make the error message more reable.
@@ -378,17 +381,22 @@ is_query_valid_result(Res) ->
       true, Res).
 
 -spec are_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
-are_filters_valid(Mod, Where) ->
-    Errors = fold_where_tree(fun(_, Clause, Acc) ->
-                                     is_filters_field_valid(Mod, Clause, Acc)
-                             end, [], Where),
+    are_filters_valid(Mod, Where) ->
+    {_, Errors} = mapfold_where_tree(
+        fun (_, Op, Acc_x) when Op == and_; Op == or_ ->
+                {ok, Acc_x};
+            (_, Clause, Acc) ->
+                {Clause, is_filters_field_valid(Mod, Clause, Acc)}
+        end, [], Where),
     case Errors of
         [] -> true;
         _  -> {false, Errors}
     end.
 
-%% the terminal case of "a = 2"
-is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) ->
+is_filters_field_valid(_, {Op, {identifier,FieldName}, _}, Acc1) when (Op == '/' orelse Op == '+' orelse Op == '-' orelse Op == '*') ->
+    [{arithmetic_on_identifier, FieldName} | Acc1];
+is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) when (Op == '=' orelse Op == '!=' orelse Op == '>' orelse Op == '<' orelse Op == '>=' orelse Op == '<=')
+                                                                        andalso is_binary(Field) ->
     case Mod:is_field_valid([Field]) of
         true  ->
             ExpectedType = Mod:get_field_type([Field]),
@@ -416,45 +424,8 @@ is_filters_field_valid(Mod, {NullOp, {identifier, Field}}, Acc1) when NullOp =:=
 is_filters_field_valid(_Mod, {_Op, _Field1, _Field2}, Acc1) when is_binary(_Field1), is_binary(_Field2) ->
     [{invalid_field_operation} | Acc1];
 %% the case where RHS is an expression on its own (LHS must still be a valid field)
-is_filters_field_valid(_Mod, {_Op, _Field, {_RHS_op, _RHS_lhs_bare_value, _RHS_rhs}}, Acc1) ->
+is_filters_field_valid(_, _, Acc1) ->
     Acc1.
-
-%% andreiz: The code below would check for type compatibility
-%% between field and expression, if subexpressions were
-%% supported. Currently (2015-12-03), the query rewrite code in
-%% riak_kv_qry_compiler cannot deal with subexpressions.  Uncomment
-%% and edit the following when it does.
-
-%% case Mod:is_field_valid([Field]) of
-%%     true  ->
-%%         ExpectedType = Mod:get_field_type([Field]),
-%%         %% the lexer happens to have no type attached to LHS, even
-%%         %% when it's not a field but an rvalue; just assume it is
-%%         %% the type of the field at the root of the expression
-%%         RHS_lhs = maybe_assign_type(RHS_lhs_bare_value, ExpectedType),
-
-%%         %% this is the case of "A = 3 + 2":
-%%         %% * check that A is compatible with 3 and 2 on '='
-%%         %% * check that A is compatible with 3 and 2 on '+'
-%%         lists:append(
-%%           [is_filters_field_valid(Mod, {Op,     Field, RHS_lhs}, []),
-%%            is_filters_field_valid(Mod, {Op,     Field, RHS_rhs}, []),
-%%            is_filters_field_valid(Mod, {RHS_op, Field, RHS_lhs}, []),
-%%            is_filters_field_valid(Mod, {RHS_op, Field, RHS_rhs}, []) | Acc1]);
-%%     false ->
-%%         [{unexpected_where_field, Field} | Acc1]
-%% end.
-%%
-%% maybe_assign_type({_Type, _Value} = AlreadyTyped, _AttributedType) ->
-%%     AlreadyTyped;
-%% maybe_assign_type(BareValue, FieldType) ->
-%%     {lexer_type_of(FieldType), BareValue}.
-%%
-%% lexer_type_of(timestamp) -> integer;
-%% lexer_type_of(boolean)   -> boolean;
-%% lexer_type_of(sint64)    -> integer;
-%% lexer_type_of(double)    -> float;
-%% lexer_type_of(varchar)   -> binary.
 
 normalise(Bin) when is_binary(Bin) ->
     string:to_lower(binary_to_list(Bin));
