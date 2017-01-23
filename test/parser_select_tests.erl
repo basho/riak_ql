@@ -510,6 +510,6 @@ select_with_arithmetic_in_where_clause_test() ->
         "WHERE a = 10 + 1",
     {select, Parsed_query} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql)),
     ?assertEqual(
-        {where, [{'=', <<"a">>, {integer, 11}}]},
+        {where, [{'=', <<"a">>, {'+',{'integer', 10},{'integer',1}}}]},
         proplists:lookup(where, Parsed_query)
     ).
