@@ -3,7 +3,7 @@
 %% riak_ql_window_agg_fns: implementation of Windows Aggregation Fns
 %%                         for the query runner
 %%
-%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016, 2017 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -29,11 +29,16 @@
 -export([start_state/1]).
 -export([fn_arity/1]).
 -export([fn_type_signature/2]).
+-export([fn_param_check/2]).
+-export([supported_functions/0]).
 
 -type aggregate_function() :: 'COUNT' | 'SUM' | 'AVG' |'MEAN' | 'MIN' | 'MAX' | 'STDDEV' | 'STDDEV_POP' | 'STDDEV_SAMP'.
 
 -include("riak_ql_ddl.hrl").
 
+-spec supported_functions() -> [aggregate_function()].
+supported_functions() ->
+    ['COUNT', 'SUM', 'AVG','MEAN', 'MIN', 'MAX', 'STDDEV', 'STDDEV_POP', 'STDDEV_SAMP'].
 
 -spec fn_type_signature(aggregate_function(), Args::[riak_ql_ddl:external_field_type()]) ->
         riak_ql_ddl:external_field_type().
@@ -60,6 +65,11 @@ fn_type_signature('SUM', [sint64]) -> sint64;
 fn_type_signature('SUM', [timestamp]) -> timestamp;
 fn_type_signature(Fn, Args) ->
     {error, {argument_type_mismatch, Fn, Args}}.
+
+-spec fn_param_check(aggregate_function(), [riak_ql_ddl:external_field_type()]) ->
+                            ok | {error, WhichParamInvalid::pos_integer()}.
+fn_param_check(_, []) ->
+    ok.
 
 %%
 fn_arity(_FnName) -> 1.

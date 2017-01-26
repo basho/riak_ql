@@ -71,7 +71,9 @@ select_col_to_string({boolean, true}) ->
     "true";
 select_col_to_string({boolean, false}) ->
     "false";
-select_col_to_string({{window_agg_fn, FunName}, Args}) when is_atom(FunName) ->
+select_col_to_string({{FnClass, FunName}, Args})
+  when is_atom(FunName) andalso
+       (FnClass == window_agg_fn orelse FnClass == inverse_distrib_fn) ->
     lists:flatten([
                    atom_to_list(FunName),
                    $(,
