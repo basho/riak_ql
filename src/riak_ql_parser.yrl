@@ -5,6 +5,8 @@
 
 Nonterminals
 
+AlterTable
+AlterTableStatement
 Bucket
 CharacterLiteral
 ColumnConstraint
@@ -90,6 +92,7 @@ FieldValue
 
 Terminals
 
+alter
 and_
 asc
 asterisk
@@ -187,6 +190,7 @@ NullOrderSpec -> nulls last : {nulls_last, <<"nulls last">>}.
 
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
+StatementWithoutSemicolon -> AlterTableStatement : '$1'.
 StatementWithoutSemicolon -> Describe : '$1'.
 StatementWithoutSemicolon -> ShowCreateTable : '$1'.
 StatementWithoutSemicolon -> Explain : '$1'.
@@ -273,6 +277,7 @@ Comp -> lte                    : '$1'.
 Comp -> nomatch                : '$1'.
 %% Comp -> notapprox           : '$1'.
 
+AlterTable ->  alter table : alter_table.
 CreateTable -> create table : create_table.
 
 ShowTables -> show tables : [{type, show_tables}].
@@ -466,6 +471,13 @@ TablePropertyValue -> integer : '$1'.
 TablePropertyValue -> float : '$1'.
 TablePropertyValue -> character_literal : '$1'.
 
+%% ALTER TABLE STATEMENT
+
+%% We do not yet support modifying `TableContentsSource'
+AlterTableStatement ->
+    AlterTable Bucket with TableProperties :
+        alter_table_statement('$2', '$4').
+
 Erlang code.
 
 -record(outputs,
@@ -501,6 +513,8 @@ interpret_parse_result({error, _}=Err) ->
     Err;
 interpret_parse_result({ok, {?DDL{}=DDL, Props}}) ->
     {ddl, DDL, Props};
+interpret_parse_result({ok, {alter_table, TableName, _Changes, _Props}}) ->
+    {alter_table, TableName};
 interpret_parse_result({ok, Proplist}) ->
     extract_type(proplists:get_value(type, Proplist), Proplist).
 
@@ -1015,6 +1029,11 @@ make_table_definition({identifier, Table}, Contents, Properties) ->
     DDL2 = DDL1?DDL{
         minimum_capability = riak_ql_ddl:get_minimum_capability(DDL1) },
     {DDL2, validate_table_properties(Properties)}.
+
+alter_table_statement({identifier, Table}, Properties) ->
+    %% Include in this tuple an empty list of changes to be populated
+    %% in the future when we support changing column information.
+    {alter_table, Table, [], validate_table_properties(Properties)}.
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
