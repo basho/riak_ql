@@ -920,6 +920,8 @@ make_funcall({identifier, FuncName}, Args) ->
                            end,
             Args3 = [canonicalise_expr(X) || X <- Args2],
             {{window_agg_fn, Fn2}, Args3};
+        sql_select_fn ->
+            {{sql_select_fn, Fn}, Args};
         not_supported ->
             Msg2 = io_lib:format("Function not supported - '~s'.", [FuncName]),
             return_error(0, iolist_to_binary(Msg2))
@@ -945,6 +947,8 @@ get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
                              FuncName =:= 'STDDEV_SAMP' orelse
                              FuncName =:= 'STDDEV_POP' ->
     window_aggregate_fn;
+get_func_type('TIME') ->
+    sql_select_fn;
 get_func_type(FuncName) when is_atom(FuncName) ->
     not_supported.
 
