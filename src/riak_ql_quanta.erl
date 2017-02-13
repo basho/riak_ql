@@ -99,7 +99,9 @@ gen_quanta(N, Start, Slice, Acc) when is_integer(N) andalso N > 1 ->
 %% generate the starting timestamp of the range (quantum) in milliseconds since the epoch where the
 %% time belongs. Note that Time - Quanta is less than or equal to QuantaSize * Unit (in milliseconds).
 -spec quantum(time_ms(), non_neg_integer(), time_unit()) -> time_ms() | err().
-quantum(Time, QuantaSize, Unit) when Unit == d;
+quantum(Time, QuantaSize, Unit) when is_integer(Time) andalso
+                                     is_integer(QuantaSize) andalso
+                                     Unit == d;
                                      Unit == h;
                                      Unit == m;
                                      Unit == s;

@@ -147,7 +147,11 @@ select_quoted_escape_sql_test() ->
 -define(
     assertSelectPropsEqual(Expected,Actual),
     ?assertMatch({select,_}, Actual),
-    [?assertEqual(X,proplists:lookup(K,element(2,Actual))) || {K,_} = X <- Expected]
+    %% make sure `Expected` is a proplist
+    [] = [Y || Y <- Expected, size(Y) /= 2],
+    [begin
+        ?assertEqual(X,proplists:lookup(K,element(2,Actual)))
+     end || {K,_} = X <- Expected]
 ).
 
 group_by_one_field_test() ->
@@ -167,6 +171,19 @@ group_by_quantum_test() ->
         "GROUP BY time(a,1);",
     ?assertSelectPropsEqual(
         [{group_by, [{time_fn, {identifier, <<"a">>}, {integer, 1}}]}],
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
+group_by_quantum_2_test() ->
+    Query_sql =
+        "SELECT time(a,1), COUNT(*) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY time(a,1);",
+    ?assertSelectPropsEqual(
+        [{fields,
+            [{{sql_select_fn,'TIME'}, [{identifier,<<"a">>},{integer,1}]},
+             {{window_agg_fn,'COUNT'},[{identifier,[<<"*">>]}]}]
+         }],
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
