@@ -690,12 +690,15 @@ make_group_by_hash_fn({identifier,<<"time">>}, [{identifier,_} = Col, {integer,_
 make_group_by_hash_fn({identifier,<<"time">>}, [{integer,_}, {identifier,_}]) ->
     return_error_flat(
         "Arguments for GROUP BY time(..) were the wrong way round. Function signature is\n"
-        "  GROUP BY time(<column>, <milliseconds>)\n"
+        "  GROUP BY time(<column>, <duration unit><duration units>)\n"
         "Example:\n"
         "  GROUP BY time(mycolumn, 10m)");
 make_group_by_hash_fn({identifier,FnName}, Args) ->
     return_error_flat(
-        "Unknown GROUP BY function ~ts/~p, the only supported GROUP BY function is time(<column>, <milliseconds>).",
+        "Unknown GROUP BY function ~ts/~p, supported function signatures are:\n"
+        "  GROUP BY time(<column>, <duration unit><duration units>)\n"
+        "Example:\n"
+        "  GROUP BY time(mycolumn, 10m)",
         [FnName, length(Args)]).
 
 %% per Product Requirements
