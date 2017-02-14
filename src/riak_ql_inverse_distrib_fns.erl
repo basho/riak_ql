@@ -82,5 +82,8 @@ fn_param_check('MODE', []) ->
 'MEDIAN'(RowsTotal) ->
     lists:min([1 + round(RowsTotal / 2), RowsTotal]).
 
+%% Unlike PERCENTILE and MEDIAN, MODE is not a function of total
+%% number of rows in selection, and is not going to be called
+%% directly.  Hence the stub.
 'MODE'(_) ->
     erlang:error(dont_call_me).
