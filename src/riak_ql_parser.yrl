@@ -949,7 +949,7 @@ get_func_type(FuncName) ->
 %%
 canonicalise_fn(Fn) when is_binary(Fn)->
     try
-        list_to_atom(string:to_upper(binary_to_list(Fn)))
+        list_to_existing_atom(string:to_upper(binary_to_list(Fn)))
     catch
         error:badarg ->
             unsupported_function
