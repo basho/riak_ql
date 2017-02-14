@@ -67,7 +67,9 @@ fn_type_signature(Fn, Args) ->
     {error, {argument_type_mismatch, Fn, Args}}.
 
 -spec fn_param_check(aggregate_function(), [riak_ql_ddl:external_field_type()]) ->
-                            ok | {error, WhichParamInvalid::pos_integer()}.
+                            ok. %% | {error, WhichParamInvalid::pos_integer()}.
+%% (no extra parameters for these functions, but if they were, this
+%% check might return an error)
 fn_param_check(_, []) ->
     ok.
 
