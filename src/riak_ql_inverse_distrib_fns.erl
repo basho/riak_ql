@@ -88,6 +88,8 @@ fn_param_check('MODE', []) ->
 
 
 %% functions defined
+%%
+%% Note that ValuesAtF expects row position to be 0-based.
 
 'PERCENTILE_DISC'([Pc], RowsTotal, ValuesAtF) ->
     RN = (Pc * (RowsTotal - 1)),
@@ -110,26 +112,26 @@ fn_param_check('MODE', []) ->
     'PERCENTILE_DISC'([0.5], RowsTotal, ValuesAtF).
 
 'MODE'([], RowsTotal, ValuesAtF) ->
-    [Min] = ValuesAtF([{1, 1}]),
+    [[Min]] = ValuesAtF([{0, 1}]),
     largest_bin(Min, ValuesAtF, RowsTotal).
 
 %% this will be inefficient for ldb backends
 largest_bin(Min, ValuesAtF, RowsTotal) ->
-    largest_bin_({Min, 1, Min, 1}, ValuesAtF, 2, RowsTotal).
+    largest_bin_({Min, 1, Min, 1}, ValuesAtF, 1, RowsTotal).
 
-largest_bin_({LargestV, _, _, _}, _ValuesAtF, Pos, RowsTotal) when Pos > RowsTotal ->
+largest_bin_({LargestV, _, _, _}, _ValuesAtF, Pos, RowsTotal) when Pos >= RowsTotal ->
     LargestV;
 largest_bin_({LargestV, LargestC, CurrentV, CurrentC}, ValuesAtF, Pos, RowsTotal) ->
     case ValuesAtF([{Pos, 1}]) of
-        [V] when V == CurrentV ->
-            largest_bin_({LargestV, LargestC,
+        [[V]] when V == CurrentV ->
+            largest_bin_({LargestV, LargestC,  %% collecting current bin
                           CurrentV, CurrentC + 1}, ValuesAtF, Pos + 1, RowsTotal);
-        [V] when V > CurrentV,
-                 CurrentC > LargestC ->
+        [[V]] when V > CurrentV,
+                   CurrentC > LargestC ->
             largest_bin_({CurrentV, CurrentC,  %% now these be largest
                           V, 1}, ValuesAtF, Pos + 1, RowsTotal);
-        [V] when V > CurrentV,
-                 CurrentV =< LargestC ->
+        [[V]] when V > CurrentV,
+                   CurrentC =< LargestC ->
             largest_bin_({LargestV, LargestC,  %% keep largest, reset current
                           V, 1}, ValuesAtF, Pos + 1, RowsTotal)
     end.
