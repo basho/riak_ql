@@ -23,27 +23,37 @@
 -module(riak_ql_inverse_distrib_fns).
 
 
--export(['PERCENTILE'/2, 'MEDIAN'/1, 'MODE'/1]).
+-export(['PERCENTILE_DISC'/3,
+         'PERCENTILE_CONT'/3,
+         'MEDIAN'/3,
+         'MODE'/3]).
 -export([fn_arity/1,
          fn_type_signature/2,
          fn_param_check/2,
          supported_functions/0]).
 
--type invdist_function() :: 'PERCENTILE' | 'MEDIAN' | 'MODE'.
+-type invdist_function() :: 'PERCENTILE_CONT'
+                          | 'PERCENTILE_DISC'
+                          | 'MEDIAN'
+                          | 'MODE'.
 -export_type([invdist_function/0]).
 
 -include("riak_ql_ddl.hrl").
 
 supported_functions() ->
-    ['PERCENTILE', 'MEDIAN', 'MODE'].
+    ['PERCENTILE_DISC', 'PERCENTILE_CONT', 'MEDIAN', 'MODE'].
 
 -spec fn_type_signature(invdist_function(), [riak_ql_ddl:external_field_type()]) ->
                                riak_ql_ddl:external_field_type() |
                                {error, term()}.
-fn_type_signature('PERCENTILE', [ColumnType, double])
+fn_type_signature('PERCENTILE_DISC', [ColumnType, double])
   when ColumnType == sint64;
        ColumnType == double;
        ColumnType == timestamp -> ColumnType;
+fn_type_signature('PERCENTILE_CONT', [_ColumnType, double])
+  when _ColumnType == sint64;
+       _ColumnType == double;
+       _ColumnType == timestamp -> double;
 fn_type_signature('MEDIAN', [ColumnType])
   when ColumnType == sint64;
        ColumnType == double;
@@ -56,18 +66,20 @@ fn_type_signature(Fn, Args) ->
     {error, {argument_type_mismatch, Fn, Args}}.
 
 -spec fn_arity(invdist_function()) -> non_neg_integer().
-fn_arity('PERCENTILE') -> 2;
+fn_arity('PERCENTILE_CONT') -> 2;
+fn_arity('PERCENTILE_DISC') -> 2;
 fn_arity('MEDIAN') -> 1;
 fn_arity('MODE') -> 1;
 fn_arity(_) -> {error, invalid_function}.
 
 -spec fn_param_check(invdist_function(), [riak_ql_ddl:external_field_type()]) ->
                             ok | {error, WhichParamInvalid::pos_integer()}.
-fn_param_check('PERCENTILE', [Pc])
-  when Pc >= 0.0,
-       Pc =< 1.0 ->
+fn_param_check(PcntlFn, [Pc])
+  when (PcntlFn == 'PERCENTILE_CONT' orelse PcntlFn == 'PERCENTILE_DISC') andalso
+       (Pc >= 0.0 andalso Pc =< 1.0) ->
     ok;
-fn_param_check('PERCENTILE', [_Pc]) ->
+fn_param_check(PcntlFn, [_Pc])
+  when (PcntlFn == 'PERCENTILE_CONT' orelse PcntlFn == 'PERCENTILE_DISC') ->
     {error, 2};
 fn_param_check('MEDIAN', []) ->
     ok;
@@ -75,15 +87,56 @@ fn_param_check('MODE', []) ->
     ok.
 
 
+%% functions defined
 
-'PERCENTILE'(RowsTotal, Pc) when 0.0 =< Pc, Pc =< 1.0 ->
-    lists:min([1 + round(RowsTotal * Pc), RowsTotal]).
+'PERCENTILE_DISC'([Pc], RowsTotal, ValuesAtF) ->
+    RN = (Pc * (RowsTotal - 1)),
+    [[Ret]] = ValuesAtF([{trunc(RN), 1}]),
+    Ret.
 
-'MEDIAN'(RowsTotal) ->
-    lists:min([1 + round(RowsTotal / 2), RowsTotal]).
+'PERCENTILE_CONT'([Pc], RowsTotal, ValuesAtF) ->
+    RN = (Pc * (RowsTotal - 1)),
+    {LoRN, HiRN} = {trunc(RN), ceil(RN)},
+    case LoRN == HiRN of
+        true ->
+            [[Val]] = ValuesAtF([{LoRN, 1}]),
+            Val;
+        false ->
+            [[LoVal], [HiVal]] = ValuesAtF([{LoRN, 1}, {HiRN, 1}]),
+            (HiRN - RN) * LoVal + (RN - LoRN) * HiVal
+    end.
 
-%% Unlike PERCENTILE and MEDIAN, MODE is not a function of total
-%% number of rows in selection, and is not going to be called
-%% directly.  Hence the stub.
-'MODE'(_) ->
-    erlang:error(dont_call_me).
+'MEDIAN'([], RowsTotal, ValuesAtF) ->
+    'PERCENTILE_DISC'([0.5], RowsTotal, ValuesAtF).
+
+'MODE'([], RowsTotal, ValuesAtF) ->
+    [Min] = ValuesAtF([{1, 1}]),
+    largest_bin(Min, ValuesAtF, RowsTotal).
+
+%% this will be inefficient for ldb backends
+largest_bin(Min, ValuesAtF, RowsTotal) ->
+    largest_bin_({Min, 1, Min, 1}, ValuesAtF, 2, RowsTotal).
+
+largest_bin_({LargestV, _, _, _}, _ValuesAtF, Pos, RowsTotal) when Pos > RowsTotal ->
+    LargestV;
+largest_bin_({LargestV, LargestC, CurrentV, CurrentC}, ValuesAtF, Pos, RowsTotal) ->
+    case ValuesAtF([{Pos, 1}]) of
+        [V] when V == CurrentV ->
+            largest_bin_({LargestV, LargestC,
+                          CurrentV, CurrentC + 1}, ValuesAtF, Pos + 1, RowsTotal);
+        [V] when V > CurrentV,
+                 CurrentC > LargestC ->
+            largest_bin_({CurrentV, CurrentC,  %% now these be largest
+                          V, 1}, ValuesAtF, Pos + 1, RowsTotal);
+        [V] when V > CurrentV,
+                 CurrentV =< LargestC ->
+            largest_bin_({LargestV, LargestC,  %% keep largest, reset current
+                          V, 1}, ValuesAtF, Pos + 1, RowsTotal)
+    end.
+
+ceil(X) ->
+    T = trunc(X),
+    case X - T == 0 of
+        true -> T;
+        false -> T + 1
+    end.

@@ -948,6 +948,8 @@ get_func_type(FuncName) ->
 
 %%
 canonicalise_fn(Fn) when is_binary(Fn)->
+    _AtomsNowExisting =
+        [Mod:supported_functions() || Mod <- [riak_ql_window_agg_fns, riak_ql_inverse_distrib_fns]],
     try
         list_to_existing_atom(string:to_upper(binary_to_list(Fn)))
     catch
