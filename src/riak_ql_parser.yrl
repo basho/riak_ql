@@ -952,6 +952,8 @@ get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
     window_aggregate_fn;
 get_func_type('TIME') ->
     sql_select_fn;
+get_func_type('NOW') ->
+    sql_select_fn;
 get_func_type(FuncName) when is_atom(FuncName) ->
     not_supported.
 

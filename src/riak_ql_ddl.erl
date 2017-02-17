@@ -579,7 +579,9 @@ mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op =
         {skip, Acc2} ->
             {{Op, LHS, RHS}, Acc2}
     end;
-mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == '='; Op == '+'; Op == '-'; Op == '/' ->
+mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == '='; Op == '+'; Op == '-'; Op == '/'; Op == '*';
+                                                                Op == '>'; Op == '>=';
+                                                                Op == '<'; Op == '<=' ->
     {LHS_result, Acc2} = mapfold_where_tree2(Conditional, Fn, Acc1, LHS),
     {RHS_result, Acc3} = mapfold_where_tree2(Conditional, Fn, Acc2, RHS),
     Fn(Conditional, {Op,LHS_result,RHS_result}, Acc3);
