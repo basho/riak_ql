@@ -439,7 +439,7 @@ quantum_fn_second_arg_must_be_positive_integer_3_test() ->
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
-quantum_fn_last_arg_must_be_supported_quanta_test() ->
+quantum_fn_last_arg_must_be_supported_quanta_y_test() ->
     Table_def =
         "CREATE TABLE temperatures ("
         "a TIMESTAMP NOT NULL, "
@@ -448,6 +448,18 @@ quantum_fn_last_arg_must_be_supported_quanta_test() ->
         "PRIMARY KEY ((a,b,quantum(c, 15, 'y')), a,b,c))",
     ?assertEqual(
         {error,{0,riak_ql_parser,<<"Quantum time measure was y but must be d, h, m or s.">>}},
+        riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
+      ).
+
+quantum_fn_last_arg_must_be_supported_quanta_ms_test() ->
+    Table_def =
+        "CREATE TABLE temperatures ("
+        "a TIMESTAMP NOT NULL, "
+        "b SINT64 NOT NULL, "
+        "c TIMESTAMP NOT NULL, "
+        "PRIMARY KEY ((a,b,quantum(c, 15, 'ms')), a,b,c))",
+    ?assertEqual(
+        {error,{0,riak_ql_parser,<<"Quantum time measure was ms but must be d, h, m or s.">>}},
         riak_ql_parser:parse(riak_ql_lexer:get_tokens(Table_def))
       ).
 
