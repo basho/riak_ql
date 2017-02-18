@@ -3,7 +3,7 @@
 %% riak_ql_plumber - rudimentary plumber, putting together pfittings from an
 %% AST.
 %%
-%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016-2017 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -46,9 +46,10 @@ create1(_Table, Ast) ->
      Arithmetic,
      Aggregate].
 
--spec open(proplists:proplist()) -> riak_ql_pfitting_process_result:process_result().
+-spec open([undefined] | proplists:proplist()) ->
+    riak_ql_pf_result:process_result().
 open(Pipeline) ->
-    open(Pipeline, []).
+    open(Pipeline, riak_ql_pf_result:create()).
 open([], Acc) ->
     Acc;
 open([undefined|T], Acc) ->
@@ -59,10 +60,16 @@ open(Pipeline = [Ppart|_T], Acc) ->
         pfitting -> open_pfitting(Pipeline, Acc)
     end.
 
+-spec open_pspout([undefined] | proplists:proplist(), term()) ->
+    riak_ql_pf_result:process_result().
 open_pspout([Pspout|T], _Acc) ->
     Res = riak_ql_pspout:open(Pspout),
     open(T, Res).
 
+%riak_ql_pfitting:process(Pfitting::any(),Acc::[] | {'error',string()} | {'ok',riak_ql_pf_result:process_result()}) c
+% contains an opaque term as 2nd argument when terms of different types are expected in these positions
+-spec open_pfitting([riak_ql_pfitting:pfitting()], term()) ->
+    riak_ql_pf_result:process_result().
 open_pfitting([Pfitting|T], Acc) ->
     Res = riak_ql_pfitting:process(Pfitting, Acc),
     open(T, Res).
@@ -76,9 +83,9 @@ extract_project1(undefined) ->
 extract_project1(Fields = [<<"*">>]) ->
     [{project, undefined}, {fields, Fields}];
 extract_project1(Fields) ->
-    ColumnMappings = [riak_ql_pfitting_project:create_projection_column_mapping(Identifier) ||
+    ColumnMappings = [riak_ql_pf_projection:create_projection_column_mapping(Identifier) ||
                       Identifier <- Fields],
-    [{project, riak_ql_pfitting:create(riak_ql_pfitting_project, ColumnMappings)},
+    [{project, riak_ql_pfitting:create(riak_ql_pf_projection, ColumnMappings)},
      {fields, Fields}].
 
 extract_pspout(Ast) ->

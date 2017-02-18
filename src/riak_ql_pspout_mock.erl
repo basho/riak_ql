@@ -2,7 +2,7 @@
 %%
 %% riak_ql_pspout_mock -> mock pipeline spout.
 %%
-%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016-2017 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -45,7 +45,7 @@ open_invalid() ->
     Columns = [],
     Rows = [],
     Errors = [{error, <<"No table specified.">>}],
-    riak_ql_pfitting_process_result:create(Columns, Rows, Errors).
+    riak_ql_pf_result:create(Columns, Rows, Errors).
 
 open_valid() ->
     Columns = [<<"r">>, <<"i">>, <<"a">>, <<"k">>, <<"ts">>],
@@ -56,4 +56,4 @@ open_valid() ->
             [4.0,  4,          [], true, 4000],
             [5.0,  5,  <<"five">>, true,  []]],
     Errors = [],
-    riak_ql_pfitting_process_result:create(Columns, Rows, Errors).
+    riak_ql_pf_result:create(Columns, Rows, Errors).

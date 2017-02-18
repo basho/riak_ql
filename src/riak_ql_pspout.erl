@@ -2,7 +2,7 @@
 %%
 %% riak_ql_pspout - pspout emitting a result set to be piped through pfittings.
 %%
-%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016-2017 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -37,7 +37,6 @@
 create(Module, OpenFn) ->
     #pspout{module = Module, open = OpenFn}.
 
--spec open(pspout()) -> {ok, riak_ql_pfitting_process_result:process_result()}|
-                                        {error, string()}.
+-spec open(pspout()) -> riak_ql_pf_result:process_result().
 open(#pspout{module = _Module, open = OpenFn}) ->
     OpenFn().

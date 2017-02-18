@@ -28,7 +28,7 @@
 %%       then aggregating.</li>
 %% </ul>
 %%
-%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016-2017 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -47,12 +47,9 @@
 %% -------------------------------------------------------------------
 -module(riak_ql_pfitting).
 
--define(QLCMMod, riak_ql_pfitting_column_mapping).
--define(QLPRMod, riak_ql_pfitting_process_result).
-
 -record(pfitting, {
           module :: module(),
-          column_mappings :: [?QLCMMod:column_mapping()]
+          column_mappings :: [riak_ql_pf_mapping:column_mapping()]
          }).
 -opaque pfitting() :: #pfitting{}.
 -export_type([pfitting/0]).
@@ -63,9 +60,9 @@
          process/2]).
 
 -callback process(pfitting(), [binary()], [[term()]]) ->
-    {ok|error, ?QLPRMod:process_result()}.
+    {ok|error, riak_ql_pf_result:process_result()}.
 
--spec create(module(), [?QLCMMod:column_mapping()]) -> pfitting().
+-spec create(module(), [riak_ql_pf_mapping:column_mapping()]) -> pfitting().
 create(Module, ColumnMappings) ->
     #pfitting{module = Module,
               column_mappings = ColumnMappings}.
@@ -73,18 +70,19 @@ create(Module, ColumnMappings) ->
 -spec get_module(pfitting()) -> module().
 get_module(#pfitting{module = Module}) -> Module.
 
--spec get_column_mappings(pfitting()) -> [?QLCMMod:column_mapping()].
+-spec get_column_mappings(pfitting()) -> [riak_ql_pf_mapping:column_mapping()].
 get_column_mappings(#pfitting{column_mappings = ColumnMappings}) -> ColumnMappings.
 
--spec process(pfitting(), ?QLPRMod:process_result()) -> ?QLPRMod:process_result().
+-spec process(pfitting(), riak_ql_pf_result:process_result()) ->
+    riak_ql_pf_result:process_result().
 process(Pfitting, Res) ->
-    Errors = ?QLPRMod:get_errors(Res),
+    Errors = riak_ql_pf_result:get_errors(Res),
     process1(Pfitting, Res, Errors).
 
 process1(Pfitting, Res, _Errors = []) ->
     Module = get_module(Pfitting),
-    Columns = ?QLPRMod:get_columns(Res),
-    Rows = ?QLPRMod:get_rows(Res),
+    Columns = riak_ql_pf_result:get_columns(Res),
+    Rows = riak_ql_pf_result:get_rows(Res),
     Module:process(Pfitting, Columns, Rows);
 process1(_Module, Res, _Errors) ->
     Res.

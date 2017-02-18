@@ -1,12 +1,12 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_ql_pfitting_arithmetic: Riak Query Pipeline pipe fitting (pfitting)
+%% riak_ql_pf_arithmetic: Riak Query Pipeline pipe fitting (pfitting)
 %% for arithmetic functions including: add, subtract, multiply, divide.
 %% Multiple row result sets are processed to have a column containing the
 %% result of the arithmetic function for each column mapping defined for the
 %% pfitting.
 %%
-%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016-2017 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -23,12 +23,8 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_ql_pfitting_arithmetic).
+-module(riak_ql_pf_arithmetic).
 -behaviour(riak_ql_pfitting).
-
--define(QLPFMod, riak_ql_pfitting).
--define(QLPRMod, riak_ql_pfitting_process_result).
--define(QLCMMod, riak_ql_pfitting_column_mapping).
 
 -export([process/3]).
 -export([create_arithmetic_column_mapping/3]).
@@ -42,21 +38,24 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif. %%TEST
 
+-type arithmetic_op() :: add|subtract|multiply|divide.
+-export_type([arithmetic_op/0]).
+
 -type column_identifier_or_constant() :: {identifier, [binary()]} |
                                          {constant, term()}.
 
 -spec create_arithmetic_column_mapping(atom(),
-                                       ?QLCMMod:constant_or_identifier(),
-                                       ?QLCMMod:constant_or_identifier()) ->
-    ?QLCMMod:column_mapping().
+                                       riak_ql_pf_mapping:constant_or_identifier(),
+                                       riak_ql_pf_mapping:constant_or_identifier()) ->
+    riak_ql_pf_mapping:column_mapping().
 create_arithmetic_column_mapping(ArithmeticFunA, LHS, RHS) ->
     DisplayText = column_as_arithmetic(ArithmeticFunA, LHS, RHS),
-    ColumnIdentifier = ?QLCMMod:set_column_identifier(DisplayText),
-    OutputType = ?QLCMMod:set_resolvable_field_type(unresolved),
-    MappingFun = ?QLCMMod:set_column_mapping_fun(
+    ColumnIdentifier = riak_ql_pf_mapping:set_column_ident(DisplayText),
+    OutputType = riak_ql_pf_mapping:set_resolvable_field_type(unresolved),
+    MappingFun = riak_ql_pf_mapping:set_column_mapping_fun(
                     arithmetic_fun_atom_to_fun(ArithmeticFunA)),
-    MappingFunArgs = ?QLCMMod:set_column_mapping_fun_args([LHS, RHS]),
-    ?QLCMMod:create(ColumnIdentifier, DisplayText,
+    MappingFunArgs = riak_ql_pf_mapping:set_column_mapping_fun_args([LHS, RHS]),
+    riak_ql_pf_mapping:create(ColumnIdentifier, DisplayText,
                     OutputType,
                     MappingFun,
                     MappingFunArgs).
@@ -74,25 +73,25 @@ constant_as_binary(C) ->
     [C1] = io_lib:format("~p", [C]),
     list_to_binary(C1).
 
--spec column_identifier_or_constant(?QLCMMod:constant_or_identifier()) ->
+-spec column_ident_or_const(riak_ql_pf_mapping:constant_or_identifier()) ->
     column_identifier_or_constant().
-column_identifier_or_constant(C) ->
-    Type = ?QLCMMod:get_constant_or_identifier_type(C),
-    column_identifier_or_constant1(Type).
-column_identifier_or_constant1({identifier, ColumnIdentifier}) ->
-    {identifier, [_Column]} = ?QLCMMod:get_column_identifier(ColumnIdentifier);
-column_identifier_or_constant1({constant, Constant}) ->
-    {constant, _C} = ?QLCMMod:get_constant(Constant).
+column_ident_or_const(C) ->
+    Type = riak_ql_pf_mapping:get_const_or_ident_type(C),
+    column_ident_or_const1(Type).
+column_ident_or_const1({identifier, ColumnIdentifier}) ->
+    {identifier, [_Column]} = riak_ql_pf_mapping:get_column_ident(ColumnIdentifier);
+column_ident_or_const1({constant, Constant}) ->
+    {constant, _C} = riak_ql_pf_mapping:get_constant(Constant).
 
--spec column_as_arithmetic(atom(), ?QLCMMod:constant_or_identifier(),
-                           ?QLCMMod:constant_or_identifier()) ->
+-spec column_as_arithmetic(arithmetic_op(), riak_ql_pf_mapping:constant_or_identifier(),
+                           riak_ql_pf_mapping:constant_or_identifier()) ->
     binary().
 column_as_arithmetic(AFunL, LHS, RHS) ->
-    LHS1 = column_identifier_or_constant(LHS),
-    RHS1 = column_identifier_or_constant(RHS),
+    LHS1 = column_ident_or_const(LHS),
+    RHS1 = column_ident_or_const(RHS),
     column_as_arithmetic1(AFunL, LHS1, RHS1).
 
--spec column_as_arithmetic1(atom(),
+-spec column_as_arithmetic1(arithmetic_op(),
                             column_identifier_or_constant(),
                             column_identifier_or_constant()) ->
     binary().
@@ -123,9 +122,9 @@ column_as_arithmetic2(AFunL, {constant, ConstantL}, {constant, ConstantR}) ->
     <<CL/binary, AFunL/binary, CR/binary>>.
 
 process(Pfitting, Columns, Rows) ->
-    ColumnMappings = ?QLPFMod:get_column_mappings(Pfitting),
+    ColumnMappings = riak_ql_pfitting:get_column_mappings(Pfitting),
     Res = process_arithmetic(Columns, Rows, ColumnMappings),
-    ResStatus = ?QLPRMod:get_status(Res),
+    ResStatus = riak_ql_pf_result:get_status(Res),
     {ResStatus, Res}.
 
 arithmetic_fun(_F, ?SQL_NULL, ?SQL_NULL) ->
@@ -169,15 +168,15 @@ map_row_(Row, Columns, [{ArithmeticFun, [LHS, RHS]}|ColumnMappingT], Agg) ->
     map_row_(Row, Columns, ColumnMappingT, [V|Agg]).
 
 map_fun_args(A) ->
-    map_fun_args1(?QLCMMod:get_column_mapping_fun_args(A)).
+    map_fun_args1(riak_ql_pf_mapping:get_column_mapping_fun_args(A)).
 map_fun_args1(A) ->
-    [?QLCMMod:get_constant_or_identifier(C) || C <- A].
+    [riak_ql_pf_mapping:get_const_or_ident(C) || C <- A].
 
 process_arithmetic(Columns, Rows, ColumnMappings) ->
-    ArithmeticColumns = [ ?QLCMMod:get_display_text(ColumnMapping) ||
+    ArithmeticColumns = [ riak_ql_pf_mapping:get_display_text(ColumnMapping) ||
                      ColumnMapping <- ColumnMappings ],
-    ColumnMappings1 = [{?QLCMMod:get_fun(ColumnMapping),
-                        map_fun_args(?QLCMMod:get_fun_args(ColumnMapping))
+    ColumnMappings1 = [{riak_ql_pf_mapping:get_fun(ColumnMapping),
+                        map_fun_args(riak_ql_pf_mapping:get_fun_args(ColumnMapping))
                        } || ColumnMapping <- ColumnMappings],
     {ProcessRows, ProcessErrors} =
     try [map_row(Row, Columns, ColumnMappings1) || Row <- Rows] of
@@ -185,39 +184,39 @@ process_arithmetic(Columns, Rows, ColumnMappings) ->
     catch
         error:Error -> {[], [Error]}
     end,
-    ?QLPRMod:create(ArithmeticColumns, ProcessRows, ProcessErrors).
+    riak_ql_pf_result:create(ArithmeticColumns, ProcessRows, ProcessErrors).
 
 -ifdef(TEST).
 column_as_arithmetic_identifiers_test() ->
     ?assertEqual(<<"ab + cd">>,
                  column_as_arithmetic(add,
-                                       ?QLCMMod:set_constant_or_identifier(
+                                       riak_ql_pf_mapping:set_const_or_ident(
                                           {identifier, [<<"ab">>]}),
-                                       ?QLCMMod:set_constant_or_identifier(
+                                       riak_ql_pf_mapping:set_const_or_ident(
                                           {identifier, [<<"cd">>]}))).
 
 column_as_arithmetic_identifier_constant_test() ->
     ?assertEqual(<<"ab / 17">>,
                  column_as_arithmetic(divide,
-                                       ?QLCMMod:set_constant_or_identifier(
+                                       riak_ql_pf_mapping:set_const_or_ident(
                                           {identifier, [<<"ab">>]}),
-                                       ?QLCMMod:set_constant_or_identifier(
+                                       riak_ql_pf_mapping:set_const_or_ident(
                                           {constant, 17}))).
 
 column_as_arithmetic_constant_identifier_test() ->
     ?assertEqual(<<"13.0 * cd">>,
                  column_as_arithmetic(multiply,
-                                       ?QLCMMod:set_constant_or_identifier(
+                                       riak_ql_pf_mapping:set_const_or_ident(
                                           {constant, 13.0}),
-                                       ?QLCMMod:set_constant_or_identifier(
+                                       riak_ql_pf_mapping:set_const_or_ident(
                                           {identifier, [<<"cd">>]}))).
 
 column_as_arithmetic_constants_test() ->
     ?assertEqual(<<"1000 - 27.0">>,
                  column_as_arithmetic(subtract,
-                                       ?QLCMMod:set_constant_or_identifier(
+                                       riak_ql_pf_mapping:set_const_or_ident(
                                           {constant, 1000}),
-                                       ?QLCMMod:set_constant_or_identifier(
+                                       riak_ql_pf_mapping:set_const_or_ident(
                                           {constant, 27.0}))).
 
 map_simple_arithmetic_column_mappings(SimpleColumnMappings) ->
@@ -226,7 +225,7 @@ map_simple_arithmetic_column_mappings(SimpleColumnMappings) ->
 
 process_setup(SimpleColumnMappings) ->
     ColumnMappings = map_simple_arithmetic_column_mappings(SimpleColumnMappings),
-    Pfitting = ?QLPFMod:create(?MODULE, ColumnMappings),
+    Pfitting = riak_ql_pfitting:create(?MODULE, ColumnMappings),
     Columns = [<<"r">>, <<"i">>, <<"a">>, <<"k">>],
     Rows = [[1, <<"one">>, 1000, 1.0],
             [[],[],[],[]],
@@ -248,9 +247,9 @@ expected_rows_two_identifiers(ArithmeticFun, FieldExtractorFun, Rows) ->
 process_add_third_field_and_constant_test() ->
     ArithmeticFunA = add,
     ArithmeticFun = arithmetic_fun_atom_to_fun(ArithmeticFunA),
-    LHS = ?QLCMMod:set_constant_or_identifier({identifier, [<<"a">>]}),
+    LHS = riak_ql_pf_mapping:set_const_or_ident({identifier, [<<"a">>]}),
     Constant = 50,
-    RHS = ?QLCMMod:set_constant_or_identifier({constant, Constant}),
+    RHS = riak_ql_pf_mapping:set_const_or_ident({constant, Constant}),
     ExpectedColumns = [ column_as_arithmetic(ArithmeticFunA, LHS, RHS) ],
     {Pfitting, Columns, Rows} = process_setup([{ArithmeticFunA, LHS, RHS}]),
     ExpectedRows = expected_rows_single_identifier(ArithmeticFun,
@@ -258,7 +257,7 @@ process_add_third_field_and_constant_test() ->
                                                    Constant, Rows),
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pfitting, Columns, Rows),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
@@ -266,15 +265,15 @@ process_add_third_field_and_constant_test() ->
 process_subtract_constant_and_constant_test() ->
     ArithmeticFunA = subtract,
     ConstantL = 73,
-    LHS = ?QLCMMod:set_constant_or_identifier({constant, ConstantL}),
+    LHS = riak_ql_pf_mapping:set_const_or_ident({constant, ConstantL}),
     ConstantR = 51,
-    RHS = ?QLCMMod:set_constant_or_identifier({constant, ConstantR}),
+    RHS = riak_ql_pf_mapping:set_const_or_ident({constant, ConstantR}),
     ExpectedColumns = [ column_as_arithmetic(ArithmeticFunA, LHS, RHS) ],
     {Pfitting, Columns, Rows} = process_setup([{ArithmeticFunA, LHS, RHS}]),
     ExpectedRows = [[ConstantL - ConstantR] || _Row <- Rows],
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pfitting, Columns, Rows),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
@@ -282,8 +281,8 @@ process_subtract_constant_and_constant_test() ->
 process_divide_two_fields_test() ->
     ArithmeticFunA = divide,
     ArithmeticFun = arithmetic_fun_atom_to_fun(ArithmeticFunA),
-    LHS = ?QLCMMod:set_constant_or_identifier({identifier, [<<"a">>]}),
-    RHS = ?QLCMMod:set_constant_or_identifier({identifier, [<<"k">>]}),
+    LHS = riak_ql_pf_mapping:set_const_or_ident({identifier, [<<"a">>]}),
+    RHS = riak_ql_pf_mapping:set_const_or_ident({identifier, [<<"k">>]}),
     ExpectedColumns = [ column_as_arithmetic(ArithmeticFunA, LHS, RHS) ],
     {Pfitting, Columns, Rows} = process_setup([{ArithmeticFunA, LHS, RHS}]),
     ExpectedRows = expected_rows_two_identifiers(ArithmeticFun,
@@ -291,21 +290,21 @@ process_divide_two_fields_test() ->
                                                    Rows),
     ExpectedErrors = [],
     Processed = ?MODULE:process(Pfitting, Columns, Rows),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
 
 process_multiply_badarith_test() ->
     ArithmeticFunA = multiply,
-    LHS = ?QLCMMod:set_constant_or_identifier({constant, 3}),
-    RHS = ?QLCMMod:set_constant_or_identifier({identifier, [<<"i">>]}),
+    LHS = riak_ql_pf_mapping:set_const_or_ident({constant, 3}),
+    RHS = riak_ql_pf_mapping:set_const_or_ident({identifier, [<<"i">>]}),
     ExpectedColumns = [ column_as_arithmetic(ArithmeticFunA, LHS, RHS) ],
     {Pfitting, Columns, Rows} = process_setup([{ArithmeticFunA, LHS, RHS}]),
     ExpectedRows = [],
     ExpectedErrors = [badarith],
     Processed = ?MODULE:process(Pfitting, Columns, Rows),
-    ?assertEqual({error, ?QLPRMod:create(ExpectedColumns,
+    ?assertEqual({error, riak_ql_pf_result:create(ExpectedColumns,
                                          ExpectedRows,
                                          ExpectedErrors)},
                  Processed).

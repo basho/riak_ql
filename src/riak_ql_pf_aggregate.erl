@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_ql_pfitting_aggregate: Riak Query Pipeline pipe fitting (pfitting)
+%% riak_ql_pf_aggregate: Riak Query Pipeline pipe fitting (pfitting)
 %% for aggregate functions
 %%
 %% @doc Riak Query Pipeline fitting (pfitting) including for aggregate: count,
@@ -8,7 +8,7 @@
 %% with a column containing the result of the aggregate function for each column
 %% defined for the pfitting.
 %%
-%% Copyright (c) 2016 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2016-2017 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -25,12 +25,8 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_ql_pfitting_aggregate).
+-module(riak_ql_pf_aggregate).
 -behaviour(riak_ql_pfitting).
-
--define(QLPFMod, riak_ql_pfitting).
--define(QLPRMod, riak_ql_pfitting_process_result).
--define(QLCMMod, riak_ql_pfitting_column_mapping).
 
 -export([process/3]).
 -export([create_aggregate_column_mapping/2,
@@ -45,35 +41,38 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif. %%TEST
 
--spec create_aggregate_column_mapping(atom(),
-                                      ?QLCMMod:column_identifier()) ->
-    ?QLCMMod:column_mapping().
-create_aggregate_column_mapping(AggregateFunA, ColumnIdentifier) ->
-    create_aggregate_column_mapping(AggregateFunA,
-                                    ?QLCMMod:set_column_mapping_fun(
-                                       aggregate_fun_atom_to_fun(AggregateFunA)),
+-type aggregation_op() :: sum|count|min|max.
+-export_type([aggregation_op/0]).
+
+-spec create_aggregate_column_mapping(aggregation_op(),
+                                      riak_ql_pf_mapping:column_identifier()) ->
+    riak_ql_pf_mapping:column_mapping().
+create_aggregate_column_mapping(AggregationOp, ColumnIdentifier) ->
+    create_aggregate_column_mapping(AggregationOp,
+                                    riak_ql_pf_mapping:set_column_mapping_fun(
+                                       aggregate_fun_atom_to_fun(AggregationOp)),
                                     ColumnIdentifier).
--spec create_aggregate_column_mapping(atom(),
-                                      ?QLCMMod:column_mapping_function(),
-                                      ?QLCMMod:column_identifier()) ->
-    ?QLCMMod:column_mapping().
-create_aggregate_column_mapping(AggregateFunA, AggregateFun, ColumnIdentifier) ->
-    {identifier, [Column]} = ?QLCMMod:get_column_identifier(ColumnIdentifier),
-    ColumnIdentifier = ?QLCMMod:set_column_identifier(Column),
-    OutputDisplayText = column_as_aggregate(AggregateFunA, Column),
-    OutputType = ?QLCMMod:set_resolvable_field_type(unresolved),
-    AggregateFunArgs = ?QLCMMod:empty_args(),
-    ?QLCMMod:create(ColumnIdentifier,
-                    OutputDisplayText,
-                    OutputType,
-                    AggregateFun, AggregateFunArgs).
+-spec create_aggregate_column_mapping(aggregation_op(),
+                                      riak_ql_pf_mapping:column_mapping_function(),
+                                      riak_ql_pf_mapping:column_identifier()) ->
+    riak_ql_pf_mapping:column_mapping().
+create_aggregate_column_mapping(AggregationOp, AggregateFun, ColumnIdentifier) ->
+    {identifier, [Column]} = riak_ql_pf_mapping:get_column_ident(ColumnIdentifier),
+    OutputDisplayText = column_as_aggregate(AggregationOp, Column),
+    OutputType = riak_ql_pf_mapping:set_resolvable_field_type(unresolved),
+    AggregateFunArgs = riak_ql_pf_mapping:empty_args(),
+    riak_ql_pf_mapping:create(ColumnIdentifier,
+                              OutputDisplayText,
+                              OutputType,
+                              AggregateFun, AggregateFunArgs).
 
 process(Pfitting, Columns, Rows) ->
-    ColumnMappings = ?QLPFMod:get_column_mappings(Pfitting),
+    ColumnMappings = riak_ql_pfitting:get_column_mappings(Pfitting),
     Res = process_aggregate(Columns, Rows, ColumnMappings),
-    ResStatus = ?QLPRMod:get_status(Res),
+    ResStatus = riak_ql_pf_result:get_status(Res),
     {ResStatus, Res}.
 
+-spec aggregate_fun_atom_to_fun(aggregation_op()) -> function().
 aggregate_fun_atom_to_fun(sum) ->
     fun agg_fun_sum/2;
 aggregate_fun_atom_to_fun(count) ->
@@ -83,6 +82,7 @@ aggregate_fun_atom_to_fun(min) ->
 aggregate_fun_atom_to_fun(max) ->
     fun agg_fun_max/2.
 
+-spec column_as_aggregate(aggregation_op(), binary()) -> binary().
 column_as_aggregate(sum, Column) when is_binary(Column) ->
     list_to_binary("SUM(" ++ binary_to_list(Column) ++ ")");
 column_as_aggregate(count, Column) when is_binary(Column) ->
@@ -141,16 +141,16 @@ row_aggregate([_RowV|RowT], [_Column|ColumnT], ColumnMappings,
                   ORow, OColumns, Acc).
 
 process_aggregate(Columns, Rows, ColumnMappings) ->
-    AggregateColumns = [ ?QLCMMod:get_display_text(ColumnMapping) ||
+    AggregateColumns = [ riak_ql_pf_mapping:get_display_text(ColumnMapping) ||
                          ColumnMapping <- ColumnMappings ],
-    ColumnIdentifiers = [?QLCMMod:get_column_identifier(
-                            ?QLCMMod:get_constant_or_identifier(
+    ColumnIdentifiers = [riak_ql_pf_mapping:get_column_ident(
+                            riak_ql_pf_mapping:get_const_or_ident(
                                {identifier, [Column]})) ||
                          Column <- Columns ],
-    ColumnMappings1 = [ {?QLCMMod:get_column_identifier(
-                            ?QLCMMod:get_input_identifier(ColumnMapping)),
-                         ?QLCMMod:get_column_mapping_fun(
-                            ?QLCMMod:get_fun(ColumnMapping))}||
+    ColumnMappings1 = [ {riak_ql_pf_mapping:get_column_ident(
+                            riak_ql_pf_mapping:get_input_identifier(ColumnMapping)),
+                         riak_ql_pf_mapping:get_column_mapping_fun(
+                            riak_ql_pf_mapping:get_fun(ColumnMapping))}||
                         ColumnMapping <- ColumnMappings],
     { AggregateValues, ProcessErrors} =
     try lists:foldl(fun (Row, Acc) ->
@@ -165,7 +165,7 @@ process_aggregate(Columns, Rows, ColumnMappings) ->
                         0 -> [[V || {_K, V} <- AggregateValues]];
                         _ -> []
                     end,
-    ?QLPRMod:create(AggregateColumns, AggregateRows, ProcessErrors).
+    riak_ql_pf_result:create(AggregateColumns, AggregateRows, ProcessErrors).
 
 -ifdef(TEST).
 
@@ -174,16 +174,16 @@ lex_parse(Sql) ->
 
 map_simple_aggregate_column_mappings(SimpleColumnMappings) ->
     [create_aggregate_column_mapping(AggregateFunA,
-                                     ?QLCMMod:set_column_identifier(Column)) ||
+                                     riak_ql_pf_mapping:set_column_ident(Column)) ||
      {AggregateFunA, Column} <- SimpleColumnMappings].
 
 process_setup(SimpleColumnMappings) ->
     ColumnMappings = map_simple_aggregate_column_mappings(SimpleColumnMappings),
-    Pfitting = ?QLPFMod:create(?MODULE, ColumnMappings),
+    Pfitting = riak_ql_pfitting:create(?MODULE, ColumnMappings),
     {ok, Ast } = lex_parse("select r, i, a, k, ts from mock where ts > 0 and ts < 10"),
     Pspout = riak_ql_pspout_mock:create(Ast),
     Res = riak_ql_pspout:open(Pspout),
-    Rows = ?QLPRMod:get_rows(Res),
+    Rows = riak_ql_pf_result:get_rows(Res),
     {Pfitting, Res, Rows}.
 
 expected_row(FieldExtractorFun, AggregateFun, InitialAcc, Rows) ->
@@ -200,8 +200,8 @@ process_sum_integer_field_test() ->
     {Pfitting, Res, Rows } = process_setup([{AggregateFunA, AggregateColumn}]),
     ExpectedRows = [expected_row(fun ([_F1, F2, _F3, _F4, _F5]) -> F2 end, AggregateFun, ?SQL_NULL, Rows)],
     ExpectedErrors = [],
-    Processed = ?QLPFMod:process(Pfitting, Res),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    Processed = riak_ql_pfitting:process(Pfitting, Res),
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
@@ -214,8 +214,8 @@ process_max_last_field_test() ->
     {Pfitting, Res, Rows } = process_setup([{AggregateFunA, AggregateColumn}]),
     ExpectedRows = [expected_row(fun ([_F1, _F2, _F3, F4, _F5]) -> F4 end, AggregateFun, ?SQL_NULL, Rows)],
     ExpectedErrors = [],
-    Processed = ?QLPFMod:process(Pfitting, Res),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    Processed = riak_ql_pfitting:process(Pfitting, Res),
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
@@ -228,8 +228,8 @@ process_min_second_field_test() ->
     {Pfitting, Res, Rows } = process_setup([{AggregateFunA, AggregateColumn}]),
     ExpectedRows = [expected_row(fun ([_F1, F2, _F3, _F4, _F5]) -> F2 end, AggregateFun, ?SQL_NULL, Rows)],
     ExpectedErrors = [],
-    Processed = ?QLPFMod:process(Pfitting, Res),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    Processed = riak_ql_pfitting:process(Pfitting, Res),
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
@@ -242,8 +242,8 @@ process_sum_first_field_test() ->
     {Pfitting, Res, Rows } = process_setup([{AggregateFunA, AggregateColumn}]),
     ExpectedRows = [expected_row(fun ([F1, _F2, _F3, _F4, _F5]) -> F1 end, AggregateFun, ?SQL_NULL, Rows)],
     ExpectedErrors = [],
-    Processed = ?QLPFMod:process(Pfitting, Res),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    Processed = riak_ql_pfitting:process(Pfitting, Res),
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
@@ -256,8 +256,8 @@ process_count_first_field_test() ->
     {Pfitting, Res, Rows } = process_setup([{AggregateFunA, AggregateColumn}]),
     ExpectedRows = [expected_row(fun ([F1, _F2, _F3, _F4, _F5]) -> F1 end, AggregateFun, ?SQL_NULL, Rows)],
     ExpectedErrors = [],
-    Processed = ?QLPFMod:process(Pfitting, Res),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    Processed = riak_ql_pfitting:process(Pfitting, Res),
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
@@ -270,8 +270,8 @@ process_sum_varchar_field_test() ->
     ?assertNotEqual([], Rows),
     ExpectedRows = [],
     ExpectedErrors = [badarith],
-    Processed = ?QLPFMod:process(Pfitting, Res),
-    ?assertEqual({error, ?QLPRMod:create(ExpectedColumns,
+    Processed = riak_ql_pfitting:process(Pfitting, Res),
+    ?assertEqual({error, riak_ql_pf_result:create(ExpectedColumns,
                                          ExpectedRows,
                                          ExpectedErrors)},
                  Processed).
@@ -295,8 +295,8 @@ process_aggregate_all_fields_test() ->
     {Pfitting, Res, Rows } = process_setup(ColumnMappings),
     ExpectedRows = expected_row(fun (Row) -> Row end, AggregateFun, NullRow, Rows),
     ExpectedErrors = [],
-    Processed = ?QLPFMod:process(Pfitting, Res),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    Processed = riak_ql_pfitting:process(Pfitting, Res),
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
@@ -336,8 +336,8 @@ process_aggregate_mean_preparation_test() ->
     [[_A1, ACount2, _A3, _A4, ACount5]] = expected_row(fun (Row) -> Row end, CountFun, NullRow, Rows),
     ExpectedRows = [[ASum2, ACount2, ASum5, ACount5]],
     ExpectedErrors = [],
-    Processed = ?QLPFMod:process(Pfitting, Res),
-    ?assertEqual({ok, ?QLPRMod:create(ExpectedColumns,
+    Processed = riak_ql_pfitting:process(Pfitting, Res),
+    ?assertEqual({ok, riak_ql_pf_result:create(ExpectedColumns,
                                       ExpectedRows,
                                       ExpectedErrors)},
                  Processed).
