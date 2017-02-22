@@ -30,12 +30,14 @@
          ddl_record_version/1,
          first_version/0,
          flip_binary/1,
+         fold_where_tree/3,
          get_field_type/2,
          get_storage_type/1,
          get_legacy_type/2,
          get_minimum_capability/1,
          is_version_greater/2,
-         make_module_name/1, make_module_name/2
+         make_module_name/1, make_module_name/2,
+         mapfold_where_tree/3
         ]).
 
 -type external_field_type()         :: varchar | sint64 | double | timestamp | boolean | blob.
@@ -123,8 +125,6 @@
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-%% for debugging only
--export([make_ddl/2]).
 %% for other testing modules
 -export([parsed_sql_to_query/1]).
 -endif.
@@ -379,10 +379,9 @@ is_query_valid_result(Res) ->
 
 -spec are_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
 are_filters_valid(Mod, Where) ->
-    Errors = fold_where_tree(Where, [],
-                             fun(Clause, Acc) ->
+    Errors = fold_where_tree(fun(_, Clause, Acc) ->
                                      is_filters_field_valid(Mod, Clause, Acc)
-                             end),
+                             end, [], Where),
     case Errors of
         [] -> true;
         _  -> {false, Errors}
@@ -547,15 +546,62 @@ is_orderby_column_valid(Mod, X, Acc) ->
 
 
 %% Fold over the syntax tree for a where clause.
-fold_where_tree([], Acc, _) ->
+fold_where_tree(Fn, Acc, Where) when is_function(Fn) ->
+    fold_where_tree2(root, Fn, Acc, Where).
+
+fold_where_tree2(_, _, Acc, []) ->
     Acc;
-fold_where_tree([Where], Acc1, Fn) ->
-    fold_where_tree(Where, Acc1, Fn);
-fold_where_tree({Op, LHS, RHS}, Acc1, Fn) when Op == and_; Op == or_ ->
-    Acc2 = fold_where_tree(LHS, Acc1, Fn),
-    fold_where_tree(RHS, Acc2, Fn);
-fold_where_tree(Clause, Acc, Fn) ->
-    Fn(Clause, Acc).
+fold_where_tree2(Conditional, Fn, Acc1, [Where]) ->
+    fold_where_tree2(Conditional, Fn, Acc1, Where);
+fold_where_tree2(_, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op == or_ ->
+    Acc2 = fold_where_tree2(Op, Fn, Acc1, LHS),
+    fold_where_tree2(Op, Fn, Acc2, RHS);
+fold_where_tree2(Conditional, Fn, Acc, Clause) ->
+    Fn(Conditional, Clause, Acc).
+
+%% Like lists:mapfoldl but specifically for where clause AST. The fun will be
+%% called on each filter e.g. `Fun(Conditional, Filter, Acc)`. 
+%% * Conditional is either `_and`, `_or` or `root`.
+%% * Filter AST tuple
+%% * Acc is the provided accumulator
+%%
+%% The fun should return a tuple like `{MappedFilter,Acc2}`. Special returns for
+%% `MappedValue are `eliminate` which removes the filter and skip which skips
+%% this filter and any more in the same branch. 
+mapfold_where_tree(_, Acc1, []) ->
+    {[], Acc1};
+mapfold_where_tree(Fn, Acc1, Where) when is_function(Fn) ->
+    case mapfold_where_tree2(root, Fn, Acc1, Where) of
+        {eliminate, Acc2} ->
+            {[], Acc2};
+        {_,_} = Return ->
+            Return
+    end.
+
+mapfold_where_tree2(_, _, Acc, []) ->
+    Acc;
+mapfold_where_tree2(Conditional, Fn, Acc1, [Where]) ->
+    mapfold_where_tree2(Conditional, Fn, Acc1, Where);
+mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op == or_ ->
+    case Fn(Conditional, Op, Acc1) of
+        {ok, Acc2} ->
+            {LHS_result, Acc3} = mapfold_where_tree2(Op, Fn, Acc2, LHS),
+            {RHS_result, Acc4} = mapfold_where_tree2(Op, Fn, Acc3, RHS),
+            case {LHS_result, RHS_result} of
+                {eliminate, eliminate} ->
+                    {eliminate, Acc4};
+                {eliminate, _} ->
+                    {RHS_result, Acc4};
+                {_, eliminate} ->
+                    {LHS_result, Acc4};
+                {_, _} ->
+                    {{Op, LHS_result, RHS_result}, Acc4}
+            end;
+        {skip, Acc2} ->
+            {{Op, LHS, RHS}, Acc2}
+    end;
+mapfold_where_tree2(Conditional, Fn, Acc, Clause) ->
+    Fn(Conditional, Clause, Acc).
 
 -spec are_insert_columns_valid(module(), [insertion()], boolean()) ->
     true | {false, [query_syntax_error()]}.
@@ -965,14 +1011,7 @@ make_module_name_3_test() ->
 
 mock_partition_fn(_A, _B, _C) -> mock_result.
 
-make_ddl(Table, Fields) when is_binary(Table) ->
-    make_ddl(Table, Fields, #key_v1{}, #key_v1{}).
-
-make_ddl(Table, Fields, PK) when is_binary(Table) ->
-    make_ddl(Table, Fields, PK, #key_v1{}).
-
-make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
-  when is_binary(Table) ->
+make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK) when is_binary(Table) ->
     ?DDL{table         = Table,
          fields        = Fields,
          partition_key = PK,
@@ -984,16 +1023,15 @@ make_ddl(Table, Fields, #key_v1{} = PK, #key_v1{} = LK)
 
 simplest_partition_key_test() ->
     Name = <<"yando">>,
-    PK = #key_v1{ast = [
-                        ?SQL_PARAM{name = [Name]}
-                       ]},
+    Key = #key_v1{ast = [?SQL_PARAM{name = [Name]}]},
     DDL = make_ddl(<<"simplest_partition_key_test">>,
                    [
                     #riak_field_v1{name     = Name,
                                    position = 1,
                                    type     = varchar}
                    ],
-                   PK),
+                   Key,
+                   Key),
     {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {Name},
     Result = (catch get_partition_key(DDL, Obj)),
@@ -1002,7 +1040,7 @@ simplest_partition_key_test() ->
 simple_partition_key_test() ->
     Name1 = <<"yando">>,
     Name2 = <<"buckle">>,
-    PK = #key_v1{ast = [
+    Key = #key_v1{ast = [
                         ?SQL_PARAM{name = [Name1]},
                         ?SQL_PARAM{name = [Name2]}
                        ]},
@@ -1018,47 +1056,12 @@ simple_partition_key_test() ->
                                    position = 3,
                                    type     = varchar}
                    ],
-                   PK),
+                   Key,
+                   Key),
     {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Obj = {<<"one">>, <<"two">>, <<"three">>},
     Result = (catch get_partition_key(DDL, Obj)),
     ?assertEqual([{varchar, <<"three">>}, {varchar, <<"one">>}], Result).
-
-function_partition_key_test() ->
-    Name1 = <<"yando">>,
-    Name2 = <<"buckle">>,
-    PK = #key_v1{ast = [
-                        ?SQL_PARAM{name = [Name1]},
-                        #hash_fn_v1{mod  = ?MODULE,
-                                    fn   = mock_partition_fn,
-                                    args = [
-                                            ?SQL_PARAM{name = [Name2]},
-                                            15,
-                                            m
-                                           ],
-                                    type = timestamp
-                                   }
-                       ]},
-    DDL = make_ddl(<<"function_partition_key_test">>,
-                   [
-                    #riak_field_v1{name     = Name2,
-                                   position = 1,
-                                   type     = timestamp},
-                    #riak_field_v1{name     = <<"sherk">>,
-                                   position = 2,
-                                   type     = varchar},
-                    #riak_field_v1{name     = Name1,
-                                   position = 3,
-                                   type     = varchar}
-                   ],
-                   PK),
-    {module, _Module} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Obj = {1234567890, <<"two">>, <<"three">>},
-    Result = (catch get_partition_key(DDL, Obj)),
-    %% Yes the mock partition function is actually computed
-    %% read the actual code, lol
-    Expected = [{varchar, <<"three">>}, {timestamp, mock_result}],
-    ?assertEqual(Expected, Result).
 
 %%
 %% get local_key tests
@@ -1196,58 +1199,33 @@ make_ts_keys_4_test() ->
 %%
 
 partial_wildcard_check_selections_valid_test() ->
-    Selections  = [{identifier, [<<"*">>]}],
-    DDL = make_ddl(<<"partial_wildcard_check_selections_valid_test">>,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"geohash">>,
-                                   position = 2,
-                                   type     = sint64}
-                   ]),
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE partial_wildcard_check_selections_valid_test("
+        "temperature SINT64 NOT NULL, "
+        "geohash SINT64 NOT NULL, "
+        "PRIMARY KEY ((temperature, geohash), temperature, geohash))"
+    )),
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
-       true,
-       are_selections_valid(Mod, Selections, ?CANTBEBLANK)
-      ).
-
-%% FIXME this cannot happen because SQL without selections cannot be lexed
-partial_check_selections_valid_fail_test() ->
-    Selections  = [],
-    DDL = make_ddl(<<"partial_check_selections_valid_fail_test">>,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"geohash">>,
-                                   position = 2,
-                                   type     = sint64}
-                   ]),
-    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    ?assertEqual(
-       {false, [{selections_cant_be_blank, []}]},
-       are_selections_valid(Mod, Selections, ?CANTBEBLANK)
-      ).
+         true,
+         are_selections_valid(Mod, [{identifier, [<<"*">>]}], ?CANTBEBLANK)
+    ).
 
 %%
 %% Query Validation tests
 %%
 
 simple_is_query_valid_test() ->
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE simple_is_query_valid_test("
+        "temperature SINT64 NOT NULL, "
+        "geohash SINT64 NOT NULL, "
+        "PRIMARY KEY ((temperature, geohash), temperature, geohash))"
+    )),
+    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     Bucket = <<"simple_is_query_valid_test">>,
     Selections  = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
     Query = {Bucket, Selections, [], undefined},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"geohash">>,
-                                   position = 2,
-                                   type     = sint64}
-                   ]),
-    {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
     ?assertEqual(
        true,
        riak_ql_ddl:is_query_valid(Mod, DDL, Query)
@@ -1256,6 +1234,7 @@ simple_is_query_valid_test() ->
 %%
 %% Tests for queries with non-null filters
 %%
+
 simple_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
     Selections = [{identifier, [<<"temperature">>]}, {identifier, [<<"geohash">>]}],
@@ -1266,18 +1245,14 @@ simple_filter_query_test() ->
              }
             ],
     Query = {Bucket, Selections, Where, undefined},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"geohash">>,
-                                   position = 2,
-                                   type     = sint64}
-                   ]),
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE simple_filter_query_test("
+        "temperature SINT64 NOT NULL, "
+        "geohash SINT64 NOT NULL, "
+        "PRIMARY KEY ((temperature, geohash), temperature, geohash))"
+    )),
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
-    ?assertEqual(true, Res).
+    ?assertEqual(true, riak_ql_ddl:is_query_valid(Mod, DDL, Query)).
 
 full_filter_query_test() ->
     Bucket = <<"simple_filter_query_test">>,
@@ -1294,24 +1269,17 @@ full_filter_query_test() ->
                  {'>=', <<"gte field">>,  {integer, 15}}}}}}
             ],
     Query = {Bucket, Selections, Where, undefined},
-    DDL = make_ddl(Bucket,
-                   [
-                    #riak_field_v1{name     = <<"temperature">>,
-                                   position = 1,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"ne field">>,
-                                   position = 2,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"lte field">>,
-                                   position = 3,
-                                   type     = sint64},
-                    #riak_field_v1{name     = <<"gte field">>,
-                                   position = 4,
-                                   type     = sint64}
-                   ]),
+    {ddl, DDL, _} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(
+        "CREATE TABLE simple_filter_query_test("
+        "temperature SINT64 NOT NULL, "
+        "geohash SINT64 NOT NULL, "
+        "\"ne field\" SINT64 NOT NULL, "
+        "\"lte field\" SINT64 NOT NULL, "
+        "\"gte field\" SINT64 NOT NULL, "
+        "PRIMARY KEY ((temperature, geohash), temperature, geohash))"
+    )),
     {module, Mod} = riak_ql_ddl_compiler:compile_and_load_from_tmp(DDL),
-    Res = riak_ql_ddl:is_query_valid(Mod, DDL, Query),
-    ?assertEqual(true, Res).
+    ?assertEqual(true, riak_ql_ddl:is_query_valid(Mod, DDL, Query)).
 
 
 timeseries_filter_test() ->
@@ -1768,8 +1736,8 @@ fold_where_tree_test() ->
     Where = proplists:get_value(where, Parsed),
     ?assertEqual(
        [<<"myseries">>, <<"myfamily">>, <<"time">>, <<"time">>],
-       lists:reverse(fold_where_tree(Where, [],
-                                     fun({_, Field, _}, Acc) -> [Field | Acc] end))
+       lists:reverse(fold_where_tree(
+                                     fun(_, {_, Field, _}, Acc) -> [Field | Acc] end, [], Where))
       ).
 
 %%
@@ -1908,6 +1876,40 @@ get_minimum_capability_blob_test() ->
     ?assertEqual(
         v2,
         get_minimum_capability(DDL)
+    ).
+
+mapfold_where_tree_test() ->
+    ?assertEqual(
+        {{and_, a, b}, acc},
+        mapfold_where_tree(
+            fun(_, and_, Acc) -> {ok, Acc};
+               (_, F, Acc)    -> {F, Acc} end,
+            acc,
+            {and_, a, b})
+    ).
+
+mapfold_where_tree_eliminate_leaf_test() ->
+    ?assertEqual(
+        {a, acc},
+        mapfold_where_tree(
+            fun(_, and_, Acc) -> {ok, Acc};
+               (_, b, Acc)    -> {eliminate, Acc};
+               (_, F, Acc)    -> {F, Acc} end,
+            acc,
+            {and_, a, b})
+    ).
+
+mapfold_where_tree_skip_branch_test() ->
+    ?assertEqual(
+        {{and_, {or_, a, c}, b}, acc},
+        mapfold_where_tree(
+            %% or_ is skipped os function clause if a or c is process because it
+            %% should be skipped.
+            fun(_, and_, Acc) -> {ok, Acc};
+               (_, or_, Acc)  -> {skip, Acc};
+               (_, b, Acc)    -> {b, Acc} end,
+            acc,
+            {and_, {or_, a, c}, b})
     ).
 
 -endif.
