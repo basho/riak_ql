@@ -381,7 +381,7 @@ is_query_valid_result(Res) ->
       true, Res).
 
 -spec are_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
-    are_filters_valid(Mod, Where) ->
+are_filters_valid(Mod, Where) ->
     {_, Errors} = mapfold_where_tree(
         fun (_, Op, Acc_x) when Op == and_; Op == or_ ->
                 {ok, Acc_x};
