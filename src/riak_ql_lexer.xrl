@@ -104,6 +104,7 @@ Rules.
 {INSERT} : {token, {insert, list_to_binary(TokenChars)}}.
 {INTO} : {token, {into, list_to_binary(TokenChars)}}.
 {GROUP} : {token, {group, list_to_binary(TokenChars)}}.
+{GROUP_TIME} : {token, {group_time, list_to_binary(TokenChars)}}.
 {KEY} : {token, {key, list_to_binary(TokenChars)}}.
 {LAST} : {token, {last, list_to_binary(TokenChars)}}.
 {LIMIT} : {token, {limit, list_to_binary(TokenChars)}}.
