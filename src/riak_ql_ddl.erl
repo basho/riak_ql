@@ -471,6 +471,8 @@ are_selections_valid(Mod, Selections, _) ->
     end.
 
 %% Reported error types must be supported by the function syntax_error_to_msg2
+%% For functions, only the arity is checked, types are checked in the query
+%% compiler
 is_selection_column_valid(Mod, {identifier, X}, Acc) ->
     case Mod:is_field_valid(X) of
         true  ->
@@ -478,6 +480,11 @@ is_selection_column_valid(Mod, {identifier, X}, Acc) ->
         false ->
             [{unexpected_select_field, hd(X)} | Acc]
     end;
+is_selection_column_valid(_, {{sql_select_fn, 'TIME'}, [_,_]}, Acc) ->
+    Acc;
+is_selection_column_valid(_, {{sql_select_fn, 'TIME'}, Args}, Acc) ->
+    ExpectedArity = 2,
+    [{fn_called_with_wrong_arity, 'TIME', ExpectedArity, length(Args)} | Acc];
 is_selection_column_valid(_, {{window_agg_fn, Fn}, Args}, Acc) ->
     ArgLen = length(Args),
     case riak_ql_window_agg_fns:fn_arity(Fn) == ArgLen of
@@ -1877,5 +1884,18 @@ mapfold_where_tree_skip_branch_test() ->
             acc,
             {and_, {or_, a, c}, b})
     ).
+
+is_selection_column_valid_time_fn_test() ->
+    ?assertEqual(
+        [],
+        is_selection_column_valid(fake_mod_name, {{sql_select_fn, 'TIME'},[a,b]}, [])
+    ).
+
+is_selection_column_valid_time_fn_wrong_arity_test() ->
+    ?assertEqual(
+        [{fn_called_with_wrong_arity, 'TIME', 2, 3}],
+        is_selection_column_valid(fake_mod_name, {{sql_select_fn, 'TIME'},[a,b,c]}, [])
+    ).
+
 
 -endif.

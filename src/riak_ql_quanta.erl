@@ -43,7 +43,7 @@
 -type time_ms() :: non_neg_integer().
 %% A timestamp in millisconds representing number of millisconds from Unix epoch
 
--type time_unit() :: d | h | m | s.
+-type time_unit() :: d | h | m | s | ms.
 %%  The units of quantization available to quantum/3
 
 -type err() :: {error, term()}.
@@ -99,10 +99,13 @@ gen_quanta(N, Start, Slice, Acc) when is_integer(N) andalso N > 1 ->
 %% generate the starting timestamp of the range (quantum) in milliseconds since the epoch where the
 %% time belongs. Note that Time - Quanta is less than or equal to QuantaSize * Unit (in milliseconds).
 -spec quantum(time_ms(), non_neg_integer(), time_unit()) -> time_ms() | err().
-quantum(Time, QuantaSize, Unit) when Unit == d;
+quantum(Time, QuantaSize, Unit) when is_integer(Time) andalso
+                                     is_integer(QuantaSize) andalso
+                                     Unit == d;
                                      Unit == h;
                                      Unit == m;
-                                     Unit == s ->
+                                     Unit == s;
+                                     Unit == ms ->
     Ms = unit_to_ms(Unit),
     Diff = Time rem (QuantaSize*Ms),
     Time - Diff;
@@ -112,6 +115,7 @@ quantum(_, _, Unit) ->
 %% Convert an integer and a time unit in binary to millis, assumed from the unix
 %% epoch.
 -spec unit_to_millis(Value::integer(), Unit::binary() | time_unit()) -> integer() | error.
+unit_to_millis(V, U) when U == ms; U == <<"ms">> -> V;
 unit_to_millis(V, U) when U == s; U == <<"s">> -> V*1000;
 unit_to_millis(V, U) when U == m; U == <<"m">> -> V*1000*60;
 unit_to_millis(V, U) when U == h; U == <<"h">> -> V*1000*60*60;
@@ -130,7 +134,9 @@ ms_to_timestamp(Time) ->
     MicroSeconds = (Time rem 1000) * 1000,
     {0, Seconds, MicroSeconds}.
 
--spec unit_to_ms(s | m | h | d) -> time_ms().
+-spec unit_to_ms(time_unit()) -> time_ms().
+unit_to_ms(ms) ->
+    1;
 unit_to_ms(s) ->
     1000;
 unit_to_ms(m) ->

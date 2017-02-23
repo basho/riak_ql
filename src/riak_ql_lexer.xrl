@@ -5,6 +5,7 @@
 
 Definitions.
 
+ALTER = (A|a)(L|l)(T|t)(E|e)(R|r)
 AND = (A|a)(N|n)(D|d)
 ASC = (A|a)(S|s)(C|c)
 BLOB = (B|b)(L|l)(O|o)(B|b)
@@ -85,6 +86,7 @@ SEMICOLON = (\;)
 
 Rules.
 
+{ALTER} : {token, {alter, list_to_binary(TokenChars)}}.
 {AND} : {token, {and_, list_to_binary(TokenChars)}}.
 {ASC} : {token, {asc, list_to_binary(TokenChars)}}.
 {BLOB} : {token, {blob, list_to_binary(TokenChars)}}.
@@ -102,6 +104,7 @@ Rules.
 {INSERT} : {token, {insert, list_to_binary(TokenChars)}}.
 {INTO} : {token, {into, list_to_binary(TokenChars)}}.
 {GROUP} : {token, {group, list_to_binary(TokenChars)}}.
+{GROUP_TIME} : {token, {group_time, list_to_binary(TokenChars)}}.
 {KEY} : {token, {key, list_to_binary(TokenChars)}}.
 {LAST} : {token, {last, list_to_binary(TokenChars)}}.
 {LIMIT} : {token, {limit, list_to_binary(TokenChars)}}.

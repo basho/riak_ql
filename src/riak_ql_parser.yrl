@@ -5,6 +5,8 @@
 
 Nonterminals
 
+AlterTable
+AlterTableStatement
 Bucket
 CharacterLiteral
 ColumnConstraint
@@ -20,6 +22,7 @@ FieldElem
 Fields
 Funcall
 GroupBy
+GroupByClause
 Identifier
 Insert
 IsNotNull
@@ -53,6 +56,7 @@ TableProperties
 TableProperty
 TablePropertyList
 TablePropertyValue
+TimeFunc
 Val
 Vals
 Where
@@ -90,6 +94,7 @@ FieldValue
 
 Terminals
 
+alter
 and_
 asc
 asterisk
@@ -157,7 +162,16 @@ Endsymbol '$end'.
 Statement -> StatementWithoutSemicolon : '$1'.
 Statement -> StatementWithoutSemicolon semicolon : '$1'.
 
-GroupBy -> group by Fields: {group_by, '$3'}.
+GroupBy -> group by GroupByClause: {group_by, '$3'}.
+
+GroupByClause -> TimeFunc comma GroupByClause   : ['$1']++'$3'.
+GroupByClause -> Identifier comma GroupByClause : ['$1']++'$3'.
+GroupByClause -> asterisk   : return_error_flat("GROUP BY can only contain table columns and the time/2 function but '*' was found.").
+GroupByClause -> TimeFunc   : ['$1'].
+GroupByClause -> Identifier : ['$1'].
+
+TimeFunc -> Identifier left_paren FunArg right_paren         : make_group_by_hash_fn('$1', lists:flatten(['$3'])).
+TimeFunc -> Identifier left_paren FunArg FunArgN right_paren : make_group_by_hash_fn('$1', lists:flatten(['$3']++'$4')).
 
 Query -> Select WindowClause : make_window_clause('$1', '$2').
 Query -> Select              : make_window_clause('$1', make_orderby([], undefined, undefined)).
@@ -187,6 +201,7 @@ NullOrderSpec -> nulls last : {nulls_last, <<"nulls last">>}.
 
 StatementWithoutSemicolon -> Query           : convert('$1').
 StatementWithoutSemicolon -> TableDefinition : fix_up_keys('$1').
+StatementWithoutSemicolon -> AlterTableStatement : '$1'.
 StatementWithoutSemicolon -> Describe : '$1'.
 StatementWithoutSemicolon -> ShowCreateTable : '$1'.
 StatementWithoutSemicolon -> Explain : '$1'.
@@ -273,6 +288,7 @@ Comp -> lte                    : '$1'.
 Comp -> nomatch                : '$1'.
 %% Comp -> notapprox           : '$1'.
 
+AlterTable ->  alter table : alter_table.
 CreateTable -> create table : create_table.
 
 ShowTables -> show tables : [{type, show_tables}].
@@ -466,6 +482,13 @@ TablePropertyValue -> integer : '$1'.
 TablePropertyValue -> float : '$1'.
 TablePropertyValue -> character_literal : '$1'.
 
+%% ALTER TABLE STATEMENT
+
+%% We do not yet support modifying `TableContentsSource'
+AlterTableStatement ->
+    AlterTable Bucket with TableProperties :
+        alter_table_statement('$2', '$4').
+
 Erlang code.
 
 -record(outputs,
@@ -501,6 +524,8 @@ interpret_parse_result({error, _}=Err) ->
     Err;
 interpret_parse_result({ok, {?DDL{}=DDL, Props}}) ->
     {ddl, DDL, Props};
+interpret_parse_result({ok, {alter_table, TableName, _Changes, _Props}}) ->
+    {alter_table, TableName};
 interpret_parse_result({ok, Proplist}) ->
     extract_type(proplists:get_value(type, Proplist), Proplist).
 
@@ -547,7 +572,6 @@ convert(#outputs{type = create} = O) ->
 
 validate_select_query(Outputs) ->
     ok = assert_group_by_select(Outputs),
-    ok = assert_group_by_is_valid(Outputs),
     ok = assert_group_by_with_order_by(Outputs).
 
 %% If the query uses GROUP BY then check that the identifiers in the select
@@ -566,15 +590,6 @@ assert_group_by_select(#outputs{ fields = Fields, group_by = GroupBy }) ->
             return_error_flat("Field(s) " ++ string:join(IllegalIdentifiers,", ") ++ " are specified in the select statement but not the GROUP BY.")
     end.
 
-
-%%
-assert_group_by_is_valid(#outputs{ group_by = GroupBy }) ->
-    case lists:member({identifier, [<<"*">>]}, GroupBy) of
-        false ->
-            ok;
-        true ->
-            return_error_flat("GROUP BY can only contain table columns but '*' was found.")
-    end.
 
 assert_group_by_with_order_by(#outputs{group_by = GroupBy, order_by = OrderBy})
   when (GroupBy /= [] andalso OrderBy /= []) ->
@@ -683,6 +698,21 @@ make_insert({identifier, Table}, Fields, Values) ->
      {values, Values}
     ].
 
+make_group_by_hash_fn({identifier,<<"time">>}, [{identifier,_} = Col, {integer,_} = Quantum]) ->
+    {time_fn, Col, Quantum};
+make_group_by_hash_fn({identifier,<<"time">>}, [{integer,_}, {identifier,_}]) ->
+    return_error_flat(
+        "Arguments for GROUP BY time(..) were the wrong way round. Function signature is\n"
+        "  GROUP BY time(<column>, <duration unit><duration units>)\n"
+        "Example:\n"
+        "  GROUP BY time(mycolumn, 10m)");
+make_group_by_hash_fn({identifier,FnName}, Args) ->
+    return_error_flat(
+        "Unknown GROUP BY function ~ts/~p, supported function signatures are:\n"
+        "  GROUP BY time(<column>, <duration unit><duration units>)\n"
+        "Example:\n"
+        "  GROUP BY time(mycolumn, 10m)",
+        [FnName, length(Args)]).
 
 %% per Product Requirements
 %% "If NULLS LAST is specified, null values sort after all non-null
@@ -906,6 +936,8 @@ make_funcall({identifier, FuncName}, Args) ->
                            end,
             Args3 = [canonicalise_expr(X) || X <- Args2],
             {{window_agg_fn, Fn2}, Args3};
+        sql_select_fn ->
+            {{sql_select_fn, Fn}, Args};
         not_supported ->
             Msg2 = io_lib:format("Function not supported - '~s'.", [FuncName]),
             return_error(0, iolist_to_binary(Msg2))
@@ -931,6 +963,8 @@ get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
                              FuncName =:= 'STDDEV_SAMP' orelse
                              FuncName =:= 'STDDEV_POP' ->
     window_aggregate_fn;
+get_func_type('TIME') ->
+    sql_select_fn;
 get_func_type(FuncName) when is_atom(FuncName) ->
     not_supported.
 
@@ -1015,6 +1049,11 @@ make_table_definition({identifier, Table}, Contents, Properties) ->
     DDL2 = DDL1?DDL{
         minimum_capability = riak_ql_ddl:get_minimum_capability(DDL1) },
     {DDL2, validate_table_properties(Properties)}.
+
+alter_table_statement({identifier, Table}, Properties) ->
+    %% Include in this tuple an empty list of changes to be populated
+    %% in the future when we support changing column information.
+    {alter_table, Table, [], validate_table_properties(Properties)}.
 
 find_partition_key({table_element_list, Elements}) ->
     find_partition_key(Elements);
@@ -1281,6 +1320,7 @@ query_field_name(?SQL_PARAM{name = Field}) ->
 -spec return_error_flat(string()) -> no_return().
 return_error_flat(F) ->
     return_error_flat(F, []).
+
 -spec return_error_flat(string(), [term()]) -> no_return().
 return_error_flat(F, A) ->
     return_error(
