@@ -703,6 +703,8 @@ make_insert({identifier, Table}, Fields, Values) ->
      {values, Values}
     ].
 
+make_in_predicate(_, []) ->
+    return_error_flat("IN filters must have at least one value.");
 make_in_predicate(Identifier, [Val]) ->
     {expr, {'=', Identifier, Val}};
 make_in_predicate(Identifier, [Val|Tail]) ->

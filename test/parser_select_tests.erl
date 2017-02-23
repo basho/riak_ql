@@ -570,6 +570,13 @@ in_predicate_two_values_test() ->
             "SELECT * FROM mytab WHERE a IN ('oi', 'lol')"))
     ).
 
+in_predicate_with_no_values_returns_error_test() ->
+    ?assertEqual(
+        {error,{0,riak_ql_parser, <<"IN filters must have at least one value.">>}},
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens("SELECT * FROM mytab WHERE a IN ()"))
+    ).
+
+
 % FIXME RTS-1546
 % single_line_comment_single_line_in_multiline_comment_select_test() ->
 %     ?assertEqual(
