@@ -24,6 +24,7 @@ Funcall
 GroupBy
 GroupByClause
 Identifier
+InPredicate
 Insert
 IsNotNull
 IsNull
@@ -121,6 +122,7 @@ insert
 integer
 into
 is_
+in
 group
 key
 last
@@ -260,6 +262,7 @@ Funcall -> Identifier left_paren FunArg         right_paren : make_funcall('$1',
 Funcall -> Identifier left_paren asterisk       right_paren : make_funcall('$1', ['$3']).
 Funcall -> Identifier left_paren FunArg FunArgN right_paren : make_funcall('$1', ['$3'] ++ '$4').
 
+InPredicate -> Identifier in RowValueList : make_in_predicate('$1', lists:reverse(hd('$3'))).
 %% NullComp is termed NullPredicatePart2 in the SQL spec, however it is more
 %% clearly a NullComparator, so termed NullComp here.
 NullPredicate -> Vals NullComp : make_expr('$1', '$2').
@@ -364,6 +367,8 @@ TruthValue -> false : {boolean, false}.
 
 BooleanPrimary -> BooleanPredicand : '$1'.
 
+BooleanPredicand ->
+    InPredicate : '$1'.
 BooleanPredicand ->
     NullPredicate : '$1'.
 BooleanPredicand ->
@@ -697,6 +702,13 @@ make_insert({identifier, Table}, Fields, Values) ->
      {fields, FieldsWrappedIdentifiers},
      {values, Values}
     ].
+
+make_in_predicate(_, []) ->
+    return_error_flat("IN filters must have at least one value.");
+make_in_predicate(Identifier, [Val]) ->
+    {expr, {'=', Identifier, Val}};
+make_in_predicate(Identifier, [Val|Tail]) ->
+    {expr, {or_, {expr, {'=', Identifier, Val}}, make_in_predicate(Identifier, Tail)}}.
 
 make_group_by_hash_fn({identifier,<<"time">>}, [{identifier,_} = Col, {integer,_} = Quantum]) ->
     {time_fn, Col, Quantum};
