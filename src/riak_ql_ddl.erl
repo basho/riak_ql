@@ -383,7 +383,7 @@ is_query_valid_result(Res) ->
 -spec are_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
 are_filters_valid(Mod, Where) ->
     {_, Errors} = mapfold_where_tree(
-        fun (_, Op, Acc_x) when Op == and_; Op == or_ ->
+        fun (_, Op, Acc_x) when Op == and_; Op == or_; Op == root ->
                 {ok, Acc_x};
             (_, Clause, Acc) ->
                 {Clause, is_filters_field_valid(Mod, Clause, Acc)}
@@ -411,9 +411,16 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) when (Op == 
         false ->
             [{unexpected_where_field, Field} | Acc1]
     end;
+is_filters_field_valid(Mod, {_, Field, _}, Acc1) when is_binary(Field) ->
+    case Mod:is_field_valid([Field]) of
+        true  ->
+            Acc1;
+        false ->
+            [{unexpected_where_field, Field} | Acc1]
+    end;
 %% the case where field is [not] null is being tested
 is_filters_field_valid(Mod, {NullOp, {identifier, Field}}, Acc1) when NullOp =:= is_null orelse
-                                                                            NullOp =:= is_not_null ->
+                                                                      NullOp =:= is_not_null ->
     case Mod:is_field_valid([Field]) of
         true ->
             Acc1;
@@ -424,7 +431,7 @@ is_filters_field_valid(Mod, {NullOp, {identifier, Field}}, Acc1) when NullOp =:=
 is_filters_field_valid(_Mod, {_Op, _Field1, _Field2}, Acc1) when is_binary(_Field1), is_binary(_Field2) ->
     [{invalid_field_operation} | Acc1];
 %% the case where RHS is an expression on its own (LHS must still be a valid field)
-is_filters_field_valid(_, _, Acc1) ->
+is_filters_field_valid(_, _AST, Acc1) ->
     Acc1.
 
 normalise(Bin) when is_binary(Bin) ->
