@@ -401,12 +401,12 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type1, RHS_Val}}, Acc1) when (Op ==
     case Mod:is_field_valid([Field]) of
         true  ->
             ExpectedType = Mod:get_field_type([Field]),
-            RHS_type2 = sql_function_return_type(RHS_type1),
+            RHS_type2 = normalise_rhs_type(RHS_type1),
             Acc2 = case is_compatible_type(get_storage_type(ExpectedType), RHS_type2, normalise(RHS_Val)) of
                 true  -> Acc1;
-                false -> [{incompatible_type, Field, ExpectedType, RHS_type} | Acc1]
+                false -> [{incompatible_type, Field, ExpectedType, RHS_type2} | Acc1]
             end,
-            case is_compatible_operator(Op, get_storage_type(ExpectedType), RHS_type) of
+            case is_compatible_operator(Op, get_storage_type(ExpectedType), RHS_type2) of
                 true  -> Acc2;
                 false -> [{incompatible_operator, Field, ExpectedType, Op} | Acc2]
             end;
@@ -429,8 +429,10 @@ is_filters_field_valid(_Mod, {_Op, _Field1, _Field2}, Acc1) when is_binary(_Fiel
 is_filters_field_valid(_, _, Acc1) ->
     Acc1.
 
-normalise_rhs_type({sql_select_fn, FnName}) -> 
-normalise_rhs_type(RHS_type) -> RHS_type.
+normalise_rhs_type({sql_select_fn, FnName}) ->
+    sql_function_return_type(FnName);
+normalise_rhs_type(RHS_type) ->
+    RHS_type.
 
 normalise(Bin) when is_binary(Bin) ->
     string:to_lower(binary_to_list(Bin));
