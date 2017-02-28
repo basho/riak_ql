@@ -905,7 +905,7 @@ simple_invalid_sint64_test() ->
                                    type     = sint64}
                    ]),
     {module, Module} = compile_and_load_from_tmp(DDL),
-    Result = Module:validate_obj({999, -9999, 0,0}),
+    Result = Module:validate_obj({999, -9999, 0.0}),
     ?assertEqual(?INVALID, Result).
 
 simple_invalid_double_test() ->

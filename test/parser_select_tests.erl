@@ -600,3 +600,13 @@ select_with_arithmetic_in_where_clause_test() ->
         {where, [{'=', <<"a">>, {'+',{'integer', 10},{'integer',1}}}]},
         proplists:lookup(where, Parsed_query)
     ).
+
+where_clause_has_now_function_test() ->
+    Query_sql =
+        "SELECT * FROM mytab "
+        "WHERE a > now()",
+    {select, Parsed_query} = riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql)),
+    ?assertEqual(
+        {where, [{'>', <<"a">>, {{sql_select_fn, 'NOW'}, []}}]},
+        proplists:lookup(where, Parsed_query)
+    ).
