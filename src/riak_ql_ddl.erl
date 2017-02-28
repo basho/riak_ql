@@ -37,7 +37,8 @@
          get_minimum_capability/1,
          is_version_greater/2,
          make_module_name/1, make_module_name/2,
-         mapfold_where_tree/3
+         mapfold_where_tree/3,
+         sql_function_arity/1
         ]).
 
 -type external_field_type()         :: varchar | sint64 | double | timestamp | boolean | blob.
@@ -401,16 +402,17 @@ are_filters_valid(Mod, Where) ->
 
 is_filters_field_valid(_, {Op, {identifier,FieldName}, _}, Acc1) when (Op == '/' orelse Op == '+' orelse Op == '-' orelse Op == '*') ->
     [{arithmetic_on_identifier, FieldName} | Acc1];
-is_filters_field_valid(Mod, {Op, Field, {RHS_type, RHS_Val}}, Acc1) when (Op == '=' orelse Op == '!=' orelse Op == '>' orelse Op == '<' orelse Op == '>=' orelse Op == '<=')
+is_filters_field_valid(Mod, {Op, Field, {RHS_type1, RHS_Val}}, Acc1) when (Op == '=' orelse Op == '!=' orelse Op == '>' orelse Op == '<' orelse Op == '>=' orelse Op == '<=')
                                                                         andalso is_binary(Field) ->
     case Mod:is_field_valid([Field]) of
         true  ->
             ExpectedType = Mod:get_field_type([Field]),
-            Acc2 = case is_compatible_type(get_storage_type(ExpectedType), RHS_type, normalise(RHS_Val)) of
+            RHS_type2 = normalise_rhs_type(RHS_type1),
+            Acc2 = case is_compatible_type(get_storage_type(ExpectedType), RHS_type2, normalise(RHS_Val)) of
                 true  -> Acc1;
-                false -> [{incompatible_type, Field, ExpectedType, RHS_type} | Acc1]
+                false -> [{incompatible_type, Field, ExpectedType, RHS_type2} | Acc1]
             end,
-            case is_compatible_operator(Op, get_storage_type(ExpectedType), RHS_type) of
+            case is_compatible_operator(Op, get_storage_type(ExpectedType), RHS_type2) of
                 true  -> Acc2;
                 false -> [{incompatible_operator, Field, ExpectedType, Op} | Acc2]
             end;
@@ -437,8 +439,13 @@ is_filters_field_valid(Mod, {NullOp, {identifier, Field}}, Acc1) when NullOp =:=
 is_filters_field_valid(_Mod, {_Op, _Field1, _Field2}, Acc1) when is_binary(_Field1), is_binary(_Field2) ->
     [{invalid_field_operation} | Acc1];
 %% the case where RHS is an expression on its own (LHS must still be a valid field)
-is_filters_field_valid(_, _AST, Acc1) ->
+is_filters_field_valid(_, _, Acc1) ->
     Acc1.
+
+normalise_rhs_type({sql_select_fn, FnName}) ->
+    sql_function_return_type(FnName);
+normalise_rhs_type(RHS_type) ->
+    RHS_type.
 
 normalise(Bin) when is_binary(Bin) ->
     string:to_lower(binary_to_list(Bin));
@@ -493,11 +500,15 @@ is_selection_column_valid(Mod, {identifier, X}, Acc) ->
         false ->
             [{unexpected_select_field, hd(X)} | Acc]
     end;
-is_selection_column_valid(_, {{sql_select_fn, 'TIME'}, [_,_]}, Acc) ->
-    Acc;
-is_selection_column_valid(_, {{sql_select_fn, 'TIME'}, Args}, Acc) ->
-    ExpectedArity = 2,
-    [{fn_called_with_wrong_arity, 'TIME', ExpectedArity, length(Args)} | Acc];
+is_selection_column_valid(_, {{sql_select_fn, FnName}, Args}, Acc) ->
+    ExpectedArity = sql_function_arity(FnName),
+    ActualArity = length(Args),
+    case ExpectedArity == ActualArity of
+        true ->
+            Acc;
+        false ->
+            [{fn_called_with_wrong_arity, 'TIME', ExpectedArity,ActualArity} | Acc]
+    end;
 is_selection_column_valid(_, {{window_agg_fn, Fn}, Args}, Acc) ->
     ArgLen = length(Args),
     case riak_ql_window_agg_fns:fn_arity(Fn) == ArgLen of
@@ -523,6 +534,12 @@ is_selection_column_valid(_, {Op, _, _}, Acc) when is_atom(Op) ->
 is_selection_column_valid(_, Other, Acc) ->
     [{unknown_column_type, Other} | Acc].
 
+
+sql_function_arity('NOW') -> 0;
+sql_function_arity('TIME') -> 2.
+
+sql_function_return_type('NOW') -> timestamp;
+sql_function_return_type('TIME') -> timestamp.
 
 is_orderby_valid(_Mod, undefined) ->
     true;

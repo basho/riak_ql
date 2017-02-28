@@ -660,6 +660,7 @@ make_select({select, _SelectBytes},
                    end,
     FieldsWithoutExprs = [remove_exprs(X) || X <- FieldsAsList],
     FieldsWrappedIdentifiers = [wrap_identifier(X) || X <- FieldsWithoutExprs],
+    % ?debugFmt("GROUP BY FIELDS ~p",[GroupFields]),
     #outputs{type    = select,
              fields  = FieldsWrappedIdentifiers,
              buckets = Bucket,
@@ -963,11 +964,14 @@ canonicalise_expr({expr, X}) ->
 canonicalise_expr(X) ->
     X.
 
+
+%% synthetic functions which query compiler knows how to evaluate
 get_func_type('TIME') ->
-    %% a synthetic function which query compiler knows how to evaluate
     sql_select_fn;
+get_func_type('NOW') ->
+    sql_select_fn;
+%% functions defined in separate modules (riak_ql_*_fns)
 get_func_type(FuncName) ->
-    %% functions defined in separate modules (riak_ql_*_fns)
     Types = [Type || {Type, Mod} <- [{window_agg_fn, riak_ql_window_agg_fns},
                                      {inverse_distrib_fn, riak_ql_inverse_distrib_fns}],
                      lists:member(FuncName, Mod:supported_functions())],
@@ -988,6 +992,7 @@ canonicalise_fn(Fn) when is_binary(Fn)->
         error:badarg ->
             unsupported_function
     end.
+
 
 %% canonicalise_col({identifier, X}) -> {identifier, [X]};
 %% canonicalise_col(X)               -> X.
