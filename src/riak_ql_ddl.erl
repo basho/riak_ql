@@ -384,7 +384,7 @@ is_query_valid_result(Res) ->
 -spec are_filters_valid(module(), [filter()]) -> true | {false, [query_syntax_error()]}.
 are_filters_valid(Mod, Where) ->
     {_, Errors} = mapfold_where_tree(
-        fun (_, Op, Acc_x) when Op == and_; Op == or_ ->
+        fun (_, Op, Acc_x) when Op == and_; Op == or_; Op == root ->
                 {ok, Acc_x};
             (_, Clause, Acc) ->
                 {Clause, is_filters_field_valid(Mod, Clause, Acc)}
@@ -413,9 +413,16 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type1, RHS_Val}}, Acc1) when (Op ==
         false ->
             [{unexpected_where_field, Field} | Acc1]
     end;
+is_filters_field_valid(Mod, {_, Field, _}, Acc1) when is_binary(Field) ->
+    case Mod:is_field_valid([Field]) of
+        true  ->
+            Acc1;
+        false ->
+            [{unexpected_where_field, Field} | Acc1]
+    end;
 %% the case where field is [not] null is being tested
 is_filters_field_valid(Mod, {NullOp, {identifier, Field}}, Acc1) when NullOp =:= is_null orelse
-                                                                            NullOp =:= is_not_null ->
+                                                                      NullOp =:= is_not_null ->
     case Mod:is_field_valid([Field]) of
         true ->
             Acc1;
@@ -596,7 +603,7 @@ mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == and_; Op =
         {skip, Acc2} ->
             {{Op, LHS, RHS}, Acc2}
     end;
-mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == '='; Op == '+'; Op == '-'; Op == '/'; Op == '*';
+mapfold_where_tree2(Conditional, Fn, Acc1, {Op, LHS, RHS}) when Op == '='; Op == '!='; Op == '+'; Op == '-'; Op == '/'; Op == '*';
                                                                 Op == '>'; Op == '>=';
                                                                 Op == '<'; Op == '<=' ->
     {LHS_result, Acc2} = mapfold_where_tree2(Conditional, Fn, Acc1, LHS),
