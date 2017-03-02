@@ -50,10 +50,10 @@ fn_type_signature('PERCENTILE_DISC', [ColumnType, double])
   when ColumnType == sint64;
        ColumnType == double;
        ColumnType == timestamp -> ColumnType;
-fn_type_signature('PERCENTILE_CONT', [_ColumnType, double])
-  when _ColumnType == sint64;
-       _ColumnType == double;
-       _ColumnType == timestamp -> double;
+fn_type_signature('PERCENTILE_CONT', [ColumnType, double])
+  when ColumnType == sint64;
+       ColumnType == double;
+       ColumnType == timestamp -> double;
 fn_type_signature('MEDIAN', [ColumnType])
   when ColumnType == sint64;
        ColumnType == double;
@@ -115,7 +115,14 @@ fn_param_check('MODE', []) ->
     [[Min]] = ValuesAtF([{0, 1}]),
     largest_bin(Min, ValuesAtF, RowsTotal).
 
-%% this will be inefficient for ldb backends
+%% This will be inefficient for ldb backends (that is, when a qbuf is
+%% dumped to leveldb): in this function, we call ValuesAtF to retrieve
+%% one row at a time.  This means, each time it is called,
+%% `riak_kv_qry_buffers_ldb:fetch_rows` needs to seek from start and
+%% trundle all the way to the Nth position, and all over again to
+%% fetch N+1th row.  The obvious todo item it to either teach
+%% fetch_rows to cache iterators or, alternatively, fetch rows in
+%% chunks ourselves.
 largest_bin(Min, ValuesAtF, RowsTotal) ->
     largest_bin_({Min, 1, Min, 1}, ValuesAtF, 1, RowsTotal).
 
