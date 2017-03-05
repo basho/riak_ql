@@ -419,6 +419,9 @@ is_filters_field_valid(Mod, {Op, Field, {RHS_type1, RHS_Val}}, Acc1) when (Op ==
         false ->
             [{unexpected_where_field, Field} | Acc1]
     end;
+%% the case where two fields are being operated on
+is_filters_field_valid(_Mod, {_Op, _Field1, _Field2}, Acc1) when is_binary(_Field1), is_binary(_Field2) ->
+    [{invalid_field_operation} | Acc1];
 is_filters_field_valid(Mod, {_, Field, _}, Acc1) when is_binary(Field) ->
     case Mod:is_field_valid([Field]) of
         true  ->
@@ -435,9 +438,6 @@ is_filters_field_valid(Mod, {NullOp, {identifier, Field}}, Acc1) when NullOp =:=
         false ->
             [{unexpected_where_field, Field} | Acc1]
     end;
-%% the case where two fields are being operated on
-is_filters_field_valid(_Mod, {_Op, _Field1, _Field2}, Acc1) when is_binary(_Field1), is_binary(_Field2) ->
-    [{invalid_field_operation} | Acc1];
 %% the case where RHS is an expression on its own (LHS must still be a valid field)
 is_filters_field_valid(_, _, Acc1) ->
     Acc1.
