@@ -1,7 +1,7 @@
 %% -*- erlang -*-
 %%% @doc       Parser for the riak Time Series Query Language.
 %%% @author    gguthrie@basho.com
-%%% @copyright (C) 2016 Basho
+%%% @copyright (C) 2016, 2017 Basho
 
 Nonterminals
 
@@ -933,9 +933,12 @@ remove_exprs(A) ->
 
 %% Functions are disabled so return an error.
 make_funcall({identifier, FuncName}, Args) ->
-    Fn = canonicalise_window_aggregate_fn(FuncName),
+    Fn = canonicalise_fn(FuncName),
     case get_func_type(Fn) of
-        window_aggregate_fn ->
+        not_supported ->
+            Msg2 = io_lib:format("Function not supported - '~s'.", [FuncName]),
+            return_error(0, iolist_to_binary(Msg2));
+        FuncType ->
             %% FIXME this should be in the type checker in riak_kv_qry_compiler
             {Fn2, Args2} = case {Fn, Args} of
                                {'COUNT', [{asterisk, _Asterisk}]} ->
@@ -948,12 +951,7 @@ make_funcall({identifier, FuncName}, Args) ->
                                    {Fn, Args}
                            end,
             Args3 = [canonicalise_expr(X) || X <- Args2],
-            {{window_agg_fn, Fn2}, Args3};
-        sql_select_fn ->
-            {{sql_select_fn, Fn}, Args};
-        not_supported ->
-            Msg2 = io_lib:format("Function not supported - '~s'.", [FuncName]),
-            return_error(0, iolist_to_binary(Msg2))
+            {{FuncType, Fn2}, Args3}
     end;
 make_funcall(_, _) ->
     % make dialyzer stop erroring on no local return.
@@ -966,30 +964,35 @@ canonicalise_expr({expr, X}) ->
 canonicalise_expr(X) ->
     X.
 
-get_func_type(FuncName) when FuncName =:= 'AVG'    orelse
-                             FuncName =:= 'MEAN'   orelse
-                             FuncName =:= 'SUM'    orelse
-                             FuncName =:= 'COUNT'  orelse
-                             FuncName =:= 'MIN'    orelse
-                             FuncName =:= 'MAX'    orelse
-                             FuncName =:= 'STDDEV' orelse
-                             FuncName =:= 'STDDEV_SAMP' orelse
-                             FuncName =:= 'STDDEV_POP' ->
-    window_aggregate_fn;
+
+%% synthetic functions which query compiler knows how to evaluate
 get_func_type('TIME') ->
     sql_select_fn;
 get_func_type('NOW') ->
     sql_select_fn;
-get_func_type(FuncName) when is_atom(FuncName) ->
-    not_supported.
+%% functions defined in separate modules (riak_ql_*_fns)
+get_func_type(FuncName) ->
+    Types = [Type || {Type, Mod} <- [{window_agg_fn, riak_ql_window_agg_fns},
+                                     {inverse_distrib_fn, riak_ql_inverse_distrib_fns}],
+                     lists:member(FuncName, Mod:supported_functions())],
+    case Types of
+        [Type] ->
+            Type;
+        [] ->
+            not_supported
+    end.
 
-%% TODO
-%% this list to atom needs to change to list to existing atom
-%% once the fns that actually execute the Window_Aggregates Fns are written then the atoms
-%% will definetely be existing - but just not now
-%% also try/catch round it
-canonicalise_window_aggregate_fn(Fn) when is_binary(Fn)->
-     list_to_atom(string:to_upper(binary_to_list(Fn))).
+%%
+canonicalise_fn(Fn) when is_binary(Fn)->
+    _AtomsNowExisting =
+        [Mod:supported_functions() || Mod <- [riak_ql_window_agg_fns, riak_ql_inverse_distrib_fns]],
+    try
+        list_to_existing_atom(string:to_upper(binary_to_list(Fn)))
+    catch
+        error:badarg ->
+            unsupported_function
+    end.
+
 
 %% canonicalise_col({identifier, X}) -> {identifier, [X]};
 %% canonicalise_col(X)               -> X.

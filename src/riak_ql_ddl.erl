@@ -52,6 +52,9 @@
 -type null_comparator() :: is_null | is_not_null.
 
 -type selection_function() :: {{window_agg_fn, FunctionName::atom()}, [any()]}.
+-type inverse_distrib_function() :: {{inverse_distrib_fn, FunctionName::atom()},
+                                     [field_identifier()|data_value()]}.
+
 %% lexer-emitted data types
 -type data_value()       :: {integer, integer()}
                           | {float, float()}
@@ -63,6 +66,7 @@
 -type selection()  :: field_identifier()
                     | data_value()
                     | selection_function()
+                    | inverse_distrib_function()
                     | {expr, selection()}
                     | {negate, selection()}
                     | {relational_op(), selection(), selection()}
@@ -326,6 +330,8 @@ syntax_error_to_msg2({subexpressions_not_supported, Field, Op}) ->
     {"subexpressions_not_supported: expressions in where clause operators"
      " (~s ~s ...) are not supported.",
      [Field, Op]};
+syntax_error_to_msg2({unknown_column, Field}) ->
+    {"Unknown column \"~s\".", [Field]};
 syntax_error_to_msg2({unknown_column_type, Other}) ->
     {"Unexpected select column type ~p.", [Other]};
 syntax_error_to_msg2({invalid_field_operation}) ->
@@ -506,6 +512,14 @@ is_selection_column_valid(_, {{sql_select_fn, FnName}, Args}, Acc) ->
 is_selection_column_valid(_, {{window_agg_fn, Fn}, Args}, Acc) ->
     ArgLen = length(Args),
     case riak_ql_window_agg_fns:fn_arity(Fn) == ArgLen of
+        false ->
+            [{fn_called_with_wrong_arity, Fn, 1, length(Args)} | Acc];
+        true ->
+            Acc
+    end;
+is_selection_column_valid(_, {{inverse_distrib_fn, Fn}, Args}, Acc) ->
+    ArgLen = length(Args),
+    case riak_ql_inverse_distrib_fns:fn_arity(Fn) == ArgLen of
         false ->
             [{fn_called_with_wrong_arity, Fn, 1, length(Args)} | Acc];
         true ->

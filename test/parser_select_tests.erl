@@ -181,7 +181,7 @@ group_by_quantum_2_test() ->
         "GROUP BY time(a,1);",
     ?assertSelectPropsEqual(
         [{fields,
-            [{{sql_select_fn,'TIME'}, [{identifier,<<"a">>},{integer,1}]},
+            [{{sql_select_fn,'TIME'}, [{identifier,[<<"a">>]}, {integer,1}]},
              {{window_agg_fn,'COUNT'},[{identifier,[<<"*">>]}]}]
          }],
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
