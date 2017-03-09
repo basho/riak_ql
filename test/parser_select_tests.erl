@@ -187,6 +187,16 @@ group_by_quantum_2_test() ->
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 
+group_by_quantum_is_case_insensitive_test() ->
+    Query_sql =
+        "SELECT COUNT(*) FROM mytab "
+        "WHERE a = 1 "
+        "GROUP BY TIME(a,1);",
+    ?assertSelectPropsEqual(
+        [{group_by, [{time_fn, {identifier, <<"a">>}, {integer, 1}}]}],
+        riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
+    ).
+
 group_by_quantum_with_measure_test() ->
     Query_sql =
         "SELECT COUNT(*) FROM mytab "
@@ -213,7 +223,7 @@ group_by_quantum_unknown_function_test() ->
         "WHERE a = 1 "
         "GROUP BY derp(1m,a,r,p);",
     ?assertMatch(
-        {error,{0,riak_ql_parser, <<"Unknown GROUP BY function derp/4",_/binary>>}},
+        {error,{0,riak_ql_parser, <<"Unknown GROUP BY function DERP/4",_/binary>>}},
         riak_ql_parser:ql_parse(riak_ql_lexer:get_tokens(Query_sql))
     ).
 

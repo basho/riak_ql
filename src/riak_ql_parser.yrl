@@ -172,8 +172,8 @@ GroupByClause -> asterisk   : return_error_flat("GROUP BY can only contain table
 GroupByClause -> TimeFunc   : ['$1'].
 GroupByClause -> Identifier : ['$1'].
 
-TimeFunc -> Identifier left_paren FunArg right_paren         : make_group_by_hash_fn('$1', lists:flatten(['$3'])).
-TimeFunc -> Identifier left_paren FunArg FunArgN right_paren : make_group_by_hash_fn('$1', lists:flatten(['$3']++'$4')).
+TimeFunc -> Identifier left_paren FunArg right_paren         : make_group_by_hash_fn(identifier_to_upper('$1'), lists:flatten(['$3'])).
+TimeFunc -> Identifier left_paren FunArg FunArgN right_paren : make_group_by_hash_fn(identifier_to_upper('$1'), lists:flatten(['$3']++'$4')).
 
 Query -> Select WindowClause : make_window_clause('$1', '$2').
 Query -> Select              : make_window_clause('$1', make_orderby([], undefined, undefined)).
@@ -711,9 +711,9 @@ make_in_predicate(Identifier, [Val]) ->
 make_in_predicate(Identifier, [Val|Tail]) ->
     {expr, {or_, {expr, {'=', Identifier, Val}}, make_in_predicate(Identifier, Tail)}}.
 
-make_group_by_hash_fn({identifier,<<"time">>}, [{identifier,_} = Col, {integer,_} = Quantum]) ->
+make_group_by_hash_fn({identifier,<<"TIME">>}, [{identifier,_} = Col, {integer,_} = Quantum]) ->
     {time_fn, Col, Quantum};
-make_group_by_hash_fn({identifier,<<"time">>}, [{integer,_}, {identifier,_}]) ->
+make_group_by_hash_fn({identifier,<<"TIME">>}, [{integer,_}, {identifier,_}]) ->
     return_error_flat(
         "Arguments for GROUP BY time(..) were the wrong way round. Function signature is\n"
         "  GROUP BY time(<column>, <duration unit><duration units>)\n"
@@ -1340,3 +1340,9 @@ return_error_flat(F) ->
 return_error_flat(F, A) ->
     return_error(
       0, iolist_to_binary(io_lib:format(F, A))).
+
+identifier_to_upper({identifier, Name}) when is_binary(Name) ->
+    {identifier, << <<(char_to_upper(C))>> || <<C>> <= Name >>}.
+
+char_to_upper(C) when C >= $a, C =< $z -> C bxor $\s;
+char_to_upper(C) -> C.
