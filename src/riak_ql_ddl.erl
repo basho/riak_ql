@@ -167,25 +167,25 @@ maybe_mangle_char(C) ->
 get_table(?DDL{table = T}) ->
     T.
 
--spec get_partition_key(?DDL{}, tuple(data_value()), module()) -> [data_value()].
+-spec get_partition_key(?DDL{}, tuple(), module()) -> [data_value()].
 get_partition_key(?DDL{partition_key = PK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = PK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_partition_key(?DDL{}, tuple(data_value())) -> [data_value()].
+-spec get_partition_key(?DDL{}, tuple()) -> [data_value()].
 get_partition_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
     get_partition_key(DDL, Obj, Mod).
 
--spec get_local_key(?DDL{}, tuple(data_value()), module()) -> [data_value()].
+-spec get_local_key(?DDL{}, tuple(), module()) -> [data_value()].
 get_local_key(?DDL{local_key = LK}, Obj, Mod)
   when is_tuple(Obj) ->
     #key_v1{ast = Params} = LK,
     _Key = build(Params, Obj, Mod, []).
 
--spec get_local_key(?DDL{}, tuple(data_value())) -> [data_value()].
+-spec get_local_key(?DDL{}, tuple()) -> [data_value()].
 get_local_key(?DDL{table = T}=DDL, Obj)
   when is_tuple(Obj) ->
     Mod = make_module_name(T),
@@ -204,11 +204,11 @@ lk_to_pk(LKVals, Mod, ?DDL{local_key = #key_v1{ast = LKAst},
                            partition_key = PK}) ->
     KeyFields = [F || ?SQL_PARAM{name = [F]} <- LKAst],
     case {length(LKVals), length(KeyFields)} of
-        {_N, _N} ->
+        {_, _} ->
             LKPairs = lists:zip(KeyFields, LKVals),
             PKVals = [V || {_Type, V} <- make_key(Mod, PK, LKPairs)],
             {ok, PKVals};
-        {Got, Need} ->
+        {Got, Need} when Got =< 0, Need =< 0 ->
             {error, {bad_key_length, Got, Need}}
     end.
 
@@ -249,7 +249,7 @@ extract([?SQL_PARAM{name = [Nm], ordering = Ordering} | T], Vals, Acc) ->
 extract([Constant | T], Vals, Acc) ->
     extract(T, Vals, [Constant | Acc]).
 
--spec build([?SQL_PARAM{}], tuple(data_value()), module(), [data_value()]) -> [data_value()].
+-spec build([?SQL_PARAM{}], tuple(), module(), [data_value()]) -> [data_value()].
 build([], _Obj, _Mod, A) ->
     lists:reverse(A);
 build([?SQL_PARAM{name = Nm, ordering = Ordering} | T], Obj, Mod, A) ->
